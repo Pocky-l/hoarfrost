@@ -231,6 +231,18 @@ public final class ModGameTests {
     }
 
     @GameTest(template = "field", skyAccess = true)
+    public static void snowLiesOnPowderSnow(GameTestHelper helper) {
+        floor(helper);
+        helper.setBlock(new BlockPos(12, 1, 12), Blocks.POWDER_SNOW);
+        SnowSimulation sim = simulation(helper);
+        calm(sim, SnowType.SNOWFALL);
+        Vec3 on = helper.absoluteVec(new Vec3(12.5, 2.0, 12.5));
+        float top = sim.cover().topAt(on.x, on.z);
+        helper.assertTrue(Math.abs(top - on.y) < 0.01, "snow lies on the powder snow, not under it: " + (top - on.y));
+        helper.succeed();
+    }
+
+    @GameTest(template = "field", skyAccess = true)
     public static void flakeLandsOnTheGround(GameTestHelper helper) {
         floor(helper);
         SnowSimulation sim = simulation(helper);

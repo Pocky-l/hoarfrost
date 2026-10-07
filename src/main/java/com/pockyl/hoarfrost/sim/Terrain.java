@@ -247,7 +247,8 @@ public final class Terrain {
             if (!state.getFluidState().isEmpty()) {
                 return Double.NaN;
             }
-            boolean layer = state.getBlock() instanceof SnowLayerBlock;
+            // Snow layers and powder snow have no (or a lower) collision box but are snow to stand on in looks.
+            boolean layer = state.getBlock() instanceof SnowLayerBlock || state.is(Blocks.POWDER_SNOW);
             if (!layer && shapes.boxes(state, level, cursor).length == 0) {
                 continue;
             }
@@ -264,7 +265,7 @@ public final class Terrain {
             }
             if (state.is(BlockTags.LEAVES)) {
                 kind[0] = CoverChunk.LEAVES;
-            } else if (layer || state.is(Blocks.SNOW_BLOCK) || state.is(Blocks.POWDER_SNOW)) {
+            } else if (layer || state.is(Blocks.SNOW_BLOCK)) {
                 kind[0] = CoverChunk.ON_SNOW;
             }
             return by + best;
