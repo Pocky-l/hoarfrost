@@ -10,7 +10,7 @@ import com.pockyl.hoarfrost.sim.FlakePool;
 
 /**
  * Writes the flakes and grains of the simulation as camera-facing quads in the particle vertex format, interpolated
- * between ticks. Flakes have their real size - a few millimetres to a few centimetres - and soft shapes: specks, clumps
+ * between ticks. Flakes are a little larger than life - two to nine centimetres - with soft shapes: specks, clumps
  * and, in light calm snow, six-armed crystals that turn and tumble as they fall. Far away a flake never gets smaller
  * than about a pixel and a half, so the snowfall does not vanish into the distance; a flake right in front of the eye
  * is out of focus (a soft, faint blob); a flake driven fast across the view (a blizzard) is drawn as a streak, as the
@@ -25,10 +25,10 @@ final class FlakeRenderer {
     private static final int BLOB = 5;
     private static final int GRAIN = 6;
     private static final int STREAK = 7;
-    /** Blocks per unit of a flake's size (the simulation's sizes are in "pixels"): size 1 is about 11 mm. */
-    private static final float SCALE = 0.011F;
-    /** Smallest size on screen, as a share of the distance: about two pixels at 1080p. */
-    private static final float MIN_ANGLE = 0.0024F;
+    /** Blocks per unit of a flake's size (the simulation's sizes are in "pixels"): size 1 is about 22 mm. */
+    private static final float SCALE = 0.022F;
+    /** Smallest size on screen, as a share of the distance: about two and a half pixels at 1080p. */
+    private static final float MIN_ANGLE = 0.003F;
     /** The shapes fill this much of their sprite. */
     private static final float FILL = 0.7F;
     private static final float NEAR = 0.45F;
