@@ -47,7 +47,7 @@ public final class SnowCover {
     private static final float MELT_LIGHT = 2.5E-4F;
     private static final float MELT_HOT = 0.01F;
     /** Share of the loose snow under a foot that is pushed aside into a rim around the print. */
-    private static final float PUSHED = 0.35F;
+    private static final float PUSHED = 0.18F;
     private static final int MELT_LIGHT_MIN = 11;
     private static final int MAX_DT = 600;
     private static final int PATCH_SEED = 0x5E0D;
@@ -677,17 +677,6 @@ public final class SnowCover {
             deposit(cell(x + dirX * (halfL + CELL * 0.7)), cell(z + dirZ * (halfL + CELL * 0.7)), level, share);
         }
         return cells == 0 ? 0.0F : sank / cells;
-    }
-
-    /** Leaves the shape of a foot in the snow it pressed (drawn as a print until new snow fills it in). */
-    public void addPrint(double x, double y, double z, float yaw, float size) {
-        CoverChunk chunk = chunk(Mth.floor(x) >> 4, Mth.floor(z) >> 4);
-        float top = topNear(x, y, z);
-        if (chunk == null || Float.isNaN(top)) {
-            return;
-        }
-        chunk.addPrint(x, z, yaw, size, top);
-        chunk.changed(index(cell(x), cell(z)), 1.0F, true);
     }
 
     /**

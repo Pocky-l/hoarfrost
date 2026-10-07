@@ -63,6 +63,8 @@ public final class SnowClient {
     private static final int SAVE_INTERVAL = 20 * 30;
     private static final long SEED_BUDGET_NANOS = 4_000_000L;
     private static final float STEP_VOLUME = 0.25F;
+    /** How far one sees in the heart of a squall of snow. */
+    private static final float SQUALL_VISIBILITY = 14.0F;
 
     private static final SnowSettings SETTINGS = new SnowSettings();
     /** Distance walked since the last footprint and which foot is next, per entity. */
@@ -151,7 +153,7 @@ public final class SnowClient {
         }
         feedEntities(camera);
         simulation.tick(level, camera.x, camera.y, camera.z);
-        SnowSounds.tick(level, camera);
+        SnowSounds.tick(level, camera, simulation.air().gusts());
         if (ticks % SAVE_INTERVAL == 0) {
             save(camera);
         }
@@ -409,12 +411,23 @@ public final class SnowClient {
             return;
         }
         float far = event.getFarPlaneDistance();
+        float newFar = far;
         float target = ClientSnow.visibility * 1.2F;
-        if (target >= far) {
+        float k = (float) Math.min(1.0, snow * Math.sqrt(Math.max(ClientSnow.gust(), 0.0F)) * strength);
+        if (target < far) {
+            newFar = far + (target - far) * k;
+        }
+        // Inside a squall of snow the world is gone for a moment.
+        Vec3 eye = event.getCamera().getPosition();
+        float squall = simulation == null ? 0.0F
+                : simulation.air().gustAt(eye.x, eye.y, eye.z) * ClientSnow.skyView(partialTick) * (float) Math.min(1.0, strength);
+        if (squall > 0.0F) {
+            newFar = Math.min(newFar, Mth.lerp(Math.min(1.0F, squall * 1.6F), far, SQUALL_VISIBILITY));
+            k = Math.max(k, squall);
+        }
+        if (newFar >= far) {
             return;
         }
-        float k = (float) Math.min(1.0, snow * Math.sqrt(Math.max(ClientSnow.gust(), 0.0F)) * strength);
-        float newFar = far + (target - far) * k;
         if (event.getMode() == FogRenderer.FogMode.FOG_SKY) {
             // The sky itself disappears in a whiteout.
             event.setFarPlaneDistance(newFar);
@@ -428,6 +441,7 @@ public final class SnowClient {
         event.setNearPlaneDistance(Math.max(0.0F, newNear));
         event.setCanceled(true);
     }
+
 
     @SubscribeEvent
     public static void onFogColor(ViewportEvent.ComputeFogColor event) {

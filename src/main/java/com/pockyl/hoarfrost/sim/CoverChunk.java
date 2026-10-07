@@ -25,9 +25,7 @@ public final class CoverChunk {
     public static final int TILE = 32;
     private static final int TILE_SHIFT = 5;
     public static final int TILES = SIZE / TILE;
-    private static final int FORMAT = 5;
-    /** Most footprints kept per chunk; the oldest make room for new ones. */
-    public static final int MAX_PRINTS = 256;
+    private static final int FORMAT = 6;
     /** Depths are stored in 1/4096 of a block. */
     private static final float QUANTUM = 1.0F / 4096.0F;
     /** Changes of depth smaller than this (a fifth of a pixel) are not redrawn on their own. */
@@ -58,18 +56,6 @@ public final class CoverChunk {
     public final float[] mouthZ = new float[256];
     /** Incremented whenever the look of a tile changes; the renderer rebuilds tiles whose revision moved. */
     public final int[] tileRevision = new int[TILES * TILES];
-
-    /**
-     * Footprints: position inside the chunk (blocks), heading, size (blocks), and the height of the snow
-     * right after the foot left - new snow on top of that fills the print in.
-     */
-    public final float[] printX = new float[MAX_PRINTS];
-    public final float[] printZ = new float[MAX_PRINTS];
-    public final float[] printYaw = new float[MAX_PRINTS];
-    public final float[] printSize = new float[MAX_PRINTS];
-    public final float[] printTop = new float[MAX_PRINTS];
-    int printCount;
-    int printNext;
 
     boolean surfaces;
     boolean seeded;
@@ -179,22 +165,6 @@ public final class CoverChunk {
         return sum;
     }
 
-    public int printCount() {
-        return printCount;
-    }
-
-    /** Adds a footprint at a world position, replacing the oldest when full. */
-    void addPrint(double x, double z, float yaw, float size, float top) {
-        int p = printNext;
-        printNext = (printNext + 1) % MAX_PRINTS;
-        printCount = Math.min(MAX_PRINTS, printCount + 1);
-        printX[p] = (float) (x - this.x * 16);
-        printZ[p] = (float) (z - this.z * 16);
-        printYaw[p] = yaw;
-        printSize[p] = size;
-        printTop[p] = top;
-    }
-
     public boolean seeded() {
         return seeded;
     }
@@ -246,15 +216,6 @@ public final class CoverChunk {
                 out.writeByte(kind[i]);
             }
         }
-        out.writeShort(printCount);
-        for (int n = 0; n < printCount; n++) {
-            int p = Math.floorMod(printNext - printCount + n, MAX_PRINTS);
-            out.writeFloat(printX[p]);
-            out.writeFloat(printZ[p]);
-            out.writeFloat(printYaw[p]);
-            out.writeFloat(printSize[p]);
-            out.writeFloat(printTop[p]);
-        }
     }
 
     private static int quantize(float depth) {
@@ -280,16 +241,6 @@ public final class CoverChunk {
             chunk.packed[i] = in.readUnsignedShort() * QUANTUM;
             chunk.kind[i] = in.readByte();
         }
-        int prints = Math.min(MAX_PRINTS, in.readUnsignedShort());
-        for (int p = 0; p < prints; p++) {
-            chunk.printX[p] = in.readFloat();
-            chunk.printZ[p] = in.readFloat();
-            chunk.printYaw[p] = in.readFloat();
-            chunk.printSize[p] = in.readFloat();
-            chunk.printTop[p] = in.readFloat();
-        }
-        chunk.printCount = prints;
-        chunk.printNext = prints % MAX_PRINTS;
         return chunk;
     }
 }

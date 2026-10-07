@@ -166,7 +166,7 @@ public final class ModGameTests {
     }
 
     @GameTest(template = "field", skyAccess = true)
-    public static void footPushesARimAndLeavesAPrint(GameTestHelper helper) {
+    public static void footPushesARim(GameTestHelper helper) {
         floor(helper);
         SnowSimulation sim = simulation(helper);
         calm(sim, SnowType.SNOWFALL);
@@ -180,9 +180,7 @@ public final class ModGameTests {
                 rim = Math.max(rim, sim.cover().depthAt(foot.x + dx, footZ + dz));
             }
         }
-        helper.assertTrue(rim > 0.205F, "snow pushed aside forms a rim, deepest beside the print " + rim);
-        CoverChunk chunk = sim.cover().chunk((int) Math.floor(foot.x) >> 4, (int) Math.floor(footZ) >> 4);
-        helper.assertTrue(chunk != null && chunk.printCount() == 1, "the foot left a print");
+        helper.assertTrue(rim > 0.201F, "snow pushed aside forms a rim, deepest beside the print " + rim);
         helper.succeed();
     }
 
@@ -485,6 +483,25 @@ public final class ModGameTests {
                 "lee of the wall has " + drift);
         helper.assertTrue(level.getBlockState(open).isAir(), "open ground stays bare");
         helper.assertTrue(level.getBlockState(roofed).isAir(), "no drift under a roof");
+        helper.succeed();
+    }
+
+    @GameTest(template = "field", skyAccess = true)
+    public static void squallCarriesTheAirAlong(GameTestHelper helper) {
+        floor(helper);
+        SnowSimulation sim = simulation(helper);
+        calm(sim, SnowType.SNOWFALL);
+        sim.air().setTurbulence(false);
+        Vec3 center = helper.absoluteVec(new Vec3(12.0, 3.0, 12.0));
+        sim.air().addGust(center.x, center.y, center.z, 1.0F, 0.0F, 0.4F, 5.0F, 3.0F, 400);
+        float[] out = new float[3];
+        sim.air().sample(center.x, center.y, center.z, out);
+        float inside = out[0];
+        sim.air().sample(center.x, center.y, center.z + 9.0, out);
+        float outside = out[0];
+        helper.assertTrue(inside > 0.2F && inside > outside + 0.2F, "wind in the squall " + inside + " vs beside it " + outside);
+        helper.assertTrue(sim.air().gustAt(center.x, center.y, center.z) > 0.5F, "the heart of the squall is dense");
+        helper.assertTrue(sim.air().gustAt(center.x, center.y, center.z + 9.0) == 0.0F, "beside it there is nothing");
         helper.succeed();
     }
 

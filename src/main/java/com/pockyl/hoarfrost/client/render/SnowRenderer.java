@@ -14,8 +14,6 @@ import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.culling.Frustum;
 import org.joml.Matrix4f;
 
-import com.pockyl.hoarfrost.ClientConfig;
-import com.pockyl.hoarfrost.client.ClientSnow;
 import com.pockyl.hoarfrost.sim.SnowSimulation;
 
 /**

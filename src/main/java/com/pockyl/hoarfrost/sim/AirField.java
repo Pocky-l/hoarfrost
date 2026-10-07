@@ -26,12 +26,15 @@ public final class AirField {
     private static final int TURBULENCE_SEED = 0x7A51;
     private static final int MAX_WHIRLS = 3;
     private static final int MAX_WAKES = 24;
+    public static final int MAX_GUSTS = 3;
     private static final int LEE_REACH = 8;
 
     private final Terrain terrain;
     private final SnowWeather weather;
     private final List<Whirl> whirls = new ArrayList<>();
     private final List<Blast> blasts = new ArrayList<>();
+    private final List<Gust> gusts = new ArrayList<>();
+    private int nextGustId = 1;
     private final double[] wakes = new double[MAX_WAKES * 7];
     private int wakeCount;
     private float time;
@@ -71,6 +74,70 @@ public final class AirField {
         /** 0..1, fading in and out. */
         public float intensity() {
             return Math.min(1.0F, Math.min(age, life - age) / 30.0F);
+        }
+    }
+
+    /**
+     * A squall of snow: a gust of wind that gathers the snow into a dense cloud and carries it along the ground, rolling
+     * - in a blizzard every few seconds, in a quiet snowfall now and then a soft puff. It comes from upwind, follows the
+     * land at about head height, passes over (or through) the player and dies away.
+     */
+    public static final class Gust {
+        public final int id;
+        public double x;
+        public double y;
+        public double z;
+        public final float dirX;
+        public final float dirZ;
+        public final float speed;
+        /** Half sizes: across the ground and up. */
+        public final float radius;
+        public final float height;
+        public final float strength;
+        /** Which way it rolls. */
+        final float roll;
+        final int life;
+        int age;
+
+        Gust(int id, double x, double y, double z, float dirX, float dirZ, float speed, float radius, float height, float strength,
+                float roll, int life) {
+            this.id = id;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.dirX = dirX;
+            this.dirZ = dirZ;
+            this.speed = speed;
+            this.radius = radius;
+            this.height = height;
+            this.strength = strength;
+            this.roll = roll;
+            this.life = life;
+        }
+
+        /** 0..1: it builds up, holds and dies away. */
+        public float envelope() {
+            float t = age / (float) life;
+            float in = Math.min(1.0F, t / 0.15F);
+            float out = Math.min(1.0F, (1.0F - t) / 0.3F);
+            return Math.max(0.0F, Math.min(in, out));
+        }
+
+        /** How deep a point is inside the cloud, 0 (outside) .. 1 (in its heart), with the envelope. */
+        public float inside(double px, double py, double pz) {
+            double dx = px - x;
+            double dy = py - y;
+            double dz = pz - z;
+            double d = (dx * dx + dz * dz) / (radius * radius) + dy * dy / (height * height);
+            if (d >= 1.0) {
+                return 0.0F;
+            }
+            float f = (float) (1.0 - d);
+            return f * f * envelope();
+        }
+
+        public boolean done() {
+            return age >= life;
         }
     }
 
@@ -122,7 +189,7 @@ public final class AirField {
         }
     }
 
-    void tick(int tick, FastRandom random, double cameraX, double cameraZ, boolean allowWhirls) {
+    void tick(int tick, FastRandom random, double cameraX, double cameraZ, boolean allowWhirls, boolean allowGusts) {
         time = tick;
         speed = weather.windSpeed();
         if (speed > 1.0E-4F) {
@@ -152,6 +219,7 @@ public final class AirField {
                 whirl.y = terrain.height(bx, bz);
             }
         }
+        tickGusts(random, cameraX, cameraZ, allowGusts);
         // Whirls rise where strong wind meets the ground and does not stay long.
         float strong = Mth.clamp((speed - 0.18F) / 0.25F, 0.0F, 1.0F);
         if (allowWhirls && strong > 0.0F && whirls.size() < MAX_WHIRLS && random.next() < strong * weather.snow / (20.0F * 25.0F)) {
@@ -166,6 +234,71 @@ public final class AirField {
                         0.16F + random.next() * 0.18F, random.next() < 0.5F ? -1.0F : 1.0F, 50 + (int) (random.next() * 120)));
             }
         }
+    }
+
+    private void tickGusts(FastRandom random, double cameraX, double cameraZ, boolean spawn) {
+        for (Iterator<Gust> it = gusts.iterator(); it.hasNext(); ) {
+            Gust gust = it.next();
+            if (++gust.age >= gust.life) {
+                it.remove();
+                continue;
+            }
+            gust.x += gust.dirX * gust.speed;
+            gust.z += gust.dirZ * gust.speed;
+            if ((gust.age & 7) == 0) {
+                // Hugging the land: its middle stays about head height above the ground below it.
+                int bx = Mth.floor(gust.x);
+                int bz = Mth.floor(gust.z);
+                if (terrain.isLoaded(bx, bz)) {
+                    gust.y += (terrain.height(bx, bz) + gust.height * 0.45 - gust.y) * 0.3;
+                }
+            }
+        }
+        float chance = weather.snow * (0.2F + weather.gustiness) * (0.15F + speed) / 90.0F;
+        if (!spawn || gusts.size() >= MAX_GUSTS || random.next() >= chance) {
+            return;
+        }
+        float dirX = speed > 1.0E-3F ? this.dirX : 1.0F;
+        float dirZ = speed > 1.0E-3F ? this.dirZ : 0.0F;
+        float travel = 35.0F + random.next() * 15.0F;
+        float side = (random.next() - 0.5F) * 30.0F;
+        double x = cameraX - dirX * travel - dirZ * side;
+        double z = cameraZ - dirZ * travel + dirX * side;
+        int bx = Mth.floor(x);
+        int bz = Mth.floor(z);
+        if (!terrain.isLoaded(bx, bz) || !terrain.snowy(bx, bz)) {
+            return;
+        }
+        float storm = Mth.clamp(speed / 0.5F, 0.0F, 1.0F);
+        float radius = 3.5F + random.next() * (3.0F + 5.0F * storm);
+        float height = 2.5F + random.next() * (1.5F + 3.0F * storm);
+        float gustSpeed = Math.max(0.08F, speed * (1.2F + 0.4F * random.next()));
+        int life = Math.min(1600, (int) ((travel + 40.0F) / gustSpeed));
+        gusts.add(new Gust(nextGustId++, x, terrain.height(bx, bz) + height * 0.45, z, dirX, dirZ, gustSpeed, radius, height,
+                0.45F + 0.55F * random.next(), random.next() < 0.5F ? -1.0F : 1.0F, life));
+    }
+
+    /** The squalls of snow passing now. */
+    public List<Gust> gusts() {
+        return gusts;
+    }
+
+    /** A squall at a spot moving along a direction (tests). */
+    public Gust addGust(double x, double y, double z, float dirX, float dirZ, float gustSpeed, float radius, float height, int life) {
+        Gust gust = new Gust(nextGustId++, x, y, z, dirX, dirZ, gustSpeed, radius, height, 1.0F, 1.0F, life);
+        gust.age = life / 4;
+        gusts.add(gust);
+        return gust;
+    }
+
+    /** The strongest squall at a point, 0..1 (how deep inside a snow cloud it is). */
+    public float gustAt(double x, double y, double z) {
+        float strongest = 0.0F;
+        for (int g = 0; g < gusts.size(); g++) {
+            Gust gust = gusts.get(g);
+            strongest = Math.max(strongest, gust.inside(x, y, z) * gust.strength);
+        }
+        return strongest;
     }
 
     /** Starts the air pulse of an explosion. */
@@ -300,6 +433,9 @@ public final class AirField {
         for (int w = 0; w < whirls.size(); w++) {
             addWhirl(whirls.get(w), x, y, z, out);
         }
+        for (int g = 0; g < gusts.size(); g++) {
+            addGust(gusts.get(g), x, y, z, out);
+        }
         for (int b = 0; b < blasts.size(); b++) {
             blasts.get(b).add(x, y, z, out);
         }
@@ -354,6 +490,24 @@ public final class AirField {
         out[1] += push * 0.4F;
     }
 
+    /** Inside a squall: the wind is stronger along it, and the air rolls over - up at its front, down at its back. */
+    private static void addGust(Gust gust, double x, double y, double z, float[] out) {
+        float f = gust.inside(x, y, z) * gust.strength;
+        if (f <= 0.0F) {
+            return;
+        }
+        float push = gust.speed * 0.9F * f;
+        out[0] += gust.dirX * push;
+        out[2] += gust.dirZ * push;
+        // Rolling about the horizontal axis across the gust.
+        float along = (float) ((x - gust.x) * gust.dirX + (z - gust.z) * gust.dirZ) / gust.radius;
+        float up = (float) (y - gust.y) / gust.height;
+        float roll = gust.roll * gust.speed * 0.6F * f;
+        out[1] += along * roll;
+        out[0] -= gust.dirX * up * roll;
+        out[2] -= gust.dirZ * up * roll;
+    }
+
     private static void addWhirl(Whirl whirl, double x, double y, double z, float[] out) {
         float dx = (float) (x - whirl.x);
         float dz = (float) (z - whirl.z);
@@ -378,6 +532,7 @@ public final class AirField {
     }
 
     void reset() {
+        gusts.clear();
         whirls.clear();
         blasts.clear();
         wakeCount = 0;

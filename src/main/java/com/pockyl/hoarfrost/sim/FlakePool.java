@@ -46,6 +46,8 @@ public final class FlakePool {
     public final boolean[] retiring;
     /** 1 for flakes kept close around the camera (the dense snow right in front of the eyes), 0 for the rest. */
     public final byte[] zone;
+    /** The squall of snow a flake flies in (its id), 0 for the rest. */
+    public final int[] owner;
     /** Snow a falling clump carries to where it lands (blocks of depth for one cell), 0 for flakes and powder. */
     public final float[] mass;
     /** Ticks left for grains and settled flakes. */
@@ -85,6 +87,7 @@ public final class FlakePool {
         retiring = new boolean[capacity];
         life = new int[capacity];
         zone = new byte[capacity];
+        owner = new int[capacity];
         mass = new float[capacity];
         light = new int[capacity];
         free = new int[capacity];
@@ -110,6 +113,7 @@ public final class FlakePool {
         retiring[i] = false;
         life[i] = 0;
         zone[i] = 0;
+        owner[i] = 0;
         mass[i] = 0.0F;
         spin[i] = prevSpin[i] = 0.0F;
         spinRate[i] = 0.0F;

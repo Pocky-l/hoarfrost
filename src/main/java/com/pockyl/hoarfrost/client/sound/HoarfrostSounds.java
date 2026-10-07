@@ -13,6 +13,8 @@ public final class HoarfrostSounds {
     public static final SoundEvent WIND_LIGHT = event("ambient.wind.light");
     /** The roar of a snowstorm. */
     public static final SoundEvent WIND_STRONG = event("ambient.wind.strong");
+    /** The roar of a squall of snow passing by. */
+    public static final SoundEvent SQUALL = event("ambient.wind.squall");
     /** A single gust sweeping past. */
     public static final SoundEvent GUST = event("ambient.wind.gust");
     /** Feet in fresh powder: a soft, deep crunch. */

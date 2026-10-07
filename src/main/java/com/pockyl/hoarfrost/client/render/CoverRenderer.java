@@ -57,17 +57,16 @@ final class CoverRenderer implements AutoCloseable {
                     .setCullState(RenderStateShard.NO_CULL)
                     .createCompositeState(false));
     private static final ResourceLocation[] TEXTURES = {
-            Hoarfrost.id("block/snow_cover"), Hoarfrost.id("block/snow_packed"), Hoarfrost.id("block/print")};
+            Hoarfrost.id("block/snow_cover"), Hoarfrost.id("block/snow_packed")};
     private static final int TEX_SOLID = 0;
     private static final int TEX_PACKED = 1;
-    private static final int TEX_PRINT = 2;
-    /** Fresh snow is not flat: small lumps, up to this high, fading out as it is packed or thin. */
-    private static final float FLUFF = 0.022F;
+    /**
+     * Fresh snow is not flat: it lies in soft swells about a block and a half across, up to this high, smoothing out as
+     * it is packed or thin.
+     */
+    private static final float SWELL = 0.03F;
+    private static final double SWELL_SCALE = 12.0;
     private static final int FLUFF_SEED = 0x7F1F;
-    /** Prints lie this far above the snow, so the two never flicker into each other far away. */
-    private static final float PRINT_LIFT = 0.012F;
-    /** A print shows until this much new snow has fallen into it. */
-    private static final float PRINT_FILL = 0.05F;
     /** Depths below this are not drawn at all. */
     private static final float MIN_DEPTH = 0.004F;
     /**
@@ -478,9 +477,7 @@ final class CoverRenderer implements AutoCloseable {
                 }
             }
         }
-        if (stride == 1) {
-            quads += prints(builder, tile);
-        }
+
         tile.quads = quads;
         upload(tile, builder);
     }
@@ -544,6 +541,17 @@ final class CoverRenderer implements AutoCloseable {
         return quads;
     }
 
+    /** Whether a (ring) cell is a drop seen from the level {@code base}: nothing there at that level or higher. */
+    private boolean dropAt(int rz, int rx, float base) {
+        for (int layer = 0; layer < 2; layer++) {
+            int r = layer * RING_AREA + rz * RING + rx;
+            if (ringHas[r] && ringBase[r] > base - SnowCover.LEVEL_STEP) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** Whether snow lies on this surface right around a (ring) cell. */
     private boolean snowAround(int rx, int rz, int stride, float base) {
         for (int dz = -1; dz <= stride; dz++) {
@@ -572,9 +580,9 @@ final class CoverRenderer implements AutoCloseable {
                 n++;
             }
         }
-        float hollow = n == 0 ? 0.0F : Mth.clamp((sum / n - own) / 0.12F, 0.0F, 1.0F);
-        float red = 1.0F - 0.2F * hollow;
-        float green = 1.0F - 0.12F * hollow;
+        float hollow = n == 0 ? 0.0F : Mth.clamp((sum / n - own) / 0.16F, 0.0F, 1.0F);
+        float red = 1.0F - 0.12F * hollow;
+        float green = 1.0F - 0.07F * hollow;
         return (int) (red * 255.0F) << 16 | (int) (green * 255.0F) << 8 | 255;
     }
 
@@ -623,6 +631,12 @@ final class CoverRenderer implements AutoCloseable {
                 }
             }
         }
+        int drops = 0;
+        for (int k = 0; k < 4; k++) {
+            if (!taken[k] && dropAt(cornerZ + (k >> 1), cornerX + (k & 1), base)) {
+                drops++;
+            }
+        }
         float sum = 0.0F;
         float floor = Float.NEGATIVE_INFINITY;
         float depth = 0.0F;
@@ -639,111 +653,19 @@ final class CoverRenderer implements AutoCloseable {
             floor = base;
             count = 1;
         }
-        float lumps = 0.0F;
+        float swell = 0.0F;
+        float average = depth / count;
         if (depth > 0.0F) {
-            float fluff = Math.min(1.0F, depth / count / 0.12F) * (1.0F - packed / depth);
-            lumps = (Noise.unit(tileCellX + cornerX, tileCellZ + cornerZ, FLUFF_SEED) - 0.35F) * FLUFF * fluff;
+            float fresh = Math.min(1.0F, average / 0.12F) * (1.0F - packed / depth);
+            swell = (Noise.value((tileCellX + cornerX) / SWELL_SCALE, (tileCellZ + cornerZ) / SWELL_SCALE, FLUFF_SEED) - 0.5F) * 2.0F
+                    * SWELL * fresh;
         }
-        return (float) (Math.max(sum / count + lumps, floor + LIFT) - originY);
-    }
-
-    /**
-     * Height of the drawn surface at the level {@code base} at a point inside the tile (relative to the origin), from
-     * the corners around it; NaN where there is no surface at that level (a crown or a roof above does not count).
-     */
-    private float surfaceAt(float base, float x, float z) {
-        float gx = Mth.clamp(x / SnowCover.CELL, 0.0F, CoverChunk.TILE - 0.001F);
-        float gz = Mth.clamp(z / SnowCover.CELL, 0.0F, CoverChunk.TILE - 0.001F);
-        int lx = (int) gx;
-        int lz = (int) gz;
-        int r = match(lz + 1, lx + 1, base);
-        if (r < 0) {
-            return Float.NaN;
+        float height = sum / count + swell;
+        if (drops > 0) {
+            // At the brink of a drop the snow rounds over instead of ending in a cut edge.
+            height = Math.min(height, floor + average * (drops >= 2 ? 0.35F : 0.6F));
         }
-        int layer = r / RING_AREA;
-        float own = ringBase[r];
-        float depth = ringDepth[r];
-        float fx = gx - lx;
-        float fz = gz - lz;
-        float a = corner(layer, lx, lz, own, depth);
-        float b = corner(layer, lx + 1, lz, own, depth);
-        float c = corner(layer, lx, lz + 1, own, depth);
-        float d = corner(layer, lx + 1, lz + 1, own, depth);
-        return Mth.lerp(fz, Mth.lerp(fx, a, b), Mth.lerp(fx, c, d));
-    }
-
-    /**
-     * The footprints in the tile: square dents of whole pixels pressed into the snow, square to the block grid like
-     * everything in the game, sized by the foot that made them, following the surface. A print is gone once new snow has filled it
-     * or the snow has melted.
-     */
-    private int prints(BufferBuilder builder, Tile tile) {
-        CoverChunk chunk = tile.chunk;
-        int quads = 0;
-        float tileX = (float) (tile.originX - chunk.x * 16);
-        float tileZ = (float) (tile.originZ - chunk.z * 16);
-        for (int p = 0; p < chunk.printCount(); p++) {
-            float px = chunk.printX[p] - tileX;
-            float pz = chunk.printZ[p] - tileZ;
-            if (px < 0.0F || pz < 0.0F || px >= TILE_BLOCKS || pz >= TILE_BLOCKS) {
-                continue;
-            }
-            int lx = (int) (px / SnowCover.CELL);
-            int lz = (int) (pz / SnowCover.CELL);
-            // The surface the print was pressed into.
-            int layer = -1;
-            float gap = 0.4F;
-            for (int l = 0; l < 2; l++) {
-                int r = l * RING_AREA + (lz + 1) * RING + lx + 1;
-                if (ringHas[r] && Math.abs(ringBase[r] + ringDepth[r] - chunk.printTop[p]) < gap) {
-                    gap = Math.abs(ringBase[r] + ringDepth[r] - chunk.printTop[p]);
-                    layer = l;
-                }
-            }
-            if (layer < 0) {
-                continue;
-            }
-            int r = layer * RING_AREA + (lz + 1) * RING + lx + 1;
-            if (ringDepth[r] < 0.01F || (ringBase[r] + ringDepth[r] - chunk.printTop[p]) / PRINT_FILL > 0.6F) {
-                continue;
-            }
-            int texture = TEX_PRINT;
-            // A square dent of whole pixels, like everything in the game.
-            float halfL = Math.max(1.5F, Math.round(chunk.printSize[p] * 16.0F * 0.5F)) / 16.0F;
-            float halfW = halfL;
-            // Headings are along the axes: the print's pixels line up with the blocks.
-            int quarter = Math.floorMod(Math.round(chunk.printYaw[p] / (Mth.PI * 0.5F)), 4);
-            float ax = quarter == 0 ? 1.0F : quarter == 2 ? -1.0F : 0.0F;
-            float az = quarter == 1 ? 1.0F : quarter == 3 ? -1.0F : 0.0F;
-            int light = terrain.lightAt(tile.originX + px, ringBase[r] + ringDepth[r] + 0.1, tile.originZ + pz);
-            float[] cx = {px + ax * halfL - az * halfW, px + ax * halfL + az * halfW, px - ax * halfL + az * halfW,
-                    px - ax * halfL - az * halfW};
-            float[] cz = {pz + az * halfL + ax * halfW, pz + az * halfL - ax * halfW, pz - az * halfL - ax * halfW,
-                    pz - az * halfL + ax * halfW};
-            float[] us = {u0[texture], u1[texture], u1[texture], u0[texture]};
-            float[] vs = {v0[texture], v0[texture], v1[texture], v1[texture]};
-            float[] hy = new float[4];
-            boolean ok = true;
-            for (int k = 0; k < 4; k++) {
-                hy[k] = surfaceAt(ringBase[r], cx[k], cz[k]);
-                if (Float.isNaN(hy[k])) {
-                    ok = false;
-                    break;
-                }
-            }
-            if (!ok) {
-                continue;
-            }
-            // Wound counter-clockwise seen from above whichever way the print faces.
-            boolean flip = (cx[1] - cx[0]) * (cz[3] - cz[0]) - (cz[1] - cz[0]) * (cx[3] - cx[0]) > 0.0F;
-            for (int n = 0; n < 4; n++) {
-                int k = flip ? 3 - n : n;
-                builder.addVertex(cx[k], hy[k] + PRINT_LIFT, cz[k], 0xFFFFFFFF, us[k], vs[k], OverlayTexture.NO_OVERLAY, light, 0.0F, 1.0F,
-                        0.0F);
-            }
-            quads++;
-        }
-        return quads;
+        return (float) (Math.max(height, floor + LIFT) - originY);
     }
 
     /** One corner of the top surface with a normal from the slopes of the cell's edges; lit like vanilla faces. */

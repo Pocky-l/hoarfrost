@@ -114,5 +114,18 @@
       }
     ],
     "subtitle": "subtitles.hoarfrost.step"
+  },
+  "ambient.wind.squall": {
+    "sounds": [
+      {
+        "name": "hoarfrost:wind/strong_a",
+        "attenuation_distance": 40
+      },
+      {
+        "name": "hoarfrost:wind/strong_b",
+        "attenuation_distance": 40
+      }
+    ],
+    "subtitle": "subtitles.hoarfrost.squall"
   }
 }

@@ -44,5 +44,6 @@
   "hoarfrost.configuration.sound": "Звук",
   "hoarfrost.configuration.hush": "Тишина снегопада",
   "hoarfrost.configuration.windVolume": "Громкость ветра",
-  "hoarfrost.configuration.snowSteps": "Хруст снега под ногами"
+  "hoarfrost.configuration.snowSteps": "Хруст снега под ногами",
+  "subtitles.hoarfrost.squall": "Проносится снежный заряд"
 }

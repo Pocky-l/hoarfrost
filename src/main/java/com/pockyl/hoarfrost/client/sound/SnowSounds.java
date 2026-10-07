@@ -16,6 +16,10 @@ import net.minecraft.world.phys.Vec3;
 
 import com.pockyl.hoarfrost.ClientConfig;
 import com.pockyl.hoarfrost.client.ClientSnow;
+import com.pockyl.hoarfrost.sim.AirField;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * The sound of snow, which is mostly the sound of its absence:
@@ -41,6 +45,7 @@ public final class SnowSounds {
     private static LoopSound strong;
     private static LoopSound lightUpwind;
     private static LoopSound strongUpwind;
+    private static final List<SquallSound> squalls = new ArrayList<>();
     private static float outside = 1.0F;
     private static float outsideTarget = 1.0F;
     private static boolean covered;
@@ -52,7 +57,7 @@ public final class SnowSounds {
     private SnowSounds() {
     }
 
-    public static void tick(ClientLevel level, Vec3 eye) {
+    public static void tick(ClientLevel level, Vec3 eye, List<AirField.Gust> gusts) {
         ticks++;
         if (ticks % 10 == 1) {
             survey(level, eye);
@@ -94,6 +99,30 @@ public final class SnowSounds {
         }
         wasRising = rising;
         lastGust = gust;
+        hearSqualls(gusts, eye, (float) (double) ClientConfig.WIND_VOLUME.get() * outside * (covered ? 0.55F : 1.0F), highs);
+    }
+
+    /** Every squall of snow near enough is heard from where it is, moving with it. */
+    private static void hearSqualls(List<AirField.Gust> gusts, Vec3 eye, float loudness, float highs) {
+        SoundManager sounds = Minecraft.getInstance().getSoundManager();
+        squalls.removeIf(sound -> sound.isStopped() || !sounds.isActive(sound) && sound.gust().done());
+        for (AirField.Gust gust : gusts) {
+            boolean heard = false;
+            for (SquallSound sound : squalls) {
+                if (sound.gust() == gust) {
+                    sound.hear(loudness, highs);
+                    heard = true;
+                }
+            }
+            double dx = gust.x - eye.x;
+            double dz = gust.z - eye.z;
+            if (!heard && dx * dx + dz * dz < 56.0 * 56.0) {
+                SquallSound sound = new SquallSound(gust, RANDOM);
+                sound.hear(loudness, highs);
+                squalls.add(sound);
+                sounds.play(sound);
+            }
+        }
     }
 
     private static LoopSound drive(LoopSound loop, SoundEvent sound, float volume, double x, double y, double z, float highs,
@@ -183,6 +212,10 @@ public final class SnowSounds {
             sounds.stop(strongUpwind);
             strongUpwind = null;
         }
+        for (SquallSound squall : squalls) {
+            sounds.stop(squall);
+        }
+        squalls.clear();
         Hush.setWorld(0.0F);
     }
 }

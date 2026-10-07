@@ -4,6 +4,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -67,6 +68,9 @@ public final class SnowSimulation {
     private int farFalling;
     private int cloudFalling;
     private int faceFalling;
+    private int puffFalling;
+    /** Flakes flying in each squall now, by its place in the list of squalls. */
+    private final int[] puffCounts = new int[AirField.MAX_GUSTS];
     private int grains;
     private double camX;
     private double camY;
@@ -74,7 +78,8 @@ public final class SnowSimulation {
 
     public SnowSimulation(SnowSettings settings) {
         this.settings = settings;
-        this.pool = new FlakePool(settings.maxFlakes + settings.farFlakes + settings.cloudFlakes);
+        this.pool = new FlakePool(settings.maxFlakes + settings.farFlakes + settings.cloudFlakes
+                + AirField.MAX_GUSTS * puffBudget(settings));
     }
 
     public SnowSettings settings() {
@@ -125,7 +130,7 @@ public final class SnowSimulation {
         camY = cameraY;
         camZ = cameraZ;
         begin(level);
-        air.tick(tick, random, cameraX, cameraZ, settings.drifting && settings.cover);
+        air.tick(tick, random, cameraX, cameraZ, settings.drifting && settings.cover, settings.flakeDensity > 0.0F);
         updateFlakes();
         spawnFlakes();
         if (settings.cover) {
@@ -210,6 +215,8 @@ public final class SnowSimulation {
         int farNow = 0;
         int cloudNow = 0;
         int faceNow = 0;
+        int puffNow = 0;
+        Arrays.fill(puffCounts, 0);
         int grainsNow = 0;
         for (int i = 0, high = p.highWater(); i < high; i++) {
             byte state = p.state[i];
@@ -258,6 +265,11 @@ public final class SnowSimulation {
             if (p.zone[i] == 4) {
                 faceNow++;
                 moveLight(i, FACE_RADIUS, FACE_BELOW, FACE_ABOVE, 1);
+                continue;
+            }
+            if (p.zone[i] == 5) {
+                puffNow++;
+                movePuff(i);
                 continue;
             }
             double x = p.x[i];
@@ -357,6 +369,7 @@ public final class SnowSimulation {
         farFalling = farNow;
         cloudFalling = cloudNow;
         faceFalling = faceNow;
+        puffFalling = puffNow;
         grains = grainsNow;
     }
 
@@ -421,7 +434,7 @@ public final class SnowSimulation {
         int target = targetFlakes();
         int nearTarget = (int) (target * NEAR_SHARE);
         spawnZone(1, nearFalling, nearTarget);
-        spawnZone(0, falling - nearFalling - farFalling - cloudFalling - faceFalling, target - nearTarget);
+        spawnZone(0, falling - nearFalling - farFalling - cloudFalling - faceFalling - puffFalling, target - nearTarget);
         float amount = weather.snow * weather.density * Mth.clamp(weather.gust, 0.5F, 1.5F);
         spawnZone(2, farFalling, (int) Math.min(settings.farFlakes, settings.farFlakes * amount * settings.farDensity));
         float cloud = amount * weather.density * settings.flakeDensity;
@@ -429,6 +442,117 @@ public final class SnowSimulation {
         int faceTarget = (int) (cloudTarget * FACE_SHARE);
         spawnZone(3, cloudFalling, cloudTarget - faceTarget);
         spawnZone(4, faceFalling, faceTarget);
+        spawnPuffs();
+    }
+
+    /** Most flakes in one squall of snow. */
+    private static int puffBudget(SnowSettings settings) {
+        return settings.maxFlakes / 6;
+    }
+
+    /** Fills each squall with its cloud of snow, as dense as the squall is strong and the snowfall heavy. */
+    private void spawnPuffs() {
+        List<AirField.Gust> gusts = air.gusts();
+        int budget = puffBudget(settings);
+        for (int g = 0; g < gusts.size(); g++) {
+            AirField.Gust gust = gusts.get(g);
+            float fill = gust.strength * gust.envelope() * Math.min(1.0F, weather.snow * 1.5F) * settings.flakeDensity;
+            int target = (int) (budget * Math.min(1.0F, fill));
+            int n = Math.min(target - puffCounts[g], 60);
+            for (int k = 0; k < n; k++) {
+                spawnPuff(gust);
+            }
+        }
+    }
+
+    private void spawnPuff(AirField.Gust gust) {
+        float u = random.next() * 2.0F - 1.0F;
+        float v = random.next() * 2.0F - 1.0F;
+        float w = random.next() * 2.0F - 1.0F;
+        if (u * u + v * v + w * w > 1.0F) {
+            return;
+        }
+        double x = gust.x + u * gust.radius;
+        double y = gust.y + w * gust.height;
+        double z = gust.z + v * gust.radius;
+        int bx = Mth.floor(x);
+        int bz = Mth.floor(z);
+        if (!terrain.isLoaded(bx, bz) || y < terrain.height(bx, bz)) {
+            return;
+        }
+        int i = pool.add(FlakePool.FALLING, x, y, z);
+        if (i < 0) {
+            return;
+        }
+        pool.zone[i] = 5;
+        pool.owner[i] = gust.id;
+        float size = weather.sizeMin + (weather.sizeMax - weather.sizeMin) * random.next() * random.next();
+        pool.size[i] = size;
+        pool.sprite[i] = (byte) (size > 1.9F ? 1 : 0);
+        pool.fall[i] = 0.8F + 0.4F * random.next();
+        pool.phase[i] = random.next() * Mth.TWO_PI;
+        pool.rate[i] = 0.05F + 0.09F * random.next();
+        pool.vx[i] = gust.dirX * gust.speed;
+        pool.vz[i] = gust.dirZ * gust.speed;
+        pool.vy[i] = -weather.fallSpeed;
+        pool.light[i] = terrain.lightAt(x, y, z);
+    }
+
+    /**
+     * One tick of a flake in a squall: carried and rolled along with it, swirling in its eddies; it falls out of the
+     * cloud at its edges (fading away) and when the squall dies down.
+     */
+    private void movePuff(int i) {
+        FlakePool p = pool;
+        AirField.Gust gust = null;
+        List<AirField.Gust> gusts = air.gusts();
+        for (int g = 0; g < gusts.size(); g++) {
+            if (gusts.get(g).id == p.owner[i]) {
+                gust = gusts.get(g);
+                puffCounts[g]++;
+                break;
+            }
+        }
+        double x = p.x[i];
+        double y = p.y[i];
+        double z = p.z[i];
+        if (gust == null || gust.inside(x, y, z) <= 0.0F) {
+            p.retiring[i] = true;
+        }
+        if (((i + tick) & 3) == 0) {
+            air.eddies(x, y, z, sample);
+            p.airX[i] = sample[0] * 1.5F;
+            p.airY[i] = sample[1] * 1.5F;
+            p.airZ[i] = sample[2] * 1.5F;
+        }
+        float tx = weather.windX + p.airX[i];
+        float ty = -weather.fallSpeed * p.fall[i] + p.airY[i];
+        float tz = weather.windZ + p.airZ[i];
+        if (gust != null) {
+            // The squall's own wind and roll, as the air of the cloud.
+            float along = (float) ((x - gust.x) * gust.dirX + (z - gust.z) * gust.dirZ) / gust.radius;
+            float up = (float) (y - gust.y) / gust.height;
+            float roll = gust.roll * gust.speed * 0.5F;
+            tx = gust.dirX * gust.speed * (1.0F - up * gust.roll * 0.5F) + p.airX[i];
+            tz = gust.dirZ * gust.speed * (1.0F - up * gust.roll * 0.5F) + p.airZ[i];
+            ty = -weather.fallSpeed * p.fall[i] * 0.5F + along * roll + p.airY[i];
+        }
+        p.vx[i] += (tx - p.vx[i]) * 0.2F;
+        p.vy[i] += (ty - p.vy[i]) * 0.2F;
+        p.vz[i] += (tz - p.vz[i]) * 0.2F;
+        double nx = x + p.vx[i];
+        double ny = y + p.vy[i];
+        double nz = z + p.vz[i];
+        if (((i + tick) & 3) == 0 && ny < terrain.height(Mth.floor(nx), Mth.floor(nz))) {
+            p.remove(i);
+            return;
+        }
+        p.x[i] = nx;
+        p.y[i] = ny;
+        p.z[i] = nz;
+        if (((i + tick) & 15) == 0) {
+            p.light[i] = terrain.lightAt(nx, ny, nz);
+        }
     }
 
     /**
@@ -633,7 +757,7 @@ public final class SnowSimulation {
         camY = cameraY;
         camZ = cameraZ;
         begin(level);
-        air.tick(tick, random, cameraX, cameraZ, false);
+        air.tick(tick, random, cameraX, cameraZ, false, false);
         updateFlakes();
     }
 
@@ -699,6 +823,21 @@ public final class SnowSimulation {
                 }
             }
         }
+        for (AirField.Gust gust : air.gusts()) {
+            // A squall sweeping over loose snow lifts it into its cloud.
+            float lift = gust.strength * gust.envelope();
+            for (int k = 0; k < (int) (10 * lift); k++) {
+                float angle = random.next() * Mth.TWO_PI;
+                float r = gust.radius * Mth.sqrt(random.next());
+                double x = gust.x + Mth.cos(angle) * r;
+                double z = gust.z + Mth.sin(angle) * r;
+                if (cover.powderAt(x, z) < 0.004F) {
+                    continue;
+                }
+                grain(x, cover.topAt(x, z) + 0.05, z, gust.dirX * gust.speed * 0.8F, 0.05F + random.next() * 0.12F * lift,
+                        gust.dirZ * gust.speed * 0.8F, 40 + (int) (random.next() * 40));
+            }
+        }
         for (AirField.Whirl whirl : air.whirls()) {
             float intensity = whirl.intensity();
             for (int c = 0; c < (int) (4 * intensity); c++) {
@@ -738,7 +877,7 @@ public final class SnowSimulation {
             if (chunk.kind[i] != SurfaceKind.LEAVES || chunk.powder[i] < 0.02F) {
                 continue;
             }
-            float gust = speed * air.gust(x, z);
+            float gust = speed * air.gust(x, z) + 0.15F * air.gustAt(x, chunk.top(i), z);
             if (random.next() > (gust - 0.03F) * 0.6F) {
                 continue;
             }
@@ -769,8 +908,8 @@ public final class SnowSimulation {
     }
 
     /**
-     * A foot comes down in the snow: a print is pressed beside the body's center line ({@code side} -1 or 1), the snow
-     * it pushes aside forms a rim, and the foot kicks up clumps of powder - a few when walking, a spray when running,
+     * A foot comes down in the snow: a soft dent is pressed beside the body's center line ({@code side} -1 or 1), the
+     * snow it pushes aside forms a low rim, and the foot kicks up clumps of powder - a few when walking, a spray when running,
      * none when sneaking.
      *
      * @return how deep the foot sank into loose snow (0 when there was none)
@@ -779,22 +918,15 @@ public final class SnowSimulation {
         if (!settings.cover || !settings.footprints) {
             return 0.0F;
         }
-        // Prints in the style of the game: square to the block grid, on whole pixels, pointing along an axis.
-        float axisX = Math.abs(dirX) >= Math.abs(dirZ) ? Math.signum(dirX) : 0.0F;
-        float axisZ = axisX == 0.0F ? Math.signum(dirZ) : 0.0F;
-        double footX = pixel(x - axisZ * side * width * 0.22);
-        double footZ = pixel(z + axisX * side * width * 0.22);
+        double footX = x - dirZ * side * width * 0.22;
+        double footZ = z + dirX * side * width * 0.22;
         float top = cover.topNear(footX, y, footZ);
         if (Float.isNaN(top)) {
             return 0.0F;
         }
         float footWidth = Math.max(0.16F, width * 0.3F);
         float footLength = Math.max(0.22F, width * 0.5F);
-        float sank = cover.press(footX, y, footZ, footWidth, footLength, axisX, axisZ);
-        if (sank > 0.012F) {
-            float size = (float) pixel(Math.max(0.3F, width * 0.6F));
-            cover.addPrint(footX, y, footZ, (float) Math.atan2(axisZ, axisX), size);
-        }
+        float sank = cover.press(footX, y, footZ, footWidth, footLength, dirX, dirZ);
         if (sank > 0.02F && !sneaking) {
             float kick = 0.3F + speed * 6.0F;
             int count = (int) Math.min(40, sank * 90.0F * kick);
@@ -809,10 +941,6 @@ public final class SnowSimulation {
         return sank;
     }
 
-    /** Snapped to the pixel grid of the blocks (sixteenths). */
-    private static double pixel(double value) {
-        return Math.round(value * 16.0) / 16.0;
-    }
 
     /** Landing after a fall: a crater pressed into the snow and a puff of powder. */
     public void land(double x, double y, double z, float width, float fallSpeed) {
