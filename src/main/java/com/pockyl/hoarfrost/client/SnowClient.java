@@ -62,6 +62,7 @@ public final class SnowClient {
     private static final double STEP_RANGE = 48.0;
     private static final int SAVE_INTERVAL = 20 * 30;
     private static final long SEED_BUDGET_NANOS = 4_000_000L;
+    private static final float STEP_VOLUME = 0.25F;
 
     private static final SnowSettings SETTINGS = new SnowSettings();
     /** Distance walked since the last footprint and which foot is next, per entity. */
@@ -468,8 +469,9 @@ public final class SnowClient {
         if (replacement == null) {
             return;
         }
-        event.setSound(new SimpleSoundInstance(replacement.getLocation(), sound.getSource(), Math.max(0.2F, sound.getVolume()),
-                sound.getPitch() * (0.9F + level.random.nextFloat() * 0.2F), SoundInstance.createUnseededRandom(), false, 0,
+        // The vanilla instance is not resolved yet at this point (its volume and pitch are not known): ours are fixed.
+        event.setSound(new SimpleSoundInstance(replacement.getLocation(), sound.getSource(), STEP_VOLUME,
+                0.9F + level.random.nextFloat() * 0.2F, SoundInstance.createUnseededRandom(), false, 0,
                 SoundInstance.Attenuation.LINEAR, x, sound.getY(), z, false));
     }
 
