@@ -6,20 +6,26 @@ import java.io.IOException;
 import java.util.Arrays;
 
 /**
- * The snow lying on one chunk column: a 64x64 grid of quarter-block cells, each with up to two surfaces - the top of
+ * The snow lying on one chunk column: a 128x128 grid of cells, 8x8 per block, each with up to two surfaces - the top of
  * the column (open to the sky: ground, a roof, a crown) and the ground under it (beneath a crown, an overhang, the
  * roof of a tunnel or cave mouth). A surface knows its height, how much loose powder lies there and how much packed
  * snow (trodden, compressed), and what kind of surface it is. Indices below {@link #AREA} are top surfaces, the
  * index plus {@link #AREA} is the surface under it.
  */
 public final class CoverChunk {
-    public static final int SIZE = 64;
+    /** Cells per block along each side. */
+    public static final int PER_BLOCK = 8;
+    public static final int BLOCK_SHIFT = 3;
+    public static final int SIZE = 16 * PER_BLOCK;
+    public static final int SHIFT = 7;
+    public static final int MASK = SIZE - 1;
     public static final int AREA = SIZE * SIZE;
     public static final int CELLS = AREA * 2;
-    /** Render tiles are 16x16 cells (4x4 blocks). */
-    public static final int TILE = 16;
+    /** Render tiles are 32x32 cells (4x4 blocks). */
+    public static final int TILE = 32;
+    private static final int TILE_SHIFT = 5;
     public static final int TILES = SIZE / TILE;
-    private static final int FORMAT = 4;
+    private static final int FORMAT = 5;
     /** Most footprints kept per chunk; the oldest make room for new ones. */
     public static final int MAX_PRINTS = 256;
     /** Depths are stored in 1/4096 of a block. */
@@ -38,15 +44,18 @@ public final class CoverChunk {
     public final byte[] kind = new byte[CELLS];
     /** The depth of each surface as last drawn (set by the renderer): small changes wait until they can be seen. */
     public final float[] shown = new float[CELLS];
-    /** Sheltered surfaces: share of the snowfall that comes through the crowns above (0 under a solid roof). */
-    public final float[] through = new float[AREA];
     /**
-     * Sheltered surfaces: distance in blocks to the nearest opening at the same level (the edge of an overhang, a
-     * tunnel or cave mouth) and the direction from there inwards. Snow blows in from there.
+     * Sheltered ground, per block column: share of the snowfall that comes through the crowns above (0 under a solid
+     * roof).
      */
-    public final float[] mouth = new float[AREA];
-    public final float[] mouthX = new float[AREA];
-    public final float[] mouthZ = new float[AREA];
+    public final float[] through = new float[256];
+    /**
+     * Sheltered ground, per block column: distance in blocks to the nearest opening at the same level (the edge of an
+     * overhang, a tunnel or cave mouth) and the direction from there inwards. Snow blows in from there.
+     */
+    public final float[] mouth = new float[256];
+    public final float[] mouthX = new float[256];
+    public final float[] mouthZ = new float[256];
     /** Incremented whenever the look of a tile changes; the renderer rebuilds tiles whose revision moved. */
     public final int[] tileRevision = new int[TILES * TILES];
 
@@ -76,12 +85,18 @@ public final class CoverChunk {
 
     /** The top surface of a cell. */
     public static int index(int localX, int localZ) {
-        return localZ << 6 | localX;
+        return localZ << SHIFT | localX;
     }
 
     /** The cell (top surface index) of a surface index. */
     public static int cell(int i) {
         return i & (AREA - 1);
+    }
+
+    /** The block column (0..255) of a surface index. */
+    public static int block(int i) {
+        int cell = i & (AREA - 1);
+        return (cell >> SHIFT >> BLOCK_SHIFT) * 16 + ((cell & MASK) >> BLOCK_SHIFT);
     }
 
     public static boolean sheltered(int i) {
@@ -90,7 +105,7 @@ public final class CoverChunk {
 
     public static int tile(int index) {
         int cell = index & (AREA - 1);
-        return (cell >> 6 >> 4) * TILES + ((cell & 63) >> 4);
+        return (cell >> SHIFT >> TILE_SHIFT) * TILES + ((cell & MASK) >> TILE_SHIFT);
     }
 
     public float depth(int i) {

@@ -25,7 +25,7 @@ import java.util.Collection;
  * Depths are in blocks.
  */
 public final class SnowCover {
-    public static final float CELL = 0.25F;
+    public static final float CELL = 1.0F / CoverChunk.PER_BLOCK;
     /** Deepest snow that settles out of a snowfall on open ground. */
     public static final float NATURAL_DEPTH = SurfaceKind.natural(SurfaceKind.GROUND);
     /** Deepest a drift can grow. */
@@ -38,7 +38,7 @@ public final class SnowCover {
     /** The wind never takes the last of the snow: a thin crust keeps to the roughness of the surface. */
     public static final float CRUST = 0.012F;
     /** Steepest step between neighboring cells of one surface: a little over 40 degrees. */
-    public static final float REPOSE = 0.22F;
+    public static final float REPOSE = 0.88F * CELL;
     /** How much snow stays on the very edge of a drop. */
     public static final float EDGE_DEPTH = 0.16F;
     /** Surfaces further apart than this are different levels (a step, a wall), not one slope. */
@@ -59,6 +59,7 @@ public final class SnowCover {
     private final AirField air;
     private final SnowWeather weather;
     private final float[] basesOut = new float[2];
+    private final Terrain.Column column = new Terrain.Column();
     private final byte[] kindsOut = new byte[2];
     private final int[] heat = new int[256];
     private float transported;
@@ -71,7 +72,7 @@ public final class SnowCover {
 
     /** The top surface index of a cell. */
     public static int index(int cellX, int cellZ) {
-        return CoverChunk.index(cellX & 63, cellZ & 63);
+        return CoverChunk.index(cellX & CoverChunk.MASK, cellZ & CoverChunk.MASK);
     }
 
     public CoverChunk chunk(int chunkX, int chunkZ) {
@@ -79,7 +80,7 @@ public final class SnowCover {
     }
 
     public CoverChunk chunkAtCell(int cellX, int cellZ) {
-        return chunks.get(ChunkPos.asLong(cellX >> 6, cellZ >> 6));
+        return chunks.get(ChunkPos.asLong(cellX >> CoverChunk.SHIFT, cellZ >> CoverChunk.SHIFT));
     }
 
     public Collection<CoverChunk> chunks() {
@@ -208,8 +209,8 @@ public final class SnowCover {
      * still where it was; anything built on it or dug out from under it starts clean.
      */
     public void computeSurfaces(CoverChunk chunk) {
-        for (int c = 0; c < CoverChunk.AREA; c++) {
-            surfaces(chunk, c, false);
+        for (int b = 0; b < 256; b++) {
+            surfaces(chunk, chunk.x * 16 + (b & 15), chunk.z * 16 + (b >> 4), false);
         }
         for (int b = 0; b < 256; b++) {
             mouth(chunk, chunk.x * 16 + (b & 15), chunk.z * 16 + (b >> 4));
@@ -218,25 +219,33 @@ public final class SnowCover {
         chunk.touchAll();
     }
 
-    private void surfaces(CoverChunk chunk, int c, boolean notify) {
-        double x = (chunk.x * CoverChunk.SIZE + (c & 63) + 0.5) * CELL;
-        double z = (chunk.z * CoverChunk.SIZE + (c >> 6) + 0.5) * CELL;
-        chunk.through[c] = terrain.surfaces(x, z, basesOut, kindsOut);
-        for (int layer = 0; layer < 2; layer++) {
-            int i = c + layer * CoverChunk.AREA;
-            float old = chunk.base[i];
-            float now = basesOut[layer];
-            chunk.kind[i] = kindsOut[layer];
-            if (Float.isNaN(now) || Float.isNaN(old) || Math.abs(now - old) > 0.01F) {
-                float lost = chunk.depth(i);
-                chunk.powder[i] = 0.0F;
-                chunk.packed[i] = 0.0F;
-                if (notify && (lost > 0.0F || Float.isNaN(old) != Float.isNaN(now))) {
-                    chunk.changed(i, 1.0F, true);
+    /** Finds the surfaces of the cells of one block column (the column is read from the world once). */
+    private void surfaces(CoverChunk chunk, int bx, int bz, boolean notify) {
+        terrain.scan(bx, bz, column);
+        float through = 0.0F;
+        int per = CoverChunk.PER_BLOCK;
+        for (int sub = 0; sub < per * per; sub++) {
+            int sx = sub % per;
+            int sz = sub / per;
+            int c = CoverChunk.index((bx & 15) * per + sx, (bz & 15) * per + sz);
+            through = Math.max(through, terrain.surfaces(column, (sx + 0.5) * CELL, (sz + 0.5) * CELL, basesOut, kindsOut));
+            for (int layer = 0; layer < 2; layer++) {
+                int i = c + layer * CoverChunk.AREA;
+                float old = chunk.base[i];
+                float now = basesOut[layer];
+                chunk.kind[i] = kindsOut[layer];
+                if (Float.isNaN(now) || Float.isNaN(old) || Math.abs(now - old) > 0.01F) {
+                    float lost = chunk.depth(i);
+                    chunk.powder[i] = 0.0F;
+                    chunk.packed[i] = 0.0F;
+                    if (notify && (lost > 0.0F || Float.isNaN(old) != Float.isNaN(now))) {
+                        chunk.changed(i, 1.0F, true);
+                    }
                 }
+                chunk.base[i] = now;
             }
-            chunk.base[i] = now;
         }
+        chunk.through[(bz & 15) * 16 + (bx & 15)] = through;
     }
 
     /**
@@ -244,9 +253,10 @@ public final class SnowCover {
      * is level with the sheltered ground - the edge of the overhang, the mouth of the tunnel or cave.
      */
     private void mouth(CoverChunk chunk, int bx, int bz) {
+        int per = CoverChunk.PER_BLOCK;
         float floor = Float.NaN;
-        for (int c = 0; c < 16 && Float.isNaN(floor); c++) {
-            floor = chunk.base[CoverChunk.index((bx & 15) * 4 + (c & 3), (bz & 15) * 4 + (c >> 2)) + CoverChunk.AREA];
+        for (int c = 0; c < per * per && Float.isNaN(floor); c++) {
+            floor = chunk.base[CoverChunk.index((bx & 15) * per + c % per, (bz & 15) * per + c / per) + CoverChunk.AREA];
         }
         float best = CoverChunk.NO_MOUTH;
         float dirX = 0.0F;
@@ -267,12 +277,10 @@ public final class SnowCover {
                 }
             }
         }
-        for (int c = 0; c < 16; c++) {
-            int i = CoverChunk.index((bx & 15) * 4 + (c & 3), (bz & 15) * 4 + (c >> 2));
-            chunk.mouth[i] = best;
-            chunk.mouthX[i] = dirX;
-            chunk.mouthZ[i] = dirZ;
-        }
+        int b = (bz & 15) * 16 + (bx & 15);
+        chunk.mouth[b] = best;
+        chunk.mouthX[b] = dirX;
+        chunk.mouthZ[b] = dirZ;
     }
 
     /** A block changed: the cells of its column find their surfaces again. */
@@ -282,13 +290,7 @@ public final class SnowCover {
         if (chunk == null || !chunk.surfaces) {
             return;
         }
-        int cellX = x * 4;
-        int cellZ = z * 4;
-        for (int dz = 0; dz < 4; dz++) {
-            for (int dx = 0; dx < 4; dx++) {
-                surfaces(chunk, index(cellX + dx, cellZ + dz), true);
-            }
-        }
+        surfaces(chunk, x, z, true);
         // Openings change for the sheltered ground around, and the neighbors' edges are drawn against this column.
         for (int dz = -MOUTH_REACH; dz <= MOUTH_REACH; dz++) {
             for (int dx = -MOUTH_REACH; dx <= MOUTH_REACH; dx++) {
@@ -298,11 +300,14 @@ public final class SnowCover {
                 }
             }
         }
+        int per = CoverChunk.PER_BLOCK;
         for (int dz = -1; dz <= 1; dz++) {
             for (int dx = -1; dx <= 1; dx++) {
-                CoverChunk near = chunkAtCell(cellX + dx * 4, cellZ + dz * 4);
+                int cellX = (x + dx) * per;
+                int cellZ = (z + dz) * per;
+                CoverChunk near = chunkAtCell(cellX, cellZ);
                 if (near != null) {
-                    near.changed(index(cellX + dx * 4, cellZ + dz * 4), 1.0F, true);
+                    near.changed(index(cellX, cellZ), 1.0F, true);
                 }
             }
         }
@@ -317,7 +322,7 @@ public final class SnowCover {
         if (!CoverChunk.sheltered(i)) {
             return 1.0F;
         }
-        int c = CoverChunk.cell(i);
+        int c = CoverChunk.block(i);
         float distance = chunk.mouth[c];
         float blown = 0.0F;
         if (distance < CoverChunk.NO_MOUTH) {
@@ -341,10 +346,10 @@ public final class SnowCover {
                 continue;
             }
             int c = CoverChunk.cell(i);
-            int cellX = chunk.x * CoverChunk.SIZE + (c & 63);
-            int cellZ = chunk.z * CoverChunk.SIZE + (c >> 6);
-            int bx = cellX >> 2;
-            int bz = cellZ >> 2;
+            int cellX = chunk.x * CoverChunk.SIZE + (c & CoverChunk.MASK);
+            int cellZ = chunk.z * CoverChunk.SIZE + (c >> CoverChunk.SHIFT);
+            int bx = cellX >> CoverChunk.BLOCK_SHIFT;
+            int bz = cellZ >> CoverChunk.BLOCK_SHIFT;
             if (!terrain.snowy(bx, bz)) {
                 continue;
             }
@@ -392,8 +397,10 @@ public final class SnowCover {
             for (int b = 0; b < 256; b++) {
                 int bx = chunk.x * 16 + (b & 15);
                 int bz = chunk.z * 16 + (b >> 4);
-                int column = CoverChunk.index((b & 15) * 4 + 1, (b >> 4) * 4 + 1) + layer * CoverChunk.AREA;
-                heat[b] = chunk.hasSurface(column) ? terrain.blockLight(bx + 0.5, chunk.top(column) + 0.1, bz + 0.5) : 0;
+                int middle = CoverChunk.PER_BLOCK / 2;
+                int probe = CoverChunk.index((b & 15) * CoverChunk.PER_BLOCK + middle, (b >> 4) * CoverChunk.PER_BLOCK + middle)
+                        + layer * CoverChunk.AREA;
+                heat[b] = chunk.hasSurface(probe) ? terrain.blockLight(bx + 0.5, chunk.top(probe) + 0.1, bz + 0.5) : 0;
             }
             for (int c = 0; c < CoverChunk.AREA; c++) {
                 int i = c + layer * CoverChunk.AREA;
@@ -406,10 +413,10 @@ public final class SnowCover {
     }
 
     private void weather(CoverChunk chunk, int i, int c, int dt, float snow, float sorting) {
-        int lx = c & 63;
-        int lz = c >> 6;
-        int bx = chunk.x * 16 + (lx >> 2);
-        int bz = chunk.z * 16 + (lz >> 2);
+        int lx = c & CoverChunk.MASK;
+        int lz = c >> CoverChunk.SHIFT;
+        int bx = chunk.x * 16 + (lx >> CoverChunk.BLOCK_SHIFT);
+        int bz = chunk.z * 16 + (lz >> CoverChunk.BLOCK_SHIFT);
         boolean snowy = terrain.snowy(bx, bz);
         float depth = chunk.depth(i);
         byte kind = chunk.kind[i];
@@ -421,7 +428,7 @@ public final class SnowCover {
         if (kind == SurfaceKind.HOT) {
             melt += MELT_HOT;
         }
-        int light = heat[(lz >> 2) * 16 + (lx >> 2)];
+        int light = heat[(lz >> CoverChunk.BLOCK_SHIFT) * 16 + (lx >> CoverChunk.BLOCK_SHIFT)];
         if (light >= MELT_LIGHT_MIN) {
             melt += MELT_LIGHT * (light - MELT_LIGHT_MIN + 1);
         }
@@ -518,8 +525,8 @@ public final class SnowCover {
                 deposit(nx, nz, lastBase, amount);
                 return;
             }
-            int bx = nx >> 2;
-            int bz = nz >> 2;
+            int bx = nx >> CoverChunk.BLOCK_SHIFT;
+            int bz = nz >> CoverChunk.BLOCK_SHIFT;
             if (terrain.shelter(bx, bz) > 0.45F || air.surfaceSpeed(bx, bz) < THRESHOLD * 0.8F) {
                 deposit(nx, nz, lastBase, amount);
                 return;
@@ -560,12 +567,12 @@ public final class SnowCover {
                 continue;
             }
             int c = CoverChunk.cell(i);
-            int cellX = originX + (c & 63);
-            int cellZ = originZ + (c >> 6);
+            int cellX = originX + (c & CoverChunk.MASK);
+            int cellZ = originZ + (c >> CoverChunk.SHIFT);
             for (int n = 0; n < 4; n++) {
                 int nx = cellX + (n == 0 ? 1 : n == 1 ? -1 : 0);
                 int nz = cellZ + (n == 2 ? 1 : n == 3 ? -1 : 0);
-                CoverChunk other = (nx >> 6) == chunk.x && (nz >> 6) == chunk.z ? chunk : chunkAtCell(nx, nz);
+                CoverChunk other = (nx >> CoverChunk.SHIFT) == chunk.x && (nz >> CoverChunk.SHIFT) == chunk.z ? chunk : chunkAtCell(nx, nz);
                 if (other == null) {
                     continue;
                 }

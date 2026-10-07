@@ -174,7 +174,12 @@ public final class ModGameTests {
         Vec3 foot = helper.absoluteVec(new Vec3(12.5, 1.0, 12.5));
         sim.step(foot.x, foot.y, foot.z, 1.0F, 0.0F, 0.6F, 1, 0.1F, false);
         double footZ = foot.z + 0.6 * 0.22;
-        float rim = Math.max(sim.cover().depthAt(foot.x, footZ + 0.3), sim.cover().depthAt(foot.x, footZ - 0.3));
+        float rim = 0.0F;
+        for (double dx = -0.5; dx <= 0.5; dx += SnowCover.CELL) {
+            for (double dz = -0.5; dz <= 0.5; dz += SnowCover.CELL) {
+                rim = Math.max(rim, sim.cover().depthAt(foot.x + dx, footZ + dz));
+            }
+        }
         helper.assertTrue(rim > 0.205F, "snow pushed aside forms a rim, deepest beside the print " + rim);
         CoverChunk chunk = sim.cover().chunk((int) Math.floor(foot.x) >> 4, (int) Math.floor(footZ) >> 4);
         helper.assertTrue(chunk != null && chunk.printCount() == 1, "the foot left a print");
@@ -352,7 +357,12 @@ public final class ModGameTests {
     @GameTest(template = "field", skyAccess = true)
     public static void snowLiesOnVanillaSnowLayers(GameTestHelper helper) {
         floor(helper);
-        helper.setBlock(new BlockPos(12, 1, 12), Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 2));
+        // A patch of layers, so the flake (which sways and drifts a little) lands on it wherever it comes down.
+        for (int x = 10; x <= 14; x++) {
+            for (int z = 10; z <= 14; z++) {
+                helper.setBlock(new BlockPos(x, 1, z), Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 2));
+            }
+        }
         SnowSimulation sim = simulation(helper);
         calm(sim, SnowType.SNOWFALL);
         Vec3 on = helper.absoluteVec(new Vec3(12.5, 1.25, 12.5));

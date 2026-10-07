@@ -220,10 +220,54 @@ public final class Terrain {
         return !level.getFluidState(cursor).isEmpty();
     }
 
+    /** The blocks of one column from its top down, read from the world once for all the cells of the block. */
+    public static final class Column {
+        final int[] ys = new int[SHELTER_SCAN + 1];
+        final BlockState[] states = new BlockState[SHELTER_SCAN + 1];
+        /** Outline boxes of each block; null when snow passes it (no collision, like plants). */
+        final double[][] boxes = new double[SHELTER_SCAN + 1][];
+        int count;
+        int top;
+        boolean loaded;
+    }
+
     /**
-     * The surfaces snow settles on at (x, z), each as it looks (the cap of a fence post, the step of a stair, the visible
-     * top of a snow layer or of powder snow), plants and other blocks without collision skipped (snow covers their
-     * base):
+     * Reads the column at (bx, bz) from the heightmap's own block down: snow layers, carpets and the like do not count
+     * as blocking motion, so they sit right at the height the heightmap gives. Stops at water and lava (no snow on
+     * them, nothing for snow under them).
+     */
+    public void scan(int bx, int bz, Column column) {
+        int top = height(bx, bz);
+        column.top = top;
+        column.count = 0;
+        cursor.set(bx, top, bz);
+        column.loaded = level.isLoaded(cursor);
+        if (!column.loaded) {
+            return;
+        }
+        for (int by = top; by >= top - SHELTER_SCAN; by--) {
+            cursor.set(bx, by, bz);
+            BlockState state = level.getBlockState(cursor);
+            if (state.isAir()) {
+                continue;
+            }
+            int n = column.count++;
+            column.ys[n] = by;
+            column.states[n] = state;
+            if (!state.getFluidState().isEmpty()) {
+                column.boxes[n] = null;
+                break;
+            }
+            // Snow layers and powder snow have no (or a lower) collision box but are snow to stand on in looks.
+            boolean snow = state.getBlock() instanceof SnowLayerBlock || state.is(Blocks.POWDER_SNOW);
+            column.boxes[n] = !snow && shapes.boxes(state, level, cursor).length == 0 ? null : shapes.outline(state, level, cursor);
+        }
+    }
+
+    /**
+     * The surfaces snow settles on at a point (lx, lz inside the block) of a scanned column, each as it looks (the cap
+     * of a fence post, the step of a stair, the visible top of a snow layer or of powder snow), plants and other blocks
+     * without collision skipped (snow covers their base):
      * <ul>
      *   <li>the top of the column - ground, a roof or a crown, open to the sky; NaN over water, lava and unloaded
      *   ground;</li>
@@ -236,38 +280,31 @@ public final class Terrain {
      * @return the share of the snowfall that comes through to the lower surface: about 45% through each layer of
      *         leaves, none through anything else
      */
-    public float surfaces(double x, double z, float[] bases, byte[] kinds) {
-        int bx = Mth.floor(x);
-        int bz = Mth.floor(z);
-        int top = height(bx, bz);
+    public float surfaces(Column column, double lx, double lz, float[] bases, byte[] kinds) {
         bases[0] = Float.NaN;
         bases[1] = Float.NaN;
         kinds[0] = SurfaceKind.GROUND;
         kinds[1] = SurfaceKind.GROUND;
-        cursor.set(bx, top, bz);
-        if (!level.isLoaded(cursor)) {
+        if (!column.loaded) {
             return 0.0F;
         }
-        double lx = x - bx;
-        double lz = z - bz;
         boolean found = false;
         boolean gap = false;
         boolean solidRoof = false;
         int leaves = 0;
-        // From the heightmap's own block: snow layers, carpets and the like do not count as blocking motion, so they
-        // sit right at the height the heightmap gives and would be missed starting one below.
-        for (int by = top; by >= top - SHELTER_SCAN; by--) {
-            cursor.set(bx, by, bz);
-            BlockState state = level.getBlockState(cursor);
-            if (state.isAir()) {
+        int previous = column.top + 1;
+        for (int n = 0; n < column.count; n++) {
+            int by = column.ys[n];
+            if (by < previous - 1) {
+                // Air between this block and the one above.
                 gap |= found;
-                continue;
             }
+            previous = by;
+            BlockState state = column.states[n];
             if (!state.getFluidState().isEmpty()) {
-                // Water: no snow on it, and nothing for snow under it.
                 break;
             }
-            double best = surfaceTop(state, lx, lz);
+            double best = surfaceTop(column.boxes[n], lx, lz);
             if (Double.isNaN(best)) {
                 // A plant, or between the posts of a fence: the snow falls through to what is below.
                 gap |= found;
@@ -303,14 +340,11 @@ public final class Terrain {
         return (float) Math.pow(0.45, leaves);
     }
 
-    /** Top of the block's visible shape over (lx, lz), NaN when snow passes it (no collision, or nothing there). */
-    private double surfaceTop(BlockState state, double lx, double lz) {
-        // Snow layers and powder snow have no (or a lower) collision box but are snow to stand on in looks.
-        boolean snow = state.getBlock() instanceof SnowLayerBlock || state.is(Blocks.POWDER_SNOW);
-        if (!snow && shapes.boxes(state, level, cursor).length == 0) {
+    /** Top of a block's outline over (lx, lz), NaN when snow passes it (no collision, or nothing there). */
+    private static double surfaceTop(double[] boxes, double lx, double lz) {
+        if (boxes == null) {
             return Double.NaN;
         }
-        double[] boxes = shapes.outline(state, level, cursor);
         double best = Double.NaN;
         for (int b = 0; b < boxes.length; b += 6) {
             if (lx >= boxes[b] && lx <= boxes[b + 3] && lz >= boxes[b + 2] && lz <= boxes[b + 5] && !(boxes[b + 4] <= best)) {

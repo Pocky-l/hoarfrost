@@ -9,10 +9,10 @@ public final class ClientConfig {
     /** Budgets that scale with the hardware. Individual options below multiply on top of these. */
     public enum Quality {
         // maxFlakes, flakeRadius, coverRadius, coverChunksPerTick, farFlakes
-        LOW(3000, 14.0F, 48.0F, 2, 2000),
-        MEDIUM(6000, 18.0F, 64.0F, 3, 4000),
-        HIGH(12000, 22.0F, 96.0F, 3, 8000),
-        ULTRA(20000, 28.0F, 128.0F, 4, 14000);
+        LOW(3000, 14.0F, 40.0F, 1, 2000),
+        MEDIUM(6000, 18.0F, 56.0F, 2, 4000),
+        HIGH(12000, 22.0F, 80.0F, 2, 8000),
+        ULTRA(20000, 28.0F, 112.0F, 3, 14000);
 
         public final int maxFlakes;
         public final float flakeRadius;
