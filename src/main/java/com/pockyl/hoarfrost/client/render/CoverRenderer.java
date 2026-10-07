@@ -67,12 +67,17 @@ final class CoverRenderer implements AutoCloseable {
     /** Fresh snow is not flat: small lumps, up to this high, fading out as it is packed or thin. */
     private static final float FLUFF = 0.022F;
     private static final int FLUFF_SEED = 0x7F1F;
+    /** Prints lie this far above the snow, so the two never flicker into each other far away. */
+    private static final float PRINT_LIFT = 0.012F;
     /** A print shows until this much new snow has fallen into it. */
     private static final float PRINT_FILL = 0.05F;
     /** Depths below this are not drawn at all. */
     private static final float MIN_DEPTH = 0.004F;
-    /** The surface always sits this much above the block top, so the two never flicker into each other. */
-    private static final float LIFT = 0.0025F;
+    /**
+     * The surface always sits this much above the block top (a quarter pixel): any less and far away the depth buffer
+     * cannot tell them apart - the block shows through the snow in flickering holes, worst on translucent ice.
+     */
+    private static final float LIFT = 0.015F;
     private static final float SIDE_MIN = 0.02F;
     private static final long REBUILD_BUDGET_NANOS = 3_000_000L;
     private static final double FAR_DISTANCE = 64.0;
@@ -675,7 +680,7 @@ final class CoverRenderer implements AutoCloseable {
             boolean flip = (cx[1] - cx[0]) * (cz[3] - cz[0]) - (cz[1] - cz[0]) * (cx[3] - cx[0]) > 0.0F;
             for (int n = 0; n < 4; n++) {
                 int k = flip ? 3 - n : n;
-                builder.addVertex(cx[k], hy[k] + 0.006F, cz[k], 0xFFFFFFFF, us[k], vs[k], OverlayTexture.NO_OVERLAY, light, 0.0F, 1.0F,
+                builder.addVertex(cx[k], hy[k] + PRINT_LIFT, cz[k], 0xFFFFFFFF, us[k], vs[k], OverlayTexture.NO_OVERLAY, light, 0.0F, 1.0F,
                         0.0F);
             }
             quads++;

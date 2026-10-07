@@ -21,7 +21,8 @@ import com.pockyl.hoarfrost.client.ClientSnow;
  * The sound of snow, which is mostly the sound of its absence:
  * <ul>
  *   <li>the hush - falling snow muffles the world outdoors, deeper in calm, heavy snowfall than in a windy one;</li>
- *   <li>the wind of the snowfall from where it blows: a soft breeze in a snowfall, the roar of a blizzard with gusts
+ *   <li>the wind of the snowfall all around the listener - a soft breeze in a snowfall, the roar of a blizzard - with a
+ *   quieter part from where it blows, so the ear can tell the direction without the wind sitting in one ear, and gusts
  *   sweeping past; indoors a muffled howl outside the walls, underground nothing;</li>
  * </ul>
  * Footsteps in snow are swapped in by {@link #stepSound}.
@@ -33,8 +34,13 @@ public final class SnowSounds {
     private static final float GUST_GAIN = 0.55F;
     private static final int BURIED_SCAN = 6;
 
+    /** Share of the wind that comes from upwind; the rest is all around. */
+    private static final float DIRECTED = 0.35F;
+
     private static LoopSound light;
     private static LoopSound strong;
+    private static LoopSound lightUpwind;
+    private static LoopSound strongUpwind;
     private static float outside = 1.0F;
     private static float outsideTarget = 1.0F;
     private static boolean covered;
@@ -67,9 +73,12 @@ public final class SnowSounds {
         double y = eye.y + 2.0;
         double z = eye.z + uz * 10.0;
         float gust = ClientSnow.gust();
-        light = drive(light, HoarfrostSounds.WIND_LIGHT, volume * breezy * LIGHT_GAIN, x, y, z, highs);
-        strong = drive(strong, HoarfrostSounds.WIND_STRONG, volume * stormy * STRONG_GAIN * (float) Math.sqrt(Math.max(0.3F, gust)), x, y,
-                z, highs);
+        float lightVolume = volume * breezy * LIGHT_GAIN;
+        float strongVolume = volume * stormy * STRONG_GAIN * (float) Math.sqrt(Math.max(0.3F, gust));
+        light = drive(light, HoarfrostSounds.WIND_LIGHT, lightVolume * (1.0F - DIRECTED), x, y, z, highs, true);
+        strong = drive(strong, HoarfrostSounds.WIND_STRONG, strongVolume * (1.0F - DIRECTED), x, y, z, highs, true);
+        lightUpwind = drive(lightUpwind, HoarfrostSounds.WIND_LIGHT, lightVolume * DIRECTED, x, y, z, highs, false);
+        strongUpwind = drive(strongUpwind, HoarfrostSounds.WIND_STRONG, strongVolume * DIRECTED, x, y, z, highs, false);
 
         // A gust peaking in a storm sweeps past.
         boolean rising = gust > lastGust;
@@ -87,7 +96,8 @@ public final class SnowSounds {
         lastGust = gust;
     }
 
-    private static LoopSound drive(LoopSound loop, SoundEvent sound, float volume, double x, double y, double z, float highs) {
+    private static LoopSound drive(LoopSound loop, SoundEvent sound, float volume, double x, double y, double z, float highs,
+            boolean around) {
         SoundManager sounds = Minecraft.getInstance().getSoundManager();
         if (loop != null && (loop.isStopped() || !sounds.isActive(loop))) {
             loop = null;
@@ -96,7 +106,7 @@ public final class SnowSounds {
             if (volume < 0.004F) {
                 return null;
             }
-            loop = new LoopSound(sound, x, y, z, highs, RANDOM);
+            loop = new LoopSound(sound, x, y, z, highs, around, RANDOM);
             sounds.play(loop);
         }
         loop.setTarget(volume, x, y, z, highs);
@@ -164,6 +174,14 @@ public final class SnowSounds {
         if (strong != null) {
             sounds.stop(strong);
             strong = null;
+        }
+        if (lightUpwind != null) {
+            sounds.stop(lightUpwind);
+            lightUpwind = null;
+        }
+        if (strongUpwind != null) {
+            sounds.stop(strongUpwind);
+            strongUpwind = null;
         }
         Hush.setWorld(0.0F);
     }

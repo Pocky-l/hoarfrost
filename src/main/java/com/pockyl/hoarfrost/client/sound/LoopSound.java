@@ -7,9 +7,9 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
 
 /**
- * A looping wind sound coming from a direction. Volume, position and muffling glide towards their targets, so the wind
- * swings round smoothly when it turns, a door opening lets the storm in over a second, and the loop stops itself once
- * silent.
+ * A looping wind sound, either all around the listener (relative to the ears, centered) or coming from a direction.
+ * Volume, position and muffling glide towards their targets, so the wind swings round smoothly when it turns, a door
+ * opening lets the storm in over a second, and the loop stops itself once silent.
  */
 final class LoopSound extends AbstractTickableSoundInstance implements Hush.Muffled {
     private static final float VOLUME_STEP = 0.015F;
@@ -24,7 +24,12 @@ final class LoopSound extends AbstractTickableSoundInstance implements Hush.Muff
     private float appliedHighs;
     private int silentTicks;
 
-    LoopSound(SoundEvent event, double x, double y, double z, float highs, RandomSource random) {
+    private final boolean around;
+
+    /**
+     * @param around all around the listener: the sound stays centered, the position is ignored
+     */
+    LoopSound(SoundEvent event, double x, double y, double z, float highs, boolean around, RandomSource random) {
         super(event, SoundSource.WEATHER, SoundInstance.createUnseededRandom());
         looping = true;
         delay = 0;
@@ -32,6 +37,13 @@ final class LoopSound extends AbstractTickableSoundInstance implements Hush.Muff
         pitch = 0.96F + random.nextFloat() * 0.08F;
         // The position only gives the direction: the wind is everywhere, its loudness is the caller's.
         attenuation = Attenuation.NONE;
+        this.around = around;
+        relative = around;
+        if (around) {
+            x = 0.0;
+            y = 0.0;
+            z = 0.0;
+        }
         this.x = targetX = x;
         this.y = targetY = y;
         this.z = targetZ = z;
@@ -40,9 +52,11 @@ final class LoopSound extends AbstractTickableSoundInstance implements Hush.Muff
 
     void setTarget(float volume, double x, double y, double z, float highs) {
         target = Math.clamp(volume, 0.0F, 1.0F);
-        targetX = x;
-        targetY = y;
-        targetZ = z;
+        if (!around) {
+            targetX = x;
+            targetY = y;
+            targetZ = z;
+        }
         targetHighs = highs;
     }
 
