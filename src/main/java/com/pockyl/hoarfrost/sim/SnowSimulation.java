@@ -23,6 +23,11 @@ public final class SnowSimulation {
     private static final int SETTLE_RANGE = 34;
     private static final float GRAIN_RADIUS = 20.0F;
     private static final int MAX_GRAINS_SHARE = 4;
+    /** The dense snow right around the camera: a box this wide, a share of the flakes kept there. */
+    private static final float NEAR_RADIUS = 7.0F;
+    private static final float NEAR_BELOW = 3.0F;
+    private static final float NEAR_ABOVE = 6.0F;
+    private static final float NEAR_SHARE = 0.3F;
 
     private final SnowSettings settings;
     private final SnowWeather weather = new SnowWeather();
@@ -36,6 +41,7 @@ public final class SnowSimulation {
     private int coverCursor;
     private int tick;
     private int falling;
+    private int nearFalling;
     private int grains;
     private double camX;
     private double camY;
@@ -160,6 +166,10 @@ public final class SnowSimulation {
     // Flakes
     // ------------------------------------------------------------------------------------------------------------
 
+    private float radius() {
+        return settings.radius;
+    }
+
     private float above() {
         return settings.radius * 0.8F;
     }
@@ -170,8 +180,8 @@ public final class SnowSimulation {
 
     private void updateFlakes() {
         FlakePool p = pool;
-        float radius = settings.radius;
         int fallingNow = 0;
+        int nearNow = 0;
         int grainsNow = 0;
         for (int i = 0, high = p.highWater(); i < high; i++) {
             byte state = p.state[i];
@@ -192,6 +202,9 @@ public final class SnowSimulation {
             }
             if (state == FlakePool.FALLING) {
                 fallingNow++;
+                if (p.zone[i] == 1) {
+                    nearNow++;
+                }
             } else {
                 grainsNow++;
             }
@@ -248,6 +261,8 @@ public final class SnowSimulation {
                 continue;
             }
             // Wrap around the simulated volume: what leaves it downwind comes back upwind.
+            boolean close = p.zone[i] == 1;
+            float radius = close ? NEAR_RADIUS : this.radius();
             double ox = nx - camX;
             double oz = nz - camZ;
             boolean wrapped = false;
@@ -265,7 +280,7 @@ public final class SnowSimulation {
                 nz += radius * 2.0F;
                 wrapped = true;
             }
-            if (ny < camY - below() || ny > camY + above() + 6.0) {
+            if (close ? ny < camY - NEAR_BELOW || ny > camY + NEAR_ABOVE + 2.0 : ny < camY - below() || ny > camY + above() + 6.0) {
                 p.remove(i);
                 continue;
             }
@@ -295,6 +310,7 @@ public final class SnowSimulation {
             }
         }
         falling = fallingNow;
+        nearFalling = nearNow;
         grains = grainsNow;
     }
 
@@ -308,8 +324,8 @@ public final class SnowSimulation {
         int bx = Mth.floor(nx);
         int bz = Mth.floor(nz);
         int top = terrain.height(bx, bz);
-        float snowTop = settings.cover ? cover.topAt(nx, nz) : Float.NaN;
-        if (!Float.isNaN(snowTop) && ny <= snowTop && y > snowTop - 0.35 && ny > top - 1.0) {
+        float snowTop = settings.cover ? cover.landingTop(nx, y, nz) : Float.NaN;
+        if (!Float.isNaN(snowTop) && ny <= snowTop && y > snowTop - 0.35) {
             settle(i, nx, snowTop + 0.004, nz);
             return true;
         }
@@ -340,6 +356,9 @@ public final class SnowSimulation {
     private void settle(int i, double x, double y, double z) {
         FlakePool p = pool;
         if (p.state[i] == FlakePool.GRAIN) {
+            if (p.mass[i] > 0.0F && settings.cover) {
+                cover.addPowder(x, y, z, p.mass[i]);
+            }
             p.remove(i);
             return;
         }
@@ -354,19 +373,27 @@ public final class SnowSimulation {
 
     private void spawnFlakes() {
         int target = targetFlakes();
-        if (falling < target) {
-            // When the snow sets in (or the player arrives) the air fills at once, flakes fading in where they are;
-            // after that new flakes come in at the top.
-            boolean fill = falling < target * 0.6F;
-            int n = Math.min(target - falling, fill ? Math.max(40, target / 20) : target / 60 + 8);
+        int nearTarget = (int) (target * NEAR_SHARE);
+        spawnZone(1, nearFalling, nearTarget);
+        spawnZone(0, falling - nearFalling, target - nearTarget);
+    }
+
+    /**
+     * Keeps a zone at its number of flakes. When the snow sets in (or the player arrives) the air fills at once, flakes
+     * fading in where they are; after that new flakes come in at the top. Extra flakes fade out.
+     */
+    private void spawnZone(int zone, int count, int target) {
+        if (count < target) {
+            boolean fill = count < target * 0.6F;
+            int n = Math.min(target - count, fill ? Math.max(40, target / 20) : target / 60 + 8);
             for (int k = 0; k < n; k++) {
-                spawnFlake(fill);
+                spawnFlake(zone, fill);
             }
-        } else if (falling > target * 1.1F + 20) {
-            int retire = (falling - target) / 30 + 1;
+        } else if (count > target * 1.1F + 20) {
+            int retire = (count - target) / 30 + 1;
             for (int k = 0; k < retire; k++) {
                 int i = (int) (random.next() * pool.highWater());
-                if (pool.state[i] == FlakePool.FALLING) {
+                if (pool.state[i] == FlakePool.FALLING && pool.zone[i] == zone) {
                     pool.retiring[i] = true;
                 }
             }
@@ -379,22 +406,34 @@ public final class SnowSimulation {
         return (int) Math.min(pool.capacity - reserve, (pool.capacity - reserve) * amount);
     }
 
-    private void spawnFlake(boolean fill) {
-        float radius = settings.radius;
-        float angle = random.next() * Mth.TWO_PI;
-        float r = radius * Mth.sqrt(random.next());
-        double x = camX + Mth.cos(angle) * r;
-        double z = camZ + Mth.sin(angle) * r;
+    private void spawnFlake(int zone, boolean fill) {
+        double x;
+        double z;
+        double top;
+        double bottom;
+        if (zone == 1) {
+            x = camX + (random.next() * 2.0F - 1.0F) * NEAR_RADIUS;
+            z = camZ + (random.next() * 2.0F - 1.0F) * NEAR_RADIUS;
+            top = camY + NEAR_ABOVE;
+            bottom = camY - NEAR_BELOW;
+        } else {
+            float radius = settings.radius;
+            float angle = random.next() * Mth.TWO_PI;
+            float r = radius * Mth.sqrt(random.next());
+            x = camX + Mth.cos(angle) * r;
+            z = camZ + Mth.sin(angle) * r;
+            top = camY + above();
+            bottom = camY - below();
+        }
         int bx = Mth.floor(x);
         int bz = Mth.floor(z);
         if (!terrain.isLoaded(bx, bz) || !terrain.snowy(bx, bz)) {
             return;
         }
         int ground = terrain.height(bx, bz);
-        double top = camY + above();
         double y;
         if (fill) {
-            double low = Math.max(ground + 0.2, camY - below());
+            double low = Math.max(ground + 0.2, bottom);
             if (low >= top) {
                 return;
             }
@@ -409,6 +448,7 @@ public final class SnowSimulation {
         if (i < 0) {
             return;
         }
+        pool.zone[i] = (byte) zone;
         float u = random.next();
         float size = weather.sizeMin + (weather.sizeMax - weather.sizeMin) * u * u;
         pool.size[i] = size;
@@ -450,18 +490,18 @@ public final class SnowSimulation {
     }
 
     /** A grain of powder at a position with a velocity, alive for a while. */
-    private void grain(double x, double y, double z, float vx, float vy, float vz, int life) {
-        grain(x, y, z, vx, vy, vz, life, 0.6F + random.next() * 0.7F);
+    private int grain(double x, double y, double z, float vx, float vy, float vz, int life) {
+        return grain(x, y, z, vx, vy, vz, life, 0.6F + random.next() * 0.7F);
     }
 
     /** A grain or clump of snow of a given size in pixels. */
-    private void grain(double x, double y, double z, float vx, float vy, float vz, int life, float size) {
+    private int grain(double x, double y, double z, float vx, float vy, float vz, int life, float size) {
         if (grains >= pool.capacity / MAX_GRAINS_SHARE) {
-            return;
+            return -1;
         }
         int i = pool.add(FlakePool.GRAIN, x, y, z);
         if (i < 0) {
-            return;
+            return -1;
         }
         grains++;
         pool.size[i] = size;
@@ -475,6 +515,7 @@ public final class SnowSimulation {
         pool.life[i] = life;
         pool.alpha[i] = 0.6F;
         pool.light[i] = terrain.lightAt(x, y + 0.2, z);
+        return i;
     }
 
     /**
@@ -559,9 +600,13 @@ public final class SnowSimulation {
             float top = chunk.top(i);
             int count = (int) Math.min(14, 3 + released * 150.0F);
             for (int c = 0; c < count; c++) {
-                grain(x + (random.next() - 0.5F) * 0.6, top - random.next() * 0.6, z + (random.next() - 0.5F) * 0.6,
-                        weather.windX * 0.5F, -0.02F - random.next() * 0.03F, weather.windZ * 0.5F, 160 + (int) (random.next() * 140),
+                int clump = grain(x + (random.next() - 0.5F) * 0.6, top - random.next() * 0.6, z + (random.next() - 0.5F) * 0.6,
+                        weather.windX * 0.5F, -0.02F - random.next() * 0.03F, weather.windZ * 0.5F, 200 + (int) (random.next() * 160),
                         1.2F + random.next() * 1.6F);
+                if (clump >= 0) {
+                    // The snow comes down to the ground under the tree.
+                    pool.mass[clump] = released / count;
+                }
             }
         }
     }
@@ -588,17 +633,21 @@ public final class SnowSimulation {
         if (!settings.cover || !settings.footprints) {
             return 0.0F;
         }
-        double footX = x - dirZ * side * width * 0.22;
-        double footZ = z + dirX * side * width * 0.22;
-        float top = cover.topAt(footX, footZ);
-        if (Float.isNaN(top) || Math.abs(top - y) > 0.9) {
+        // Prints in the style of the game: square to the block grid, on whole pixels, pointing along an axis.
+        float axisX = Math.abs(dirX) >= Math.abs(dirZ) ? Math.signum(dirX) : 0.0F;
+        float axisZ = axisX == 0.0F ? Math.signum(dirZ) : 0.0F;
+        double footX = pixel(x - axisZ * side * width * 0.22);
+        double footZ = pixel(z + axisX * side * width * 0.22);
+        float top = cover.topNear(footX, y, footZ);
+        if (Float.isNaN(top)) {
             return 0.0F;
         }
         float footWidth = Math.max(0.16F, width * 0.3F);
         float footLength = Math.max(0.22F, width * 0.5F);
-        float sank = cover.press(footX, footZ, footWidth, footLength, dirX, dirZ);
+        float sank = cover.press(footX, y, footZ, footWidth, footLength, axisX, axisZ);
         if (sank > 0.012F) {
-            cover.addPrint(footX, footZ, (float) Math.atan2(dirZ, dirX), Math.max(0.28F, width * 0.6F), shape);
+            float size = (float) pixel(Math.max(0.3F, width * 0.6F));
+            cover.addPrint(footX, y, footZ, (float) Math.atan2(axisZ, axisX), size, shape);
         }
         if (sank > 0.02F && !sneaking) {
             float kick = 0.3F + speed * 6.0F;
@@ -614,16 +663,21 @@ public final class SnowSimulation {
         return sank;
     }
 
+    /** Snapped to the pixel grid of the blocks (sixteenths). */
+    private static double pixel(double value) {
+        return Math.round(value * 16.0) / 16.0;
+    }
+
     /** Landing after a fall: a crater pressed into the snow and a puff of powder. */
     public void land(double x, double y, double z, float width, float fallSpeed) {
         if (!settings.cover || !settings.footprints || fallSpeed < 0.25F) {
             return;
         }
-        float top = cover.topAt(x, z);
-        if (Float.isNaN(top) || Math.abs(top - y) > 0.9) {
+        float top = cover.topNear(x, y, z);
+        if (Float.isNaN(top)) {
             return;
         }
-        float sank = cover.press(x, z, width + 0.2, width + 0.2, 1.0F, 0.0F);
+        float sank = cover.press(x, y, z, width + 0.2, width + 0.2, 1.0F, 0.0F);
         int count = (int) Math.min(40, sank * 120.0F * fallSpeed * 2.0F);
         for (int c = 0; c < count; c++) {
             float angle = random.next() * Mth.TWO_PI;
@@ -647,7 +701,7 @@ public final class SnowSimulation {
             float r = radius * 0.7F * Mth.sqrt(random.next());
             double px = x + Mth.cos(angle) * r;
             double pz = z + Mth.sin(angle) * r;
-            float top = cover.topAt(px, pz);
+            float top = cover.topNear(px, y + 1.0, pz);
             double py = Float.isNaN(top) ? y : top + 0.05;
             float out = 0.1F + random.next() * 0.25F;
             grain(px, py, pz, Mth.cos(angle) * out, 0.1F + random.next() * 0.35F, Mth.sin(angle) * out, 50 + (int) (random.next() * 70));

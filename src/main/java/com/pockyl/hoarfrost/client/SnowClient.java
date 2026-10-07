@@ -504,9 +504,8 @@ public final class SnowClient {
         double x = sound.getX();
         double z = sound.getZ();
         SnowCover cover = simulation.cover();
-        float top = cover.topAt(x, z);
-        float depth = !Float.isNaN(top) && Math.abs(top - sound.getY()) < 0.9 ? cover.depthAt(x, z) : 0.0F;
-        float powder = cover.powderAt(x, z);
+        float depth = cover.depthNear(x, sound.getY(), z);
+        float powder = cover.powderNear(x, sound.getY(), z);
         boolean vanillaSnow = event.getName().equals("block.snow.step") || event.getName().equals("block.powder_snow.step");
         SoundEvent replacement = SnowSounds.stepSound(depth, depth > 0.0F ? 1.0F - powder / depth : 0.0F, vanillaSnow);
         if (replacement == null) {

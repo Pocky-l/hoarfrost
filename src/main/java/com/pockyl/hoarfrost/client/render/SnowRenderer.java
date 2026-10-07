@@ -72,7 +72,8 @@ public final class SnowRenderer implements AutoCloseable {
             BufferBuilder builder = new BufferBuilder(flakeBytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
             curtains.render(builder, simulation.terrain(), camX, camY, camZ, simulation.settings().radius, ClientConfig.quality().curtainRings,
                     curtainStrength, ClientSnow.driftX(partialTick), ClientSnow.driftZ(partialTick), ClientSnow.fallen(partialTick),
-                    ClientSnow.windX(), ClientSnow.windZ(), ClientSnow.fallSpeed());
+                    ClientSnow.windX(), ClientSnow.windZ(), ClientSnow.fallSpeed(),
+                    Math.clamp((ClientSnow.windSpeed() - 0.15F) / 0.4F, 0.0F, 1.0F));
             draw(builder);
         }
 

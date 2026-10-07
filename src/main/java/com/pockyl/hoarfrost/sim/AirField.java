@@ -229,7 +229,7 @@ public final class AirField {
 
     /** Wind speed in the lowest air at a height above the ground: the wind slows down towards the surface. */
     static float profile(float aboveGround) {
-        return Math.min(1.1F, 0.45F + 0.28F * (float) Math.log(1.0 + Math.max(0.0, aboveGround)));
+        return Math.min(1.15F, 0.55F + 0.22F * (float) Math.log(1.0 + Math.max(0.0, aboveGround)));
     }
 
     /**

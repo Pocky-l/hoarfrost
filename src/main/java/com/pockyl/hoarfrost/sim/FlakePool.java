@@ -44,6 +44,10 @@ public final class FlakePool {
     public final byte[] sprite;
     /** True once the flake is being retired (fading out to free its slot). */
     public final boolean[] retiring;
+    /** 1 for flakes kept close around the camera (the dense snow right in front of the eyes), 0 for the rest. */
+    public final byte[] zone;
+    /** Snow a falling clump carries to where it lands (blocks of depth for one cell), 0 for flakes and powder. */
+    public final float[] mass;
     /** Ticks left for grains and settled flakes. */
     public final int[] life;
     /** Packed light, refreshed every few ticks. */
@@ -80,6 +84,8 @@ public final class FlakePool {
         sprite = new byte[capacity];
         retiring = new boolean[capacity];
         life = new int[capacity];
+        zone = new byte[capacity];
+        mass = new float[capacity];
         light = new int[capacity];
         free = new int[capacity];
     }
@@ -103,6 +109,8 @@ public final class FlakePool {
         alpha[i] = 0.0F;
         retiring[i] = false;
         life[i] = 0;
+        zone[i] = 0;
+        mass[i] = 0.0F;
         spin[i] = prevSpin[i] = 0.0F;
         spinRate[i] = 0.0F;
         return i;

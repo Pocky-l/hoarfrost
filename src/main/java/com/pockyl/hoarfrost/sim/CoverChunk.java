@@ -6,17 +6,20 @@ import java.io.IOException;
 import java.util.Arrays;
 
 /**
- * The snow lying on one chunk column: a 64x64 grid of quarter-block cells on the top surface of each block column.
- * A cell knows the height of the surface under it, how much loose powder lies there and how much packed snow
- * (trodden, compressed), and what kind of surface it is.
+ * The snow lying on one chunk column: a 64x64 grid of quarter-block cells, each with up to two surfaces - the top of
+ * the column (open to the sky: ground, a roof, a crown) and the ground under it (beneath a crown, an overhang, the
+ * roof of a tunnel or cave mouth). A surface knows its height, how much loose powder lies there and how much packed
+ * snow (trodden, compressed), and what kind of surface it is. Indices below {@link #AREA} are top surfaces, the
+ * index plus {@link #AREA} is the surface under it.
  */
 public final class CoverChunk {
     public static final int SIZE = 64;
     public static final int AREA = SIZE * SIZE;
+    public static final int CELLS = AREA * 2;
     /** Render tiles are 16x16 cells (4x4 blocks). */
     public static final int TILE = 16;
     public static final int TILES = SIZE / TILE;
-    private static final int FORMAT = 2;
+    private static final int FORMAT = 3;
     /** Most footprints kept per chunk; the oldest make room for new ones. */
     public static final int MAX_PRINTS = 256;
     /** Footprint shapes. */
@@ -29,18 +32,29 @@ public final class CoverChunk {
     private static final float QUANTUM = 1.0F / 4096.0F;
     /** Changes of depth smaller than this (a fifth of a pixel) are not redrawn on their own. */
     private static final float SHOWN_STEP = 0.012F;
+    /** No opening to the open air near a sheltered surface. */
+    public static final float NO_MOUTH = 99.0F;
 
     public final int x;
     public final int z;
-    /** Height of the surface under the snow, NaN where snow cannot lie (water, nothing loaded). */
-    public final float[] base = new float[AREA];
-    public final float[] powder = new float[AREA];
-    public final float[] packed = new float[AREA];
-    public final byte[] kind = new byte[AREA];
+    /** Height of the surface under the snow, NaN where there is none (water, nothing loaded, no ground below). */
+    public final float[] base = new float[CELLS];
+    public final float[] powder = new float[CELLS];
+    public final float[] packed = new float[CELLS];
+    public final byte[] kind = new byte[CELLS];
+    /** The depth of each surface as last drawn (set by the renderer): small changes wait until they can be seen. */
+    public final float[] shown = new float[CELLS];
+    /** Sheltered surfaces: share of the snowfall that comes through the crowns above (0 under a solid roof). */
+    public final float[] through = new float[AREA];
+    /**
+     * Sheltered surfaces: distance in blocks to the nearest opening at the same level (the edge of an overhang, a
+     * tunnel or cave mouth) and the direction from there inwards. Snow blows in from there.
+     */
+    public final float[] mouth = new float[AREA];
+    public final float[] mouthX = new float[AREA];
+    public final float[] mouthZ = new float[AREA];
     /** Incremented whenever the look of a tile changes; the renderer rebuilds tiles whose revision moved. */
     public final int[] tileRevision = new int[TILES * TILES];
-    /** The depth of each cell as last drawn (set by the renderer): small changes wait until they can be seen. */
-    public final float[] shown = new float[AREA];
 
     /**
      * Footprints: position inside the chunk (blocks), heading, size (blocks), shape, and the height of the snow
@@ -64,14 +78,26 @@ public final class CoverChunk {
         this.x = x;
         this.z = z;
         Arrays.fill(base, Float.NaN);
+        Arrays.fill(mouth, NO_MOUTH);
     }
 
+    /** The top surface of a cell. */
     public static int index(int localX, int localZ) {
         return localZ << 6 | localX;
     }
 
+    /** The cell (top surface index) of a surface index. */
+    public static int cell(int i) {
+        return i & (AREA - 1);
+    }
+
+    public static boolean sheltered(int i) {
+        return i >= AREA;
+    }
+
     public static int tile(int index) {
-        return (index >> 6 >> 4) * TILES + ((index & 63) >> 4);
+        int cell = index & (AREA - 1);
+        return (cell >> 6 >> 4) * TILES + ((cell & 63) >> 4);
     }
 
     public float depth(int i) {
@@ -84,6 +110,56 @@ public final class CoverChunk {
 
     public boolean hasSurface(int i) {
         return !Float.isNaN(base[i]);
+    }
+
+    /**
+     * The surface of a cell whose height is closest to {@code y}, if it is within {@code tolerance}; -1 otherwise.
+     */
+    public int near(int cell, float y, float tolerance) {
+        int best = -1;
+        float bestGap = tolerance;
+        for (int i = cell; i < CELLS; i += AREA) {
+            if (hasSurface(i)) {
+                float gap = Math.abs(base[i] - y);
+                if (gap <= bestGap) {
+                    best = i;
+                    bestGap = gap;
+                }
+            }
+        }
+        return best;
+    }
+
+    /** The surface of a cell whose snow something falling at height {@code y} lands on: the highest top not above it. */
+    public int below(int cell, float y) {
+        int best = -1;
+        float bestTop = Float.NEGATIVE_INFINITY;
+        for (int i = cell; i < CELLS; i += AREA) {
+            if (hasSurface(i)) {
+                float top = top(i);
+                if (top <= y && top > bestTop) {
+                    best = i;
+                    bestTop = top;
+                }
+            }
+        }
+        return best;
+    }
+
+    /**
+     * The surface of a cell that something at height {@code y} stands on: the highest ground not above it (its feet may
+     * be deep in the snow on it).
+     */
+    public int ground(int cell, float y) {
+        int best = -1;
+        float bestBase = Float.NEGATIVE_INFINITY;
+        for (int i = cell; i < CELLS; i += AREA) {
+            if (hasSurface(i) && base[i] <= y && base[i] > bestBase) {
+                best = i;
+                bestBase = base[i];
+            }
+        }
+        return best;
     }
 
     /** Changes whenever any tile changes. */
@@ -120,7 +196,7 @@ public final class CoverChunk {
         return surfaces;
     }
 
-    /** Notes a change of depth in a cell; its tile is redrawn once the change can be seen (or right away). */
+    /** Notes a change of depth in a surface; its tile is redrawn once the change can be seen (or right away). */
     void changed(int i, float amount, boolean now) {
         dirty = true;
         if (now || Math.abs(powder[i] + packed[i] - shown[i]) > SHOWN_STEP) {
@@ -148,13 +224,13 @@ public final class CoverChunk {
         out.writeInt(z);
         out.writeBoolean(seeded);
         int cells = 0;
-        for (int i = 0; i < AREA; i++) {
+        for (int i = 0; i < CELLS; i++) {
             if (powder[i] + packed[i] > 0.0F) {
                 cells++;
             }
         }
         out.writeShort(cells);
-        for (int i = 0; i < AREA; i++) {
+        for (int i = 0; i < CELLS; i++) {
             if (powder[i] + packed[i] > 0.0F) {
                 out.writeShort(i);
                 out.writeFloat(base[i]);
@@ -192,7 +268,7 @@ public final class CoverChunk {
         chunk.seeded = in.readBoolean();
         int cells = in.readUnsignedShort();
         for (int n = 0; n < cells; n++) {
-            int i = in.readUnsignedShort() & (AREA - 1);
+            int i = in.readUnsignedShort() & (CELLS - 1);
             chunk.base[i] = in.readFloat();
             chunk.powder[i] = in.readUnsignedShort() * QUANTUM;
             chunk.packed[i] = in.readUnsignedShort() * QUANTUM;

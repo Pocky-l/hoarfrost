@@ -29,9 +29,11 @@ final class SnowCurtains {
     /**
      * @param inner radius of the simulated flakes; the curtains start just outside
      * @param strength 0..1, the curtains' opacity for this snowfall
+     * @param storm 0..1, how stormy the wind is: in a blizzard the curtains are dense and the flakes in them streak
+     *        sideways with the wind
      */
     void render(BufferBuilder builder, Terrain terrain, double camX, double camY, double camZ, float inner, int rings, float strength,
-            double driftX, double driftZ, double fallen, float windX, float windZ, float fallSpeed) {
+            double driftX, double driftZ, double fallen, float windX, float windZ, float fallSpeed, float storm) {
         lastQuads = 0;
         if (strength <= 0.01F || rings <= 0) {
             return;
@@ -39,10 +41,10 @@ final class SnowCurtains {
         for (int ring = 0; ring < rings; ring++) {
             float radius = inner + 2.0F + ring * (5.0F + ring * 2.5F);
             float scale = 1.0F + radius / 40.0F;
-            float tileW = 6.0F * scale;
+            float tileW = 6.0F * scale * (1.0F + 3.0F * storm);
             float tileH = 12.0F * scale;
             float top = (float) (camY + 26.0 + radius * 0.25);
-            float alpha = strength * (0.55F - 0.04F * ring);
+            float alpha = strength * (0.55F - 0.04F * ring) * (1.0F + 0.6F * storm);
             int segments = Math.max(12, Mth.ceil(Mth.TWO_PI * radius / SEGMENT));
             float step = Mth.TWO_PI / segments;
             float offset = ring * 0.37F;

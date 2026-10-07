@@ -29,6 +29,8 @@ public final class Terrain {
     private static final int EXPIRE = 60;
     private static final int LEE_REACH = 8;
     private static final int SECTORS = 16;
+    /** How far below the top of a column sheltered ground is looked for (under trees, overhangs, tunnel roofs). */
+    public static final int SHELTER_SCAN = 24;
 
     private final ShapeCache shapes = new ShapeCache();
     private final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
@@ -219,54 +221,103 @@ public final class Terrain {
     }
 
     /**
-     * The surface snow settles on at (x, z): the top of the highest block of the column there as it looks (the cap of a
-     * fence post, the step of a stair, the visible top of a snow layer), leaves included - crowns turn white. Plants and
-     * other blocks without collision are skipped, snow covers their base. NaN over water, lava and unloaded ground.
+     * The surfaces snow settles on at (x, z), each as it looks (the cap of a fence post, the step of a stair, the visible
+     * top of a snow layer or of powder snow), plants and other blocks without collision skipped (snow covers their
+     * base):
+     * <ul>
+     *   <li>the top of the column - ground, a roof or a crown, open to the sky; NaN over water, lava and unloaded
+     *   ground;</li>
+     *   <li>the ground under it, below a gap of air: under a crown, an overhang, a tunnel or cave roof. NaN if there is
+     *   none within {@link #SHELTER_SCAN} blocks.</li>
+     * </ul>
      *
-     * @param kind receives the {@link SurfaceKind} of the surface
+     * @param bases receives the two heights
+     * @param kinds receives the two {@link SurfaceKind}s
+     * @return the share of the snowfall that comes through to the lower surface: about 45% through each layer of
+     *         leaves, none through anything else
      */
-    public double surface(double x, double z, byte[] kind) {
+    public float surfaces(double x, double z, float[] bases, byte[] kinds) {
         int bx = Mth.floor(x);
         int bz = Mth.floor(z);
         int top = height(bx, bz);
-        kind[0] = SurfaceKind.GROUND;
+        bases[0] = Float.NaN;
+        bases[1] = Float.NaN;
+        kinds[0] = SurfaceKind.GROUND;
+        kinds[1] = SurfaceKind.GROUND;
         cursor.set(bx, top, bz);
         if (!level.isLoaded(cursor)) {
-            return Double.NaN;
+            return 0.0F;
         }
         double lx = x - bx;
         double lz = z - bz;
+        boolean found = false;
+        boolean gap = false;
+        boolean solidRoof = false;
+        int leaves = 0;
         // From the heightmap's own block: snow layers, carpets and the like do not count as blocking motion, so they
         // sit right at the height the heightmap gives and would be missed starting one below.
-        for (int by = top; by >= top - 4; by--) {
+        for (int by = top; by >= top - SHELTER_SCAN; by--) {
             cursor.set(bx, by, bz);
             BlockState state = level.getBlockState(cursor);
             if (state.isAir()) {
+                gap |= found;
                 continue;
             }
             if (!state.getFluidState().isEmpty()) {
-                return Double.NaN;
+                // Water: no snow on it, and nothing for snow under it.
+                break;
             }
-            // Snow layers and powder snow have no (or a lower) collision box but are snow to stand on in looks.
-            boolean layer = state.getBlock() instanceof SnowLayerBlock || state.is(Blocks.POWDER_SNOW);
-            if (!layer && shapes.boxes(state, level, cursor).length == 0) {
+            double best = surfaceTop(state, lx, lz);
+            if (Double.isNaN(best)) {
+                // A plant, or between the posts of a fence: the snow falls through to what is below.
+                gap |= found;
                 continue;
             }
-            double[] boxes = shapes.outline(state, level, cursor);
-            double best = Double.NEGATIVE_INFINITY;
-            for (int b = 0; b < boxes.length; b += 6) {
-                if (lx >= boxes[b] && lx <= boxes[b + 3] && lz >= boxes[b + 2] && lz <= boxes[b + 5] && boxes[b + 4] > best) {
-                    best = boxes[b + 4];
+            byte kind = SurfaceKind.of(state);
+            if (!found) {
+                found = true;
+                bases[0] = (float) (by + best);
+                kinds[0] = kind;
+                if (kind == SurfaceKind.LEAVES) {
+                    leaves++;
+                } else {
+                    solidRoof = true;
                 }
-            }
-            if (best == Double.NEGATIVE_INFINITY) {
-                // Between the posts of a fence or the bars of a pane: the snow falls through to the ground.
                 continue;
             }
-            kind[0] = SurfaceKind.of(state);
-            return by + best;
+            if (gap) {
+                bases[1] = (float) (by + best);
+                kinds[1] = kind;
+                break;
+            }
+            // Still inside the roof (several blocks thick).
+            if (kind == SurfaceKind.LEAVES) {
+                leaves++;
+            } else {
+                solidRoof = true;
+            }
         }
-        return Double.NaN;
+        if (Float.isNaN(bases[1]) || solidRoof) {
+            return 0.0F;
+        }
+        return (float) Math.pow(0.45, leaves);
+    }
+
+    /** Top of the block's visible shape over (lx, lz), NaN when snow passes it (no collision, or nothing there). */
+    private double surfaceTop(BlockState state, double lx, double lz) {
+        // Snow layers and powder snow have no (or a lower) collision box but are snow to stand on in looks.
+        boolean snow = state.getBlock() instanceof SnowLayerBlock || state.is(Blocks.POWDER_SNOW);
+        if (!snow && shapes.boxes(state, level, cursor).length == 0) {
+            return Double.NaN;
+        }
+        double[] boxes = shapes.outline(state, level, cursor);
+        double best = Double.NaN;
+        for (int b = 0; b < boxes.length; b += 6) {
+            if (lx >= boxes[b] && lx <= boxes[b + 3] && lz >= boxes[b + 2] && lz <= boxes[b + 5] && !(boxes[b + 4] <= best)) {
+                best = boxes[b + 4];
+            }
+        }
+        return best;
     }
 
     /** Block light at a position, 0..15 (lamps, torches and fire melt the snow around them). */

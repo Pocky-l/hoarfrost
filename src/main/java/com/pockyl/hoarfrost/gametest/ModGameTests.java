@@ -5,6 +5,7 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
@@ -213,6 +214,92 @@ public final class ModGameTests {
     }
 
     @GameTest(template = "field", skyAccess = true)
+    public static void snowUnderACrownIsThinner(GameTestHelper helper) {
+        floor(helper);
+        for (int x = 3; x <= 11; x++) {
+            for (int z = 3; z <= 20; z++) {
+                helper.setBlock(new BlockPos(x, 5, z), Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true));
+            }
+        }
+        SnowSimulation sim = simulation(helper);
+        calm(sim, SnowType.SNOWFALL);
+        weather(helper, sim, 40);
+        double under = meanDepth(helper, sim, 6, 8);
+        double open = meanDepth(helper, sim, 16, 19);
+        Vec3 crown = helper.absoluteVec(new Vec3(7.5, 6.0, 12.5));
+        helper.assertTrue(under > 0.02, "snow gets through the crown: " + under);
+        helper.assertTrue(under < 0.7 * open, "less under the crown (" + under + ") than in the open (" + open + ")");
+        helper.assertTrue(sim.cover().depthAt(crown.x, crown.z) > 0.02F, "the crown has a cap of snow");
+        helper.succeed();
+    }
+
+    @GameTest(template = "field", skyAccess = true)
+    public static void windBlowsSnowIntoATunnel(GameTestHelper helper) {
+        floor(helper);
+        // A tunnel along +x: walls two thick, a roof, open at x = 10, closed at x = 21.
+        for (int x = 10; x <= 21; x++) {
+            for (int z = 6; z <= 18; z++) {
+                boolean wall = z <= 7 || z >= 17 || x == 21;
+                for (int y = 1; y <= 3; y++) {
+                    if (wall) {
+                        helper.setBlock(new BlockPos(x, y, z), Blocks.STONE);
+                    }
+                }
+                helper.setBlock(new BlockPos(x, 4, z), Blocks.STONE);
+            }
+        }
+        SnowSimulation sim = simulation(helper);
+        calm(sim, SnowType.SNOWFALL);
+        sim.weather().windX = 0.4F;
+        weather(helper, sim, 40);
+        double mouth = meanDepthAt(helper, sim, 10, 11, 12);
+        double deep = meanDepthAt(helper, sim, 18, 19, 12);
+        helper.assertTrue(mouth > 0.02, "snow blown into the mouth: " + mouth);
+        helper.assertTrue(deep < 0.25 * mouth, "little reaches deep inside: " + deep + " vs " + mouth);
+        helper.succeed();
+    }
+
+    @GameTest(template = "field", skyAccess = true)
+    public static void flakeFallsThroughACrownToTheGround(GameTestHelper helper) {
+        floor(helper);
+        for (int x = 8; x <= 16; x++) {
+            for (int z = 8; z <= 16; z++) {
+                helper.setBlock(new BlockPos(x, 6, z), Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true));
+            }
+        }
+        SnowSimulation sim = simulation(helper);
+        calm(sim, SnowType.SNOWFALL);
+        Vec3 start = helper.absoluteVec(new Vec3(12.5, 4.5, 12.5));
+        int flake = sim.addFlake(start.x, start.y, start.z, 1.0F);
+        for (int t = 0; t < 400 && sim.pool().state[flake] == FlakePool.FALLING; t++) {
+            sim.stepFlakes(helper.getLevel(), start.x, start.y, start.z);
+        }
+        double ground = helper.absoluteVec(new Vec3(0.0, 1.0, 0.0)).y;
+        helper.assertTrue(sim.pool().state[flake] == FlakePool.SETTLED && Math.abs(sim.pool().y[flake] - ground) < 0.05,
+                "flake lies on the ground under the crown, at " + (sim.pool().y[flake] - ground));
+        helper.succeed();
+    }
+
+    @GameTest(template = "field", skyAccess = true)
+    public static void windLeavesACrustOnIce(GameTestHelper helper) {
+        floor(helper);
+        for (int x = 2; x < 22; x++) {
+            for (int z = 2; z < 22; z++) {
+                helper.setBlock(new BlockPos(x, 0, z), Blocks.PACKED_ICE);
+            }
+        }
+        SnowSimulation sim = simulation(helper);
+        calm(sim, SnowType.SNOWFALL);
+        powder(helper, sim, 2, 22, 0.05F);
+        sim.weather().snow = 0.0F;
+        sim.weather().windX = 0.6F;
+        weather(helper, sim, 40);
+        double ice = meanDepth(helper, sim, 8, 12);
+        helper.assertTrue(ice >= SnowCover.CRUST * 0.9, "a thin crust stays on the ice: " + ice);
+        helper.succeed();
+    }
+
+    @GameTest(template = "field", skyAccess = true)
     public static void explosionBlowsTheSnowAway(GameTestHelper helper) {
         floor(helper);
         SnowSimulation sim = simulation(helper);
@@ -398,12 +485,15 @@ public final class ModGameTests {
         chunk.powder[100] = 0.21F;
         chunk.packed[100] = 0.05F;
         chunk.kind[100] = SurfaceKind.LEAVES;
+        chunk.base[CoverChunk.AREA + 7] = 60.0F;
+        chunk.powder[CoverChunk.AREA + 7] = 0.1F;
         try {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
             chunk.write(new DataOutputStream(bytes));
             CoverChunk read = CoverChunk.read(new DataInputStream(new ByteArrayInputStream(bytes.toByteArray())));
             helper.assertTrue(read.x == 3 && read.z == -7, "position");
             helper.assertTrue(read.base[100] == 64.5F && read.kind[100] == SurfaceKind.LEAVES, "surface");
+            helper.assertTrue(Math.abs(read.powder[CoverChunk.AREA + 7] - 0.1F) < 0.001F, "the sheltered surface");
             helper.assertTrue(Math.abs(read.powder[100] - 0.21F) < 0.001F && Math.abs(read.packed[100] - 0.05F) < 0.001F, "depths");
         } catch (IOException e) {
             helper.fail("could not write or read: " + e);
@@ -481,9 +571,24 @@ public final class ModGameTests {
         }
     }
 
+    /** Depth of the snow on the ground (relative y 1) at a point, under a crown or roof too. */
     private static double depth(GameTestHelper helper, SnowSimulation sim, double x, double z) {
         Vec3 at = helper.absoluteVec(new Vec3(x, 1.0, z));
-        return sim.cover().depthAt(at.x, at.z);
+        return sim.cover().depthNear(at.x, at.y, at.z);
+    }
+
+    /** Mean depth of the lowest snow at the columns from relative x {@code from} to {@code to}, at relative z. */
+    private static double meanDepthAt(GameTestHelper helper, SnowSimulation sim, int from, int to, int z) {
+        double sum = 0.0;
+        int cells = 0;
+        for (double x = from + 0.125; x < to + 1; x += SnowCover.CELL) {
+            for (double dz = 0.125; dz < 1.0; dz += SnowCover.CELL) {
+                Vec3 at = helper.absoluteVec(new Vec3(x, 1.0, z + dz));
+                sum += sim.cover().depthNear(at.x, at.y, at.z);
+                cells++;
+            }
+        }
+        return sum / cells;
     }
 
     /** Mean depth over the columns from relative x {@code from} to {@code to}, across the middle of the field. */
