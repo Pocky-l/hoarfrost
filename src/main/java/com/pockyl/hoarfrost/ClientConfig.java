@@ -8,24 +8,25 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 public final class ClientConfig {
     /** Budgets that scale with the hardware. Individual options below multiply on top of these. */
     public enum Quality {
-        // maxFlakes, flakeRadius, coverRadius, coverChunksPerTick, curtainRings
-        LOW(3000, 14.0F, 48.0F, 2, 4),
-        MEDIUM(6000, 18.0F, 64.0F, 3, 5),
-        HIGH(12000, 22.0F, 96.0F, 3, 7),
-        ULTRA(20000, 28.0F, 128.0F, 4, 8);
+        // maxFlakes, flakeRadius, coverRadius, coverChunksPerTick, farFlakes
+        LOW(3000, 14.0F, 48.0F, 2, 2000),
+        MEDIUM(6000, 18.0F, 64.0F, 3, 4000),
+        HIGH(12000, 22.0F, 96.0F, 3, 8000),
+        ULTRA(20000, 28.0F, 128.0F, 4, 14000);
 
         public final int maxFlakes;
         public final float flakeRadius;
         public final float coverRadius;
         public final int coverChunksPerTick;
-        public final int curtainRings;
+        /** Flakes falling in the middle distance beyond the simulated ones. */
+        public final int farFlakes;
 
-        Quality(int maxFlakes, float flakeRadius, float coverRadius, int coverChunksPerTick, int curtainRings) {
+        Quality(int maxFlakes, float flakeRadius, float coverRadius, int coverChunksPerTick, int farFlakes) {
             this.maxFlakes = maxFlakes;
             this.flakeRadius = flakeRadius;
             this.coverRadius = coverRadius;
             this.coverChunksPerTick = coverChunksPerTick;
-            this.curtainRings = curtainRings;
+            this.farFlakes = farFlakes;
         }
     }
 
@@ -50,7 +51,7 @@ public final class ClientConfig {
             .translation(key("density"))
             .defineInRange("density", 1.0, 0.1, 3.0);
     public static final ModConfigSpec.BooleanValue CURTAINS = BUILDER
-            .comment("Curtains of snow in the middle distance, beyond the simulated flakes.")
+            .comment("Snow falling in the middle distance, beyond the simulated flakes.")
             .translation(key("curtains"))
             .define("curtains", true);
 

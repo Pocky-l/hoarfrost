@@ -10,18 +10,28 @@ import com.pockyl.hoarfrost.sim.FlakePool;
 
 /**
  * Writes the flakes and grains of the simulation as camera-facing quads in the particle vertex format, interpolated
- * between ticks. Flakes are pixel art like vanilla's snow: single pixels, small crosses and, for large flakes, stars
- * that turn slowly as they tumble. A flake right in front of the eye is out of focus (a soft, faint blob); a flake
- * driven fast across the view (a blizzard) is drawn as a short streak, as the eye sees it.
+ * between ticks. Flakes have their real size - a few millimetres to a few centimetres - and soft shapes: specks, clumps
+ * and, in light calm snow, six-armed crystals that turn and tumble as they fall. Far away a flake never gets smaller
+ * than about a pixel and a half, so the snowfall does not vanish into the distance; a flake right in front of the eye
+ * is out of focus (a soft, faint blob); a flake driven fast across the view (a blizzard) is drawn as a streak, as the
+ * eye sees it.
  */
 final class FlakeRenderer {
     static final ResourceLocation TEXTURE = Hoarfrost.id("textures/fx/flakes.png");
     private static final int SPRITES = 8;
-    /** Size of the shape inside each 8x8 sprite, in texels. */
-    private static final float[] SHAPE = {1.0F, 2.0F, 3.0F, 5.0F, 7.0F, 4.0F, 1.0F, 1.0F};
+    private static final int CLUMP = 1;
+    private static final int CRYSTAL_FIRST = 2;
+    private static final int CRYSTAL_LAST = 4;
     private static final int BLOB = 5;
     private static final int GRAIN = 6;
-    private static final float NEAR = 1.2F;
+    private static final int STREAK = 7;
+    /** Blocks per unit of a flake's size (the simulation's sizes are in "pixels"): size 1 is about 7 mm. */
+    private static final float SCALE = 0.007F;
+    /** Smallest size on screen, as a share of the distance: about a pixel and a half at 1080p. */
+    private static final float MIN_ANGLE = 0.0017F;
+    /** The shapes fill this much of their sprite. */
+    private static final float FILL = 0.7F;
+    private static final float NEAR = 0.45F;
 
     private int lastCount;
 
@@ -45,28 +55,31 @@ final class FlakeRenderer {
                 continue;
             }
             float distance = Mth.sqrt(x * x + y * y + z * z);
-            float alpha = pool.alpha[i] * (state == FlakePool.GRAIN ? 0.8F : 0.92F);
+            float alpha = pool.alpha[i] * (state == FlakePool.GRAIN ? 0.85F : 0.95F);
             int sprite = pool.sprite[i];
-            float size = pool.size[i];
             if (state == FlakePool.GRAIN) {
-                sprite = GRAIN;
-            } else if (state == FlakePool.FALLING && distance < NEAR) {
+                sprite = pool.size[i] > 1.4F ? CLUMP : GRAIN;
+            }
+            float world = Math.max(pool.size[i] * SCALE, distance * MIN_ANGLE);
+            if (state == FlakePool.FALLING && distance < NEAR) {
                 // Too close to focus on.
                 sprite = BLOB;
-                size *= 1.6F;
-                alpha *= 0.12F + 0.5F * distance / NEAR;
+                world *= 2.5F;
+                alpha *= 0.1F + 0.5F * distance / NEAR;
             }
+            // Smaller than its minimum on screen: drawn at the minimum, but fainter, like a speck.
+            alpha *= Math.min(1.0F, 0.45F + pool.size[i] * SCALE / Math.max(1.0E-4F, distance * MIN_ANGLE));
             if (alpha < 0.02F) {
                 continue;
             }
-            float half = 4.0F * size / SHAPE[sprite] / 16.0F;
+            float half = world * 0.5F / FILL;
+            float halfA = half;
             float ax;
             float ay;
             float az;
             float bx;
             float by;
             float bz;
-            float halfA = half;
             float vx = (float) (pool.x[i] - pool.prevX[i]);
             float vy = (float) (pool.y[i] - pool.prevY[i]);
             float vz = (float) (pool.z[i] - pool.prevZ[i]);
@@ -79,6 +92,7 @@ final class FlakeRenderer {
             float pz = vz - nz * along;
             float across = Mth.sqrt(px * px + py * py + pz * pz);
             float bright = 0.9F + 0.1F * ((i * 0x9E3779B9 >>> 24) / 255.0F);
+            boolean crystal = sprite >= CRYSTAL_FIRST && sprite <= CRYSTAL_LAST;
             if (state == FlakePool.SETTLED) {
                 // Lying on the snow or a block: flat, slightly turned.
                 float angle = pool.spin[i];
@@ -89,22 +103,20 @@ final class FlakeRenderer {
                 by = 0.0F;
                 bz = ax;
                 y += 0.003F;
-                half *= 0.8F;
-                halfA = half;
-            } else if (across > 0.09F && (sprite <= 2 || sprite == GRAIN)) {
-                // A streak along the motion across the view.
+            } else if (across > 0.12F && !crystal && sprite != BLOB) {
+                // A streak along the motion across the view: the long axis of the streak sprite is u.
+                sprite = STREAK;
                 ax = px / across;
                 ay = py / across;
                 az = pz / across;
                 bx = ny * az - nz * ay;
                 by = nz * ax - nx * az;
                 bz = nx * ay - ny * ax;
-                halfA = half + across * 1.1F;
-                alpha *= Math.max(0.55F, 1.0F - across * 0.8F);
-            } else if (sprite == 3 || sprite == 4) {
+                halfA = half + across * 0.9F;
+                half *= 0.6F;
+                alpha *= Math.max(0.5F, 1.0F - across * 0.6F);
+            } else if (crystal) {
                 float angle = Mth.lerp(partialTick, pool.prevSpin[i], pool.spin[i]);
-                // Tumbling: the flake turns between face-on and edge-on as it falls.
-                halfA = half * (0.35F + 0.65F * Math.abs(Mth.cos(pool.phase[i] * 0.6F)));
                 float c = Mth.cos(angle);
                 float s = Mth.sin(angle);
                 ax = left.x() * c + up.x() * s;
@@ -113,6 +125,13 @@ final class FlakeRenderer {
                 bx = up.x() * c - left.x() * s;
                 by = up.y() * c - left.y() * s;
                 bz = up.z() * c - left.z() * s;
+                // Tumbling: the crystal turns between face-on and edge-on as it falls.
+                halfA = half * (0.3F + 0.7F * Math.abs(Mth.cos(pool.phase[i] * 0.6F)));
+                if (Mth.sin(pool.phase[i] * 2.3F + i) > 0.985F) {
+                    // Turned to the light for a moment: it glints.
+                    bright = 1.0F;
+                    alpha = 1.0F;
+                }
             } else {
                 ax = left.x();
                 ay = left.y();
@@ -121,27 +140,19 @@ final class FlakeRenderer {
                 by = up.y();
                 bz = up.z();
             }
-            if (state == FlakePool.FALLING && sprite >= 1 && sprite <= 2 && Mth.sin(pool.phase[i] * 2.3F + i) > 0.992F) {
-                // Now and then a crystal turns its face to the light and glints.
-                bright = 1.0F;
-                alpha = 1.0F;
-                sprite = 2;
-                half *= 1.35F;
-                halfA *= 1.35F;
-            }
             float u0 = sprite / (float) SPRITES;
             float u1 = (sprite + 1) / (float) SPRITES;
             int light = pool.light[i];
             int a = (int) (Math.min(1.0F, alpha) * 255.0F);
+            int red = (int) (242.0F * bright);
+            int green = (int) (247.0F * bright);
+            int blue = (int) (255.0F * bright);
             ax *= halfA;
             ay *= halfA;
             az *= halfA;
             bx *= half;
             by *= half;
             bz *= half;
-            int red = (int) (242.0F * bright);
-            int green = (int) (247.0F * bright);
-            int blue = (int) (255.0F * bright);
             builder.addVertex(x - ax - bx, y - ay - by, z - az - bz).setUv(u1, 1.0F).setColor(red, green, blue, a).setLight(light);
             builder.addVertex(x - ax + bx, y - ay + by, z - az + bz).setUv(u1, 0.0F).setColor(red, green, blue, a).setLight(light);
             builder.addVertex(x + ax + bx, y + ay + by, z + az + bz).setUv(u0, 0.0F).setColor(red, green, blue, a).setLight(light);

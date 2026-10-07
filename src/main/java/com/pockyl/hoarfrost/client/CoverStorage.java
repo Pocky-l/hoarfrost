@@ -33,9 +33,9 @@ import java.util.zip.GZIPOutputStream;
 final class CoverStorage implements AutoCloseable {
     /**
      * Bumped when natural seeding or the data changes, so that ground seen before is seeded again (5: sheltered ground
-     * under crowns, roofs and in tunnels).
+     * under crowns, roofs and in tunnels; 6: square footprints).
      */
-    private static final int FORMAT = 5;
+    private static final int FORMAT = 6;
 
     private final Path directory;
     private final Long2ObjectOpenHashMap<Region> regions = new Long2ObjectOpenHashMap<>();

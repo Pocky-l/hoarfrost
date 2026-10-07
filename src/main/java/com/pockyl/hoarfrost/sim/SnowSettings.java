@@ -9,6 +9,10 @@ public final class SnowSettings {
     public int maxFlakes = 6000;
     /** Flakes are simulated within this horizontal distance of the camera. */
     public float radius = 22.0F;
+    /** Flakes in the middle distance, beyond the simulated ones (they only fall and drift). */
+    public int farFlakes = 6000;
+    /** Multiplier for the number of flakes in the middle distance (0 = none). */
+    public float farDensity = 1.0F;
     /** Multiplier for the number of flakes. */
     public float flakeDensity = 1.0F;
     /** Snow settling on the ground. */

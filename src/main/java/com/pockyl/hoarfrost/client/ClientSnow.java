@@ -20,7 +20,7 @@ import com.pockyl.hoarfrost.weather.SnowType;
  * <p>The snow type comes from the server when it has this mod, otherwise from the shared {@link SnowSchedule}. All
  * parameters glide towards the current type over ~10 seconds, so flurries thicken into a snowfall instead of switching.
  *
- * <p>Everything that fills the whole view or the ears (fog, sky, hush, wind, curtains) follows the land around the
+ * <p>Everything that fills the whole view or the ears (fog, sky, hush, wind) follows the land around the
  * listener: it fades towards land where it rains or never snows. Flakes and the snow on the ground go column by
  * column and use the world's precipitation level.
  */
@@ -43,7 +43,6 @@ public final class ClientSnow {
     private static float windBase = SnowType.SNOWFALL.wind;
     private static double driftX;
     private static double driftZ;
-    private static double fallen;
     private static float skyView = 1.0F;
     private static float previousSkyView = 1.0F;
     private static final SnowWeather BLENDED = new SnowWeather();
@@ -51,7 +50,6 @@ public final class ClientSnow {
     // Blended parameters of the current type that only the client uses.
     public static float visibility = SnowType.SNOWFALL.visibility;
     public static float hush = SnowType.SNOWFALL.hush;
-    public static float curtains = SnowType.SNOWFALL.curtains;
 
     private ClientSnow() {
     }
@@ -96,13 +94,11 @@ public final class ClientSnow {
             windBase = type.wind;
             visibility = type.visibility;
             hush = type.hush;
-            curtains = type.curtains;
         } else {
             BLENDED.blendTo(type, BLEND);
             windBase += (type.wind - windBase) * BLEND;
             visibility += (type.visibility - visibility) * BLEND;
             hush += (type.hush - hush) * BLEND;
-            curtains += (type.curtains - curtains) * BLEND;
         }
         double time = level.getGameTime();
         gust = SnowSchedule.gust(time, BLENDED.gustiness);
@@ -112,7 +108,6 @@ public final class ClientSnow {
         windZ = Mth.sin(angle) * speed;
         driftX += windX;
         driftZ += windZ;
-        fallen += BLENDED.fallSpeed;
         tickSkyView(level);
     }
 
@@ -230,10 +225,6 @@ public final class ClientSnow {
         return driftZ + windZ * partialTick;
     }
 
-    /** How far the snow has fallen so far, in blocks, with the partial tick. */
-    public static double fallen(float partialTick) {
-        return fallen + BLENDED.fallSpeed * partialTick;
-    }
 
     public static float fallSpeed() {
         return BLENDED.fallSpeed;

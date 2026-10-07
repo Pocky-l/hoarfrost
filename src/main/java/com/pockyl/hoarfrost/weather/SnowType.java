@@ -9,11 +9,11 @@ import java.util.Locale;
  * <p>Speeds are in blocks per tick, flake sizes in pixels (sixteenths of a block).
  */
 public enum SnowType {
-    // density, fall, sizeMin, sizeMax, flutter, wind, gust, visibility, accumulation, hush, curtains
-    FLURRIES(0.22F, 0.045F, 1.0F, 1.6F, 0.022F, 0.035F, 0.45F, 300.0F, 0.3F, 0.3F, 0.35F),
-    SNOWFALL(0.6F, 0.05F, 1.0F, 2.4F, 0.026F, 0.05F, 0.35F, 170.0F, 1.0F, 0.6F, 0.8F),
-    LARGE_FLAKES(0.42F, 0.036F, 2.0F, 4.2F, 0.034F, 0.022F, 0.15F, 130.0F, 1.4F, 0.85F, 0.65F),
-    BLIZZARD(1.0F, 0.07F, 0.8F, 1.9F, 0.012F, 0.75F, 0.9F, 70.0F, 1.3F, 0.25F, 1.0F);
+    // density, fall, sizeMin, sizeMax, flutter, wind, gust, visibility, accumulation, hush
+    FLURRIES(0.22F, 0.045F, 1.0F, 1.6F, 0.022F, 0.035F, 0.45F, 300.0F, 0.3F, 0.3F),
+    SNOWFALL(0.6F, 0.05F, 1.0F, 2.4F, 0.026F, 0.05F, 0.35F, 170.0F, 1.0F, 0.6F),
+    LARGE_FLAKES(0.42F, 0.036F, 2.0F, 4.2F, 0.034F, 0.022F, 0.15F, 130.0F, 1.4F, 0.85F),
+    BLIZZARD(1.0F, 0.07F, 0.8F, 1.9F, 0.012F, 0.75F, 0.9F, 70.0F, 1.3F, 0.25F);
 
     private static final SnowType[] VALUES = values();
 
@@ -35,11 +35,9 @@ public enum SnowType {
     public final float accumulation;
     /** How much the snow hushes the world's sounds, 0..1 (a blizzard is loud with wind instead). */
     public final float hush;
-    /** Strength of the curtains of snow in the middle distance. */
-    public final float curtains;
 
     SnowType(float density, float fallSpeed, float sizeMin, float sizeMax, float flutter, float wind, float gustiness,
-            float visibility, float accumulation, float hush, float curtains) {
+            float visibility, float accumulation, float hush) {
         this.density = density;
         this.fallSpeed = fallSpeed;
         this.sizeMin = sizeMin;
@@ -50,7 +48,6 @@ public enum SnowType {
         this.visibility = visibility;
         this.accumulation = accumulation;
         this.hush = hush;
-        this.curtains = curtains;
     }
 
     public String id() {

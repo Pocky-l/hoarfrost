@@ -19,13 +19,12 @@ import com.pockyl.hoarfrost.client.ClientSnow;
 import com.pockyl.hoarfrost.sim.SnowSimulation;
 
 /**
- * Draws the snow of a simulation: the falling flakes and the curtains of distant snow in the weather pass (with the
- * vanilla particle shader, which shader packs swap for their weather program), and the snow lying on the world.
+ * Draws the snow of a simulation: the falling flakes in the weather pass (with the vanilla particle shader, which shader
+ * packs swap for their weather program), and the snow lying on the world.
  */
 public final class SnowRenderer implements AutoCloseable {
     private final SnowSimulation simulation;
     private final FlakeRenderer flakes = new FlakeRenderer();
-    private final SnowCurtains curtains = new SnowCurtains();
     private final CoverRenderer cover;
     private final ByteBufferBuilder flakeBytes = new ByteBufferBuilder(1 << 20);
 
@@ -43,12 +42,7 @@ public final class SnowRenderer implements AutoCloseable {
     }
 
     public void renderSnowfall(LightTexture lightTexture, Camera camera, float partialTick, double camX, double camY, double camZ) {
-        boolean anyFlakes = simulation.pool().count() > 0;
-        float curtainStrength = ClientConfig.CURTAINS.get()
-                ? ClientSnow.curtains * ClientSnow.snow() * ClientSnow.skyView(partialTick)
-                        * Math.min(1.0F, simulation.settings().flakeDensity)
-                : 0.0F;
-        if (!anyFlakes && curtainStrength <= 0.01F) {
+        if (simulation.pool().count() == 0) {
             return;
         }
         lightTexture.turnOnLightLayer();
@@ -58,26 +52,12 @@ public final class SnowRenderer implements AutoCloseable {
         RenderSystem.enableDepthTest();
         RenderSystem.depthMask(false);
         RenderSystem.disableCull();
-
-        if (anyFlakes) {
-            Minecraft.getInstance().getTextureManager().getTexture(FlakeRenderer.TEXTURE).setFilter(false, false);
-            RenderSystem.setShaderTexture(0, FlakeRenderer.TEXTURE);
-            BufferBuilder builder = new BufferBuilder(flakeBytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
-            flakes.render(builder, simulation.pool(), camX, camY, camZ, partialTick, camera.getLeftVector(), camera.getUpVector(),
-                    camera.getLookVector());
-            draw(builder);
-        }
-        if (curtainStrength > 0.01F) {
-            Minecraft.getInstance().getTextureManager().getTexture(SnowCurtains.TEXTURE).setFilter(true, false);
-            RenderSystem.setShaderTexture(0, SnowCurtains.TEXTURE);
-            BufferBuilder builder = new BufferBuilder(flakeBytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
-            curtains.render(builder, simulation.terrain(), camX, camY, camZ, simulation.settings().radius,
-                    ClientConfig.quality().curtainRings,
-                    curtainStrength, ClientSnow.driftX(partialTick), ClientSnow.driftZ(partialTick), ClientSnow.fallen(partialTick),
-                    ClientSnow.windX(), ClientSnow.windZ(), ClientSnow.fallSpeed(),
-                    Math.clamp((ClientSnow.windSpeed() - 0.15F) / 0.4F, 0.0F, 1.0F));
-            draw(builder);
-        }
+        Minecraft.getInstance().getTextureManager().getTexture(FlakeRenderer.TEXTURE).setFilter(true, false);
+        RenderSystem.setShaderTexture(0, FlakeRenderer.TEXTURE);
+        BufferBuilder builder = new BufferBuilder(flakeBytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
+        flakes.render(builder, simulation.pool(), camX, camY, camZ, partialTick, camera.getLeftVector(), camera.getUpVector(),
+                camera.getLookVector());
+        draw(builder);
 
         RenderSystem.enableCull();
         RenderSystem.depthMask(true);

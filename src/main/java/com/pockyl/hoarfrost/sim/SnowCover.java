@@ -673,13 +673,13 @@ public final class SnowCover {
     }
 
     /** Leaves the shape of a foot in the snow it pressed (drawn as a print until new snow fills it in). */
-    public void addPrint(double x, double y, double z, float yaw, float size, byte shape) {
+    public void addPrint(double x, double y, double z, float yaw, float size) {
         CoverChunk chunk = chunk(Mth.floor(x) >> 4, Mth.floor(z) >> 4);
         float top = topNear(x, y, z);
         if (chunk == null || Float.isNaN(top)) {
             return;
         }
-        chunk.addPrint(x, z, yaw, size, shape, top);
+        chunk.addPrint(x, z, yaw, size, top);
         chunk.changed(index(cell(x), cell(z)), 1.0F, true);
     }
 

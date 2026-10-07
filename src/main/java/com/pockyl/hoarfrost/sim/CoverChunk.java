@@ -19,15 +19,9 @@ public final class CoverChunk {
     /** Render tiles are 16x16 cells (4x4 blocks). */
     public static final int TILE = 16;
     public static final int TILES = SIZE / TILE;
-    private static final int FORMAT = 3;
+    private static final int FORMAT = 4;
     /** Most footprints kept per chunk; the oldest make room for new ones. */
     public static final int MAX_PRINTS = 256;
-    /** Footprint shapes. */
-    public static final byte PRINT_BOOT = 0;
-    public static final byte PRINT_PAW = 1;
-    public static final byte PRINT_HOOF = 2;
-    public static final byte PRINT_BIRD = 3;
-    public static final byte PRINT_BLOB = 4;
     /** Depths are stored in 1/4096 of a block. */
     private static final float QUANTUM = 1.0F / 4096.0F;
     /** Changes of depth smaller than this (a fifth of a pixel) are not redrawn on their own. */
@@ -57,7 +51,7 @@ public final class CoverChunk {
     public final int[] tileRevision = new int[TILES * TILES];
 
     /**
-     * Footprints: position inside the chunk (blocks), heading, size (blocks), shape, and the height of the snow
+     * Footprints: position inside the chunk (blocks), heading, size (blocks), and the height of the snow
      * right after the foot left - new snow on top of that fills the print in.
      */
     public final float[] printX = new float[MAX_PRINTS];
@@ -65,7 +59,6 @@ public final class CoverChunk {
     public final float[] printYaw = new float[MAX_PRINTS];
     public final float[] printSize = new float[MAX_PRINTS];
     public final float[] printTop = new float[MAX_PRINTS];
-    public final byte[] printShape = new byte[MAX_PRINTS];
     int printCount;
     int printNext;
 
@@ -176,7 +169,7 @@ public final class CoverChunk {
     }
 
     /** Adds a footprint at a world position, replacing the oldest when full. */
-    void addPrint(double x, double z, float yaw, float size, byte shape, float top) {
+    void addPrint(double x, double z, float yaw, float size, float top) {
         int p = printNext;
         printNext = (printNext + 1) % MAX_PRINTS;
         printCount = Math.min(MAX_PRINTS, printCount + 1);
@@ -184,7 +177,6 @@ public final class CoverChunk {
         printZ[p] = (float) (z - this.z * 16);
         printYaw[p] = yaw;
         printSize[p] = size;
-        printShape[p] = shape;
         printTop[p] = top;
     }
 
@@ -247,7 +239,6 @@ public final class CoverChunk {
             out.writeFloat(printYaw[p]);
             out.writeFloat(printSize[p]);
             out.writeFloat(printTop[p]);
-            out.writeByte(printShape[p]);
         }
     }
 
@@ -281,7 +272,6 @@ public final class CoverChunk {
             chunk.printYaw[p] = in.readFloat();
             chunk.printSize[p] = in.readFloat();
             chunk.printTop[p] = in.readFloat();
-            chunk.printShape[p] = in.readByte();
         }
         chunk.printCount = prints;
         chunk.printNext = prints % MAX_PRINTS;

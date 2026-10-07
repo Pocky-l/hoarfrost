@@ -19,28 +19,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.animal.Cat;
-import net.minecraft.world.entity.animal.Chicken;
-import net.minecraft.world.entity.animal.Cow;
-import net.minecraft.world.entity.animal.Fox;
-import net.minecraft.world.entity.animal.Ocelot;
-import net.minecraft.world.entity.animal.Parrot;
-import net.minecraft.world.entity.animal.Pig;
-import net.minecraft.world.entity.animal.PolarBear;
-import net.minecraft.world.entity.animal.Rabbit;
-import net.minecraft.world.entity.animal.Sheep;
-import net.minecraft.world.entity.animal.Wolf;
-import net.minecraft.world.entity.animal.camel.Camel;
-import net.minecraft.world.entity.animal.goat.Goat;
-import net.minecraft.world.entity.animal.horse.AbstractHorse;
-import net.minecraft.world.entity.animal.sniffer.Sniffer;
-import net.minecraft.world.entity.monster.AbstractIllager;
-import net.minecraft.world.entity.monster.AbstractSkeleton;
-import net.minecraft.world.entity.monster.EnderMan;
-import net.minecraft.world.entity.monster.Witch;
-import net.minecraft.world.entity.monster.Zombie;
-import net.minecraft.world.entity.monster.piglin.AbstractPiglin;
-import net.minecraft.world.entity.npc.AbstractVillager;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -118,16 +96,18 @@ public final class SnowClient {
 
     private static void applyConfig() {
         ClientConfig.Quality quality = ClientConfig.quality();
-        int capacity = SETTINGS.maxFlakes;
+        int capacity = SETTINGS.maxFlakes + SETTINGS.farFlakes;
         SETTINGS.maxFlakes = quality.maxFlakes;
+        SETTINGS.farFlakes = quality.farFlakes;
         SETTINGS.radius = quality.flakeRadius;
         SETTINGS.coverRadius = quality.coverRadius;
         SETTINGS.coverChunksPerTick = quality.coverChunksPerTick;
         SETTINGS.flakeDensity = ClientConfig.SNOWFALL.get() ? (float) (double) ClientConfig.DENSITY.get() : 0.0F;
+        SETTINGS.farDensity = ClientConfig.CURTAINS.get() ? SETTINGS.flakeDensity : 0.0F;
         SETTINGS.cover = ClientConfig.COVER.get();
         SETTINGS.drifting = ClientConfig.DRIFTING.get();
         SETTINGS.footprints = ClientConfig.FOOTPRINTS.get();
-        if (capacity != SETTINGS.maxFlakes || !SETTINGS.cover) {
+        if (capacity != SETTINGS.maxFlakes + SETTINGS.farFlakes || !SETTINGS.cover) {
             reset();
         }
     }
@@ -258,31 +238,10 @@ public final class SnowClient {
                 int foot = FOOT.get(id) == 1 ? -1 : 1;
                 FOOT.put(id, foot);
                 simulation.step(entity.getX(), entity.getY(), entity.getZ(), (float) moveX / horizontal, (float) moveZ / horizontal, width,
-                        foot, horizontal, entity.isCrouching(), printShape(entity));
+                        foot, horizontal, entity.isCrouching());
             }
             STRIDE.put(id, walked);
         }
-    }
-
-    /** What the feet of an entity leave in the snow. */
-    private static byte printShape(Entity entity) {
-        if (entity instanceof Player || entity instanceof AbstractVillager || entity instanceof Zombie || entity instanceof AbstractSkeleton
-                || entity instanceof AbstractIllager || entity instanceof AbstractPiglin || entity instanceof Witch
-                || entity instanceof EnderMan) {
-            return CoverChunk.PRINT_BOOT;
-        }
-        if (entity instanceof Wolf || entity instanceof Fox || entity instanceof Cat || entity instanceof Ocelot
-                || entity instanceof PolarBear || entity instanceof Rabbit) {
-            return CoverChunk.PRINT_PAW;
-        }
-        if (entity instanceof Chicken || entity instanceof Parrot) {
-            return CoverChunk.PRINT_BIRD;
-        }
-        if (entity instanceof AbstractHorse || entity instanceof Cow || entity instanceof Sheep || entity instanceof Goat
-                || entity instanceof Pig || entity instanceof Camel || entity instanceof Sniffer) {
-            return CoverChunk.PRINT_HOOF;
-        }
-        return CoverChunk.PRINT_BLOB;
     }
 
     // ------------------------------------------------------------------------------------------------------------

@@ -154,7 +154,7 @@ public final class ModGameTests {
         Vec3 foot = helper.absoluteVec(new Vec3(12.5, 1.0, 12.5));
         float before = sim.cover().depthAt(foot.x, foot.z);
         float topBefore = sim.cover().topAt(foot.x, foot.z);
-        float sank = sim.step(foot.x, foot.y, foot.z, 1.0F, 0.0F, 0.6F, 1, 0.1F, false, CoverChunk.PRINT_BOOT);
+        float sank = sim.step(foot.x, foot.y, foot.z, 1.0F, 0.0F, 0.6F, 1, 0.1F, false);
         helper.assertTrue(sank > 0.15F, "the foot sank " + sank + " into " + before + ", top " + topBefore + " at foot y " + foot.y);
         double footZ = foot.z + 0.6 * 0.22;
         float depth = sim.cover().depthAt(foot.x, footZ);
@@ -172,7 +172,7 @@ public final class ModGameTests {
         calm(sim, SnowType.SNOWFALL);
         powder(helper, sim, 8, 17, 0.2F);
         Vec3 foot = helper.absoluteVec(new Vec3(12.5, 1.0, 12.5));
-        sim.step(foot.x, foot.y, foot.z, 1.0F, 0.0F, 0.6F, 1, 0.1F, false, CoverChunk.PRINT_BOOT);
+        sim.step(foot.x, foot.y, foot.z, 1.0F, 0.0F, 0.6F, 1, 0.1F, false);
         double footZ = foot.z + 0.6 * 0.22;
         float rim = Math.max(sim.cover().depthAt(foot.x, footZ + 0.3), sim.cover().depthAt(foot.x, footZ - 0.3));
         helper.assertTrue(rim > 0.205F, "snow pushed aside forms a rim, deepest beside the print " + rim);
