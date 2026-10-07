@@ -1,5 +1,6 @@
 package com.pockyl.hoarfrost.client.render;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
@@ -8,76 +9,100 @@ import com.pockyl.hoarfrost.ClientConfig;
 import com.pockyl.hoarfrost.client.ClientSnow;
 
 /**
- * The look of a snowy sky and air. Vanilla treats every precipitation like rain: a dark grey sky, dimmer daylight. Under
- * snow clouds the sky is milky and bright, the light is soft but not dim (fresh snow throws it back), and the air
- * fills with a white-blue haze that closes in to a whiteout in a blizzard.
+ * The look of a snowy sky and air. Vanilla treats every precipitation like rain, and a thunderstorm like a darker rain:
+ * the sky, the clouds and the distance turn a dirty dark grey. Under snow clouds it is different - the sky is milky
+ * and bright, a snowstorm by day is a pale grey-white whiteout, the light is soft but not dim (fresh snow throws it
+ * back, even moonlight at night), and the haze of falling snow is white-blue.
+ *
+ * <p>Everything here fades with the share of snowy land around the player, so rain elsewhere keeps its own look.
  */
 public final class SnowSky {
     private SnowSky() {
     }
 
-    private static float amount() {
-        if (!ClientConfig.BRIGHT_SKY.get()) {
-            return 0.0F;
-        }
-        return ClientSnow.snow();
+    private static boolean enabled() {
+        return ClientConfig.BRIGHT_SKY.get();
     }
 
-    private static float luma(Vec3 color) {
-        return (float) (color.x * 0.3 + color.y * 0.59 + color.z * 0.11);
+    private static float luma(double r, double g, double b) {
+        return (float) (r * 0.3 + g * 0.59 + b * 0.11);
     }
 
-    /** The sky colour: towards a light, slightly blue milky white of the same brightness the time of day gives. */
+    /** How much of vanilla's darkening of a colour by rain and thunder is taken back: by the share of snowy land. */
+    private static float restore(ClientLevel level, float partialTick, float rainLoss, float thunderLoss) {
+        float rain = level.getRainLevel(partialTick);
+        float thunder = level.getThunderLevel(partialTick);
+        float kept = (1.0F - rainLoss * rain) * (1.0F - thunderLoss * thunder);
+        float presence = ClientSnow.presence();
+        return 1.0F / Mth.lerp(presence, 1.0F, Math.max(0.2F, kept));
+    }
+
+    /** The sky colour: a light, slightly blue milky white of the brightness the time of day gives. */
     public static Vec3 skyColor(Vec3 color, float partialTick) {
-        float k = amount() * 0.65F;
-        if (k <= 0.0F) {
+        ClientLevel level = Minecraft.getInstance().level;
+        float k = ClientSnow.snow() * 0.75F;
+        if (!enabled() || level == null || k <= 0.0F) {
             return color;
         }
-        float l = Math.min(1.0F, luma(color) * 1.45F + 0.02F);
-        return color.lerp(new Vec3(l * 0.93F, l * 0.96F, l), k);
+        // Vanilla greys the sky by 0.3 x rain and 0.6 x thunder of its brightness.
+        float l = Math.min(1.0F, luma(color.x, color.y, color.z) * restore(level, partialTick, 0.3F, 0.6F) * 1.12F + 0.02F);
+        return color.lerp(new Vec3(l * 0.92F, l * 0.955F, l), k);
     }
 
     /** Snow clouds are pale grey, not the dark grey of rain clouds. */
     public static Vec3 cloudColor(Vec3 color, float partialTick) {
-        float k = amount() * 0.6F;
-        if (k <= 0.0F) {
+        ClientLevel level = Minecraft.getInstance().level;
+        float k = ClientSnow.snow() * 0.7F;
+        if (!enabled() || level == null || k <= 0.0F) {
             return color;
         }
-        float l = Math.min(1.0F, luma(color) * 1.35F);
-        return color.lerp(new Vec3(l * 0.96F, l * 0.97F, l), k);
+        float l = Math.min(1.0F, luma(color.x, color.y, color.z) * restore(level, partialTick, 0.38F, 0.76F) * 1.05F);
+        return color.lerp(new Vec3(l * 0.95F, l * 0.97F, l), k);
     }
 
-    /** Daylight: much of the darkening vanilla gives precipitation is taken back - snow light is soft, not dim. */
+    /**
+     * Daylight: most of the darkening vanilla gives rain and thunder is taken back in snowy land - snow light is soft,
+     * not dim - and at night snowy land stays a little brighter, the snow throwing back the light of the moon.
+     */
     public static float skyDarken(ClientLevel level, float darken, float partialTick) {
-        float k = amount();
-        if (k <= 0.0F) {
+        float presence = ClientSnow.presence();
+        if (!enabled() || presence <= 0.0F) {
             return darken;
         }
         float rain = level.getRainLevel(partialTick);
         float thunder = level.getThunderLevel(partialTick);
         float dimming = (1.0F - rain * 5.0F / 16.0F) * (1.0F - thunder * 5.0F / 16.0F);
-        if (dimming <= 0.01F) {
-            return darken;
+        float result = darken;
+        if (dimming > 0.01F && dimming < 0.999F) {
+            float clear = (darken - 0.2F) / 0.8F / dimming;
+            float snowy = Mth.clamp(clear * (1.0F - rain * 0.1F), 0.0F, 1.0F) * 0.8F + 0.2F;
+            result = Mth.lerp(presence * 0.75F, darken, Math.max(darken, snowy));
         }
-        float clear = (darken - 0.2F) / 0.8F / dimming;
-        float snowy = clear * (1.0F - rain * 0.1F);
-        float target = Mth.clamp(snowy, 0.0F, 1.0F) * 0.8F + 0.2F;
-        // The rain level is already in the darkening; how much of it is snow is the share of snowy land around.
-        return Mth.lerp(ClientSnow.presence() * 0.7F, darken, Math.max(darken, target));
+        return Math.max(result, 0.2F + 0.06F * presence);
     }
 
     /**
-     * Fog colour: the haze of falling snow is white-blue and lighter than the air, by day and night alike (at night it
-     * glows faintly).
+     * Fog colour: the haze of falling snow is white-blue and lighter than the air - pale by day, a faint glow at night -
+     * instead of vanilla's darkened grey.
      */
     public static float[] fogColor(float r, float g, float b, float partialTick) {
-        float k = ClientSnow.snow() * ClientSnow.skyView(partialTick) * (float) Math.min(1.0, ClientConfig.FOG.get());
-        if (k <= 0.0F) {
+        ClientLevel level = Minecraft.getInstance().level;
+        if (level == null || ClientSnow.presence() <= 0.0F) {
             return null;
         }
-        float l = r * 0.3F + g * 0.59F + b * 0.11F;
-        float bright = Math.min(1.0F, l * 1.4F + 0.03F);
-        float mix = k * (0.45F + 0.4F * Mth.clamp((260.0F - ClientSnow.visibility) / 220.0F, 0.0F, 1.0F));
+        // Vanilla multiplies the fog by 1 - 0.5 x rain (blue 0.4) and 1 - 0.5 x thunder.
+        float back = enabled() ? restore(level, partialTick, 0.5F, 0.5F) : 1.0F;
+        r = Math.min(1.0F, r * back);
+        g = Math.min(1.0F, g * back);
+        b = Math.min(1.0F, b * back);
+        float k = ClientSnow.snow() * ClientSnow.skyView(partialTick) * (float) Math.min(1.0, ClientConfig.FOG.get());
+        if (k <= 0.0F) {
+            return new float[] {r, g, b};
+        }
+        float l = luma(r, g, b);
+        float bright = Math.min(1.0F, l * 1.25F + 0.03F);
+        float whiteout = Mth.clamp((260.0F - ClientSnow.visibility) / 220.0F, 0.0F, 1.0F);
+        float mix = k * (0.5F + 0.35F * whiteout);
         return new float[] {
                 Mth.lerp(mix, r, bright * 0.91F),
                 Mth.lerp(mix, g, bright * 0.95F),

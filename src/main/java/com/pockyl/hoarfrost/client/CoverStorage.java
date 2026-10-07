@@ -31,8 +31,8 @@ import java.util.zip.GZIPOutputStream;
  * (small files) and written by a background thread from a snapshot.
  */
 final class CoverStorage implements AutoCloseable {
-    /** Bumped when natural seeding changes, so that ground seen before is seeded again (3: snow on vanilla snow layers and powder snow). */
-    private static final int FORMAT = 3;
+    /** Bumped when natural seeding changes, so that ground seen before is seeded again (4: deeper snow, footprints). */
+    private static final int FORMAT = 4;
 
     private final Path directory;
     private final Long2ObjectOpenHashMap<Region> regions = new Long2ObjectOpenHashMap<>();

@@ -17,6 +17,7 @@ import com.pockyl.hoarfrost.sim.FlakePool;
 import com.pockyl.hoarfrost.sim.SnowCover;
 import com.pockyl.hoarfrost.sim.SnowSettings;
 import com.pockyl.hoarfrost.sim.SnowSimulation;
+import com.pockyl.hoarfrost.sim.SurfaceKind;
 import com.pockyl.hoarfrost.weather.SnowSchedule;
 import com.pockyl.hoarfrost.weather.SnowType;
 import com.pockyl.hoarfrost.world.DriftBuilder;
@@ -152,7 +153,7 @@ public final class ModGameTests {
         Vec3 foot = helper.absoluteVec(new Vec3(12.5, 1.0, 12.5));
         float before = sim.cover().depthAt(foot.x, foot.z);
         float topBefore = sim.cover().topAt(foot.x, foot.z);
-        float sank = sim.step(foot.x, foot.y, foot.z, 1.0F, 0.0F, 0.6F, 1, 0.1F, false);
+        float sank = sim.step(foot.x, foot.y, foot.z, 1.0F, 0.0F, 0.6F, 1, 0.1F, false, CoverChunk.PRINT_BOOT);
         helper.assertTrue(sank > 0.15F, "the foot sank " + sank + " into " + before + ", top " + topBefore + " at foot y " + foot.y);
         double footZ = foot.z + 0.6 * 0.22;
         float depth = sim.cover().depthAt(foot.x, footZ);
@@ -160,6 +161,54 @@ public final class ModGameTests {
         helper.assertTrue(powder == 0.0F && depth > 0.04F && depth < 0.08F, "print holds " + depth + " (powder " + powder + ")");
         float aside = sim.cover().depthAt(foot.x + 1.5, foot.z + 1.5);
         helper.assertTrue(Math.abs(aside - 0.2F) < 0.001F, "snow beside the print is untouched: " + aside);
+        helper.succeed();
+    }
+
+    @GameTest(template = "field", skyAccess = true)
+    public static void footPushesARimAndLeavesAPrint(GameTestHelper helper) {
+        floor(helper);
+        SnowSimulation sim = simulation(helper);
+        calm(sim, SnowType.SNOWFALL);
+        powder(helper, sim, 8, 17, 0.2F);
+        Vec3 foot = helper.absoluteVec(new Vec3(12.5, 1.0, 12.5));
+        sim.step(foot.x, foot.y, foot.z, 1.0F, 0.0F, 0.6F, 1, 0.1F, false, CoverChunk.PRINT_BOOT);
+        double footZ = foot.z + 0.6 * 0.22;
+        float rim = Math.max(sim.cover().depthAt(foot.x, footZ + 0.3), sim.cover().depthAt(foot.x, footZ - 0.3));
+        helper.assertTrue(rim > 0.205F, "snow pushed aside forms a rim, deepest beside the print " + rim);
+        CoverChunk chunk = sim.cover().chunk((int) Math.floor(foot.x) >> 4, (int) Math.floor(footZ) >> 4);
+        helper.assertTrue(chunk != null && chunk.printCount() == 1, "the foot left a print");
+        helper.succeed();
+    }
+
+    @GameTest(template = "field", skyAccess = true)
+    public static void iceHoldsOnlyADusting(GameTestHelper helper) {
+        floor(helper);
+        for (int x = 2; x < 12; x++) {
+            for (int z = 2; z < 22; z++) {
+                helper.setBlock(new BlockPos(x, 0, z), Blocks.PACKED_ICE);
+            }
+        }
+        SnowSimulation sim = simulation(helper);
+        calm(sim, SnowType.SNOWFALL);
+        weather(helper, sim, 40);
+        double ice = meanDepth(helper, sim, 4, 9);
+        double ground = meanDepth(helper, sim, 15, 20);
+        helper.assertTrue(ice <= 0.051 && ice > 0.01, "ice holds a dusting of " + ice);
+        helper.assertTrue(ground > 3.0 * ice, "ground holds more: " + ground);
+        helper.succeed();
+    }
+
+    @GameTest(template = "field", skyAccess = true)
+    public static void hotBlocksMeltTheSnow(GameTestHelper helper) {
+        floor(helper);
+        helper.setBlock(new BlockPos(12, 0, 12), Blocks.MAGMA_BLOCK);
+        SnowSimulation sim = simulation(helper);
+        calm(sim, SnowType.SNOWFALL);
+        powder(helper, sim, 10, 15, 0.2F);
+        weather(helper, sim, 5);
+        Vec3 magma = helper.absoluteVec(new Vec3(12.5, 1.0, 12.5));
+        helper.assertTrue(sim.cover().depthAt(magma.x, magma.z) < 0.01F, "snow on magma melted");
+        helper.assertTrue(sim.cover().depthAt(magma.x + 2.0, magma.z) > 0.19F, "snow on stone stays");
         helper.succeed();
     }
 
@@ -348,13 +397,13 @@ public final class ModGameTests {
         chunk.base[100] = 64.5F;
         chunk.powder[100] = 0.21F;
         chunk.packed[100] = 0.05F;
-        chunk.kind[100] = CoverChunk.LEAVES;
+        chunk.kind[100] = SurfaceKind.LEAVES;
         try {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
             chunk.write(new DataOutputStream(bytes));
             CoverChunk read = CoverChunk.read(new DataInputStream(new ByteArrayInputStream(bytes.toByteArray())));
             helper.assertTrue(read.x == 3 && read.z == -7, "position");
-            helper.assertTrue(read.base[100] == 64.5F && read.kind[100] == CoverChunk.LEAVES, "surface");
+            helper.assertTrue(read.base[100] == 64.5F && read.kind[100] == SurfaceKind.LEAVES, "surface");
             helper.assertTrue(Math.abs(read.powder[100] - 0.21F) < 0.001F && Math.abs(read.packed[100] - 0.05F) < 0.001F, "depths");
         } catch (IOException e) {
             helper.fail("could not write or read: " + e);

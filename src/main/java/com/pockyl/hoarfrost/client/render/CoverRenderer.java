@@ -31,8 +31,10 @@ import com.pockyl.hoarfrost.client.compat.ShaderPacks;
 import com.pockyl.hoarfrost.sim.CoverChunk;
 import com.pockyl.hoarfrost.sim.SnowCover;
 import com.pockyl.hoarfrost.sim.Terrain;
+import com.pockyl.hoarfrost.weather.Noise;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
@@ -57,11 +59,18 @@ final class CoverRenderer implements AutoCloseable {
                     .createCompositeState(false));
     private static final ResourceLocation[] TEXTURES = {
             Hoarfrost.id("block/snow_dust_sparse"), Hoarfrost.id("block/snow_dust"), Hoarfrost.id("block/snow_cover"),
-            Hoarfrost.id("block/snow_packed")};
+            Hoarfrost.id("block/snow_packed"), Hoarfrost.id("block/print_boot"), Hoarfrost.id("block/print_paw"),
+            Hoarfrost.id("block/print_hoof"), Hoarfrost.id("block/print_bird"), Hoarfrost.id("block/print_blob")};
     private static final int TEX_SPARSE = 0;
     private static final int TEX_DUST = 1;
     private static final int TEX_SOLID = 2;
     private static final int TEX_PACKED = 3;
+    private static final int TEX_PRINT = 4;
+    /** Fresh snow is not flat: small lumps, up to this high, fading out as it is packed or thin. */
+    private static final float FLUFF = 0.022F;
+    private static final int FLUFF_SEED = 0x7F1F;
+    /** A print shows until this much new snow has fallen into it. */
+    private static final float PRINT_FILL = 0.05F;
     /** Depths below this are not drawn at all; below the next two the snow is a dusting with gaps. */
     private static final float MIN_DEPTH = 0.0015F;
     private static final float SPARSE_DEPTH = 0.012F;
@@ -95,6 +104,10 @@ final class CoverRenderer implements AutoCloseable {
     private final float[] v1 = new float[TEXTURES.length];
     private boolean shaderPack;
     private double originY;
+    private int tileCellX;
+    private int tileCellZ;
+    private final float[] cornerCache = new float[(CoverChunk.TILE + 1) * (CoverChunk.TILE + 1)];
+    private final boolean[] cornerKnown = new boolean[(CoverChunk.TILE + 1) * (CoverChunk.TILE + 1)];
     private int frame;
     private int lastQuads;
 
@@ -401,6 +414,9 @@ final class CoverRenderer implements AutoCloseable {
         CoverChunk chunk = tile.chunk;
         tile.builtRevision = chunk.tileRevision[tile.index];
         loadRing(tile);
+        tileCellX = tile.cellX;
+        tileCellZ = tile.cellZ;
+        Arrays.fill(cornerKnown, false);
         double minY = Double.MAX_VALUE;
         double maxY = -Double.MAX_VALUE;
         for (int lz = 0; lz < CoverChunk.TILE; lz++) {
@@ -435,11 +451,16 @@ final class CoverRenderer implements AutoCloseable {
                 int cellX = tile.cellX + lx;
                 int cellZ = tile.cellZ + lz;
                 int light = terrain.lightAt((cellX + 0.5) * SnowCover.CELL, base + depth + 0.1, (cellZ + 0.5) * SnowCover.CELL);
-                int texture = depth < SPARSE_DEPTH ? TEX_SPARSE : depth < DUST_DEPTH ? TEX_DUST : ringPacked[r] > 0.5F ? TEX_PACKED : TEX_SOLID;
                 float h00 = corner(lx, lz, r);
                 float h10 = corner(lx + 1, lz, r);
                 float h11 = corner(lx + 1, lz + 1, r);
                 float h01 = corner(lx, lz + 1, r);
+                // The layer is chosen by the smoothed depth, so neighbouring cells of a thin dusting agree.
+                float smooth = (float) ((h00 + h10 + h11 + h01) * 0.25F + originY - base);
+                float shown = Math.min(depth, Math.max(smooth, 0.0F));
+                int texture = shown < SPARSE_DEPTH ? TEX_SPARSE : shown < DUST_DEPTH ? TEX_DUST
+                        : ringPacked[r] > 0.5F ? TEX_PACKED : TEX_SOLID;
+                int tint = shadowTint(r, base, depth);
                 float x0 = lx * SnowCover.CELL;
                 float z0 = lz * SnowCover.CELL;
                 float x1 = x0 + SnowCover.CELL;
@@ -449,10 +470,10 @@ final class CoverRenderer implements AutoCloseable {
                 float u = u0[texture] + du * (cellX & 3);
                 float v = v0[texture] + dv * (cellZ & 3);
                 // Counter-clockwise seen from above: shader packs recompute the normal from the winding.
-                topVertex(builder, x0, h00, z0, u, v, light, h10 - h00, h01 - h00);
-                topVertex(builder, x0, h01, z1, u, v + dv, light, h11 - h01, h01 - h00);
-                topVertex(builder, x1, h11, z1, u + du, v + dv, light, h11 - h01, h11 - h10);
-                topVertex(builder, x1, h10, z0, u + du, v, light, h10 - h00, h11 - h10);
+                topVertex(builder, x0, h00, z0, u, v, light, h10 - h00, h01 - h00, tint);
+                topVertex(builder, x0, h01, z1, u, v + dv, light, h11 - h01, h01 - h00, tint);
+                topVertex(builder, x1, h11, z1, u + du, v + dv, light, h11 - h01, h11 - h10, tint);
+                topVertex(builder, x1, h10, z0, u + du, v, light, h10 - h00, h11 - h10, tint);
                 quads++;
                 if (depth >= SIDE_MIN) {
                     float floor = (float) (base - originY);
@@ -463,30 +484,164 @@ final class CoverRenderer implements AutoCloseable {
                 }
             }
         }
+        quads += prints(builder, tile);
         tile.quads = quads;
         upload(tile, builder);
     }
 
     /**
+     * Snow in a hollow (a print, the trough beside a drift) lies in the shade of its rims and takes the blue of the
+     * sky, like real snow: the deeper the cell lies below its neighbours, the bluer it is drawn.
+     */
+    private int shadowTint(int r, float base, float depth) {
+        float own = base + depth;
+        float sum = 0.0F;
+        int n = 0;
+        for (int k = 0; k < 4; k++) {
+            int o = r + (k == 0 ? 1 : k == 1 ? -1 : k == 2 ? RING : -RING);
+            if (ringHas[o] && Math.abs(ringBase[o] - base) < SnowCover.LEVEL_STEP) {
+                sum += ringBase[o] + ringDepth[o];
+                n++;
+            }
+        }
+        float hollow = n == 0 ? 0.0F : Mth.clamp((sum / n - own) / 0.12F, 0.0F, 1.0F);
+        float red = 1.0F - 0.2F * hollow;
+        float green = 1.0F - 0.12F * hollow;
+        return (int) (red * 255.0F) << 16 | (int) (green * 255.0F) << 8 | 255;
+    }
+
+    /**
      * Height of a cell corner relative to the mesh origin: the average snow surface of the four cells around it. A
      * neighbor on the same surface without snow counts with its bare ground (the snow thins out towards it); a
-     * neighbor on another level (a wall, a step down) does not count.
+     * neighbor on another level (a wall, a step down) does not count. Fresh powder gets small lumps. Corners are the
+     * same for every cell that shares them, so the surface has no cracks.
      */
     private float corner(int cornerX, int cornerZ, int self) {
         float base = ringBase[self];
         float own = base + ringDepth[self];
         float sum = 0.0F;
+        float floor = base;
+        float depth = 0.0F;
+        float packed = 0.0F;
+        boolean shared = true;
         for (int dz = 0; dz < 2; dz++) {
             for (int dx = 0; dx < 2; dx++) {
                 int r = (cornerZ + dz) * RING + cornerX + dx;
-                sum += ringHas[r] && Math.abs(ringBase[r] - base) < SnowCover.LEVEL_STEP ? ringBase[r] + ringDepth[r] : own;
+                if (ringHas[r] && Math.abs(ringBase[r] - base) < SnowCover.LEVEL_STEP) {
+                    sum += ringBase[r] + ringDepth[r];
+                    floor = Math.max(floor, ringBase[r]);
+                    depth += ringDepth[r];
+                    packed += ringPacked[r] * ringDepth[r];
+                } else {
+                    sum += own;
+                    shared = false;
+                }
             }
         }
-        return (float) (Math.max(sum * 0.25F, base + LIFT) - originY);
+        float lumps = 0.0F;
+        if (depth > 0.0F) {
+            float fluff = Math.min(1.0F, depth * 0.25F / 0.12F) * (1.0F - packed / depth);
+            lumps = (Noise.unit(tileCellX + cornerX, tileCellZ + cornerZ, FLUFF_SEED) - 0.35F) * FLUFF * fluff;
+        }
+        float height = (float) (Math.max(sum * 0.25F + lumps, floor + LIFT) - originY);
+        if (shared && cornerX >= 0 && cornerX <= CoverChunk.TILE && cornerZ >= 0 && cornerZ <= CoverChunk.TILE) {
+            // All four cells are one surface: they must agree exactly on this corner.
+            int c = cornerZ * (CoverChunk.TILE + 1) + cornerX;
+            if (cornerKnown[c]) {
+                return cornerCache[c];
+            }
+            cornerKnown[c] = true;
+            cornerCache[c] = height;
+        }
+        return height;
+    }
+
+    /** Height of the drawn surface at a point inside the tile (relative to the origin), from the corners around it. */
+    private float surfaceAt(float x, float z) {
+        float gx = Mth.clamp(x / SnowCover.CELL, 0.0F, CoverChunk.TILE - 0.001F);
+        float gz = Mth.clamp(z / SnowCover.CELL, 0.0F, CoverChunk.TILE - 0.001F);
+        int lx = (int) gx;
+        int lz = (int) gz;
+        int r = (lz + 1) * RING + lx + 1;
+        if (!ringHas[r]) {
+            return Float.NaN;
+        }
+        float fx = gx - lx;
+        float fz = gz - lz;
+        float a = corner(lx, lz, r);
+        float b = corner(lx + 1, lz, r);
+        float c = corner(lx, lz + 1, r);
+        float d = corner(lx + 1, lz + 1, r);
+        return Mth.lerp(fz, Mth.lerp(fx, a, b), Mth.lerp(fx, c, d));
+    }
+
+    /**
+     * The footprints in the tile: the pixel shape of a boot, paw, hoof or bird foot pressed into the snow, following
+     * the surface. A print is gone once new snow has filled it or the snow has melted.
+     */
+    private int prints(BufferBuilder builder, Tile tile) {
+        CoverChunk chunk = tile.chunk;
+        int quads = 0;
+        float tileX = (float) (tile.originX - chunk.x * 16);
+        float tileZ = (float) (tile.originZ - chunk.z * 16);
+        for (int p = 0; p < chunk.printCount(); p++) {
+            float px = chunk.printX[p] - tileX;
+            float pz = chunk.printZ[p] - tileZ;
+            if (px < 0.0F || pz < 0.0F || px >= TILE_BLOCKS || pz >= TILE_BLOCKS) {
+                continue;
+            }
+            int lx = (int) (px / SnowCover.CELL);
+            int lz = (int) (pz / SnowCover.CELL);
+            int r = (lz + 1) * RING + lx + 1;
+            if (!ringHas[r] || ringDepth[r] < 0.01F) {
+                continue;
+            }
+            float filled = (ringBase[r] + ringDepth[r] - chunk.printTop[p]) / PRINT_FILL;
+            if (filled > 0.6F) {
+                continue;
+            }
+            byte shape = chunk.printShape[p];
+            int texture = TEX_PRINT + Mth.clamp(shape, 0, 4);
+            float size = chunk.printSize[p];
+            float halfL = size * 0.5F;
+            float halfW = shape == CoverChunk.PRINT_BOOT ? size * 0.25F : halfL;
+            float yaw = chunk.printYaw[p];
+            float ax = Mth.cos(yaw);
+            float az = Mth.sin(yaw);
+            int light = terrain.lightAt(tile.originX + px, ringBase[r] + ringDepth[r] + 0.1, tile.originZ + pz);
+            // Corners: along the heading (toe at v0) and across it.
+            float[] cx = {px + ax * halfL - az * halfW, px + ax * halfL + az * halfW, px - ax * halfL + az * halfW,
+                    px - ax * halfL - az * halfW};
+            float[] cz = {pz + az * halfL + ax * halfW, pz + az * halfL - ax * halfW, pz - az * halfL - ax * halfW,
+                    pz - az * halfL + ax * halfW};
+            float[] us = {u0[texture], u1[texture], u1[texture], u0[texture]};
+            float[] vs = {v0[texture], v0[texture], v1[texture], v1[texture]};
+            float[] hy = new float[4];
+            boolean ok = true;
+            for (int k = 0; k < 4; k++) {
+                hy[k] = surfaceAt(cx[k], cz[k]);
+                if (Float.isNaN(hy[k])) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (!ok) {
+                continue;
+            }
+            // Wound counter-clockwise seen from above whichever way the print faces.
+            boolean flip = (cx[1] - cx[0]) * (cz[3] - cz[0]) - (cz[1] - cz[0]) * (cx[3] - cx[0]) > 0.0F;
+            for (int n = 0; n < 4; n++) {
+                int k = flip ? 3 - n : n;
+                builder.addVertex(cx[k], hy[k] + 0.006F, cz[k], 0xFFFFFFFF, us[k], vs[k], OverlayTexture.NO_OVERLAY, light, 0.0F, 1.0F,
+                        0.0F);
+            }
+            quads++;
+        }
+        return quads;
     }
 
     /** One corner of the top surface with a normal from the slopes of the cell's edges; lit like vanilla faces. */
-    private void topVertex(BufferBuilder builder, float x, float y, float z, float u, float v, int light, float riseX, float riseZ) {
+    private void topVertex(BufferBuilder builder, float x, float y, float z, float u, float v, int light, float riseX, float riseZ, int tint) {
         float slopeX = riseX / SnowCover.CELL;
         float slopeZ = riseZ / SnowCover.CELL;
         float length = Mth.sqrt(slopeX * slopeX + 1.0F + slopeZ * slopeZ);
@@ -494,8 +649,10 @@ final class CoverRenderer implements AutoCloseable {
         float ny = 1.0F / length;
         float nz = -slopeZ / length;
         float shade = nx * nx * 0.6F + ny * ny + nz * nz * 0.8F;
-        int c = (int) (255.0F * shade);
-        builder.addVertex(x, y, z, 0xFF000000 | c << 16 | c << 8 | c, u, v, OverlayTexture.NO_OVERLAY, light, nx, ny, nz);
+        int r = (int) ((tint >> 16 & 0xFF) * shade);
+        int g = (int) ((tint >> 8 & 0xFF) * shade);
+        int b = (int) ((tint & 0xFF) * shade);
+        builder.addVertex(x, y, z, 0xFF000000 | r << 16 | g << 8 | b, u, v, OverlayTexture.NO_OVERLAY, light, nx, ny, nz);
     }
 
     /**
@@ -593,10 +750,10 @@ final class CoverRenderer implements AutoCloseable {
                 int light = terrain.lightAt(mesh.originX + bx - 0.5, base + depth + 0.1, mesh.originZ + bz - 0.5);
                 float x0 = bx - 1;
                 float z0 = bz - 1;
-                topVertex(builder, x0, h00, z0, u0[texture], v0[texture], light, 0.0F, 0.0F);
-                topVertex(builder, x0, h01, z0 + 1.0F, u0[texture], v1[texture], light, 0.0F, 0.0F);
-                topVertex(builder, x0 + 1.0F, h11, z0 + 1.0F, u1[texture], v1[texture], light, 0.0F, 0.0F);
-                topVertex(builder, x0 + 1.0F, h10, z0, u1[texture], v0[texture], light, 0.0F, 0.0F);
+                topVertex(builder, x0, h00, z0, u0[texture], v0[texture], light, 0.0F, 0.0F, 0xFFFFFF);
+                topVertex(builder, x0, h01, z0 + 1.0F, u0[texture], v1[texture], light, 0.0F, 0.0F, 0xFFFFFF);
+                topVertex(builder, x0 + 1.0F, h11, z0 + 1.0F, u1[texture], v1[texture], light, 0.0F, 0.0F, 0xFFFFFF);
+                topVertex(builder, x0 + 1.0F, h10, z0, u1[texture], v0[texture], light, 0.0F, 0.0F, 0xFFFFFF);
                 quads++;
             }
         }

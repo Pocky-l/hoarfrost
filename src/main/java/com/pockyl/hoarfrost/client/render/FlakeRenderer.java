@@ -78,7 +78,20 @@ final class FlakeRenderer {
             float py = vy - ny * along;
             float pz = vz - nz * along;
             float across = Mth.sqrt(px * px + py * py + pz * pz);
-            if (state != FlakePool.SETTLED && across > 0.09F && sprite <= 2) {
+            float bright = 0.9F + 0.1F * ((i * 0x9E3779B9 >>> 24) / 255.0F);
+            if (state == FlakePool.SETTLED) {
+                // Lying on the snow or a block: flat, slightly turned.
+                float angle = pool.spin[i];
+                ax = Mth.cos(angle);
+                ay = 0.0F;
+                az = Mth.sin(angle);
+                bx = -az;
+                by = 0.0F;
+                bz = ax;
+                y += 0.003F;
+                half *= 0.8F;
+                halfA = half;
+            } else if (across > 0.09F && (sprite <= 2 || sprite == GRAIN)) {
                 // A streak along the motion across the view.
                 ax = px / across;
                 ay = py / across;
@@ -90,6 +103,8 @@ final class FlakeRenderer {
                 alpha *= Math.max(0.55F, 1.0F - across * 0.8F);
             } else if (sprite == 3 || sprite == 4) {
                 float angle = Mth.lerp(partialTick, pool.prevSpin[i], pool.spin[i]);
+                // Tumbling: the flake turns between face-on and edge-on as it falls.
+                halfA = half * (0.35F + 0.65F * Math.abs(Mth.cos(pool.phase[i] * 0.6F)));
                 float c = Mth.cos(angle);
                 float s = Mth.sin(angle);
                 ax = left.x() * c + up.x() * s;
@@ -106,6 +121,14 @@ final class FlakeRenderer {
                 by = up.y();
                 bz = up.z();
             }
+            if (state == FlakePool.FALLING && sprite >= 1 && sprite <= 2 && Mth.sin(pool.phase[i] * 2.3F + i) > 0.992F) {
+                // Now and then a crystal turns its face to the light and glints.
+                bright = 1.0F;
+                alpha = 1.0F;
+                sprite = 2;
+                half *= 1.35F;
+                halfA *= 1.35F;
+            }
             float u0 = sprite / (float) SPRITES;
             float u1 = (sprite + 1) / (float) SPRITES;
             int light = pool.light[i];
@@ -116,10 +139,13 @@ final class FlakeRenderer {
             bx *= half;
             by *= half;
             bz *= half;
-            builder.addVertex(x - ax - bx, y - ay - by, z - az - bz).setUv(u1, 1.0F).setColor(242, 247, 255, a).setLight(light);
-            builder.addVertex(x - ax + bx, y - ay + by, z - az + bz).setUv(u1, 0.0F).setColor(242, 247, 255, a).setLight(light);
-            builder.addVertex(x + ax + bx, y + ay + by, z + az + bz).setUv(u0, 0.0F).setColor(242, 247, 255, a).setLight(light);
-            builder.addVertex(x + ax - bx, y + ay - by, z + az - bz).setUv(u0, 1.0F).setColor(242, 247, 255, a).setLight(light);
+            int red = (int) (242.0F * bright);
+            int green = (int) (247.0F * bright);
+            int blue = (int) (255.0F * bright);
+            builder.addVertex(x - ax - bx, y - ay - by, z - az - bz).setUv(u1, 1.0F).setColor(red, green, blue, a).setLight(light);
+            builder.addVertex(x - ax + bx, y - ay + by, z - az + bz).setUv(u1, 0.0F).setColor(red, green, blue, a).setLight(light);
+            builder.addVertex(x + ax + bx, y + ay + by, z + az + bz).setUv(u0, 0.0F).setColor(red, green, blue, a).setLight(light);
+            builder.addVertex(x + ax - bx, y + ay - by, z + az - bz).setUv(u0, 1.0F).setColor(red, green, blue, a).setLight(light);
             count++;
         }
         lastCount = count;

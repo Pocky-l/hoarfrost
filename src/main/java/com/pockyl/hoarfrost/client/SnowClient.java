@@ -19,6 +19,28 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.animal.Cat;
+import net.minecraft.world.entity.animal.Chicken;
+import net.minecraft.world.entity.animal.Cow;
+import net.minecraft.world.entity.animal.Fox;
+import net.minecraft.world.entity.animal.Ocelot;
+import net.minecraft.world.entity.animal.Parrot;
+import net.minecraft.world.entity.animal.Pig;
+import net.minecraft.world.entity.animal.PolarBear;
+import net.minecraft.world.entity.animal.Rabbit;
+import net.minecraft.world.entity.animal.Sheep;
+import net.minecraft.world.entity.animal.Wolf;
+import net.minecraft.world.entity.animal.camel.Camel;
+import net.minecraft.world.entity.animal.goat.Goat;
+import net.minecraft.world.entity.animal.horse.AbstractHorse;
+import net.minecraft.world.entity.animal.sniffer.Sniffer;
+import net.minecraft.world.entity.monster.AbstractIllager;
+import net.minecraft.world.entity.monster.AbstractSkeleton;
+import net.minecraft.world.entity.monster.EnderMan;
+import net.minecraft.world.entity.monster.Witch;
+import net.minecraft.world.entity.monster.Zombie;
+import net.minecraft.world.entity.monster.piglin.AbstractPiglin;
+import net.minecraft.world.entity.npc.AbstractVillager;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -236,10 +258,31 @@ public final class SnowClient {
                 int foot = FOOT.get(id) == 1 ? -1 : 1;
                 FOOT.put(id, foot);
                 simulation.step(entity.getX(), entity.getY(), entity.getZ(), (float) moveX / horizontal, (float) moveZ / horizontal, width,
-                        foot, horizontal, entity.isCrouching());
+                        foot, horizontal, entity.isCrouching(), printShape(entity));
             }
             STRIDE.put(id, walked);
         }
+    }
+
+    /** What the feet of an entity leave in the snow. */
+    private static byte printShape(Entity entity) {
+        if (entity instanceof Player || entity instanceof AbstractVillager || entity instanceof Zombie || entity instanceof AbstractSkeleton
+                || entity instanceof AbstractIllager || entity instanceof AbstractPiglin || entity instanceof Witch
+                || entity instanceof EnderMan) {
+            return CoverChunk.PRINT_BOOT;
+        }
+        if (entity instanceof Wolf || entity instanceof Fox || entity instanceof Cat || entity instanceof Ocelot
+                || entity instanceof PolarBear || entity instanceof Rabbit) {
+            return CoverChunk.PRINT_PAW;
+        }
+        if (entity instanceof Chicken || entity instanceof Parrot) {
+            return CoverChunk.PRINT_BIRD;
+        }
+        if (entity instanceof AbstractHorse || entity instanceof Cow || entity instanceof Sheep || entity instanceof Goat
+                || entity instanceof Pig || entity instanceof Camel || entity instanceof Sniffer) {
+            return CoverChunk.PRINT_HOOF;
+        }
+        return CoverChunk.PRINT_BLOB;
     }
 
     // ------------------------------------------------------------------------------------------------------------
@@ -470,7 +513,9 @@ public final class SnowClient {
             return;
         }
         // The vanilla instance is not resolved yet at this point (its volume and pitch are not known): ours are fixed.
-        event.setSound(new SimpleSoundInstance(replacement.getLocation(), sound.getSource(), STEP_VOLUME,
+        // Deeper snow crunches louder.
+        float volume = STEP_VOLUME * (0.7F + 0.8F * Math.min(1.0F, depth / 0.2F));
+        event.setSound(new SimpleSoundInstance(replacement.getLocation(), sound.getSource(), volume,
                 0.9F + level.random.nextFloat() * 0.2F, SoundInstance.createUnseededRandom(), false, 0,
                 SoundInstance.Attenuation.LINEAR, x, sound.getY(), z, false));
     }

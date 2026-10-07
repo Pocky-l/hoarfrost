@@ -24,13 +24,11 @@ import java.util.Collection;
 public final class SnowCover {
     public static final float CELL = 0.25F;
     /** Deepest snow that settles out of a snowfall on open ground. */
-    public static final float NATURAL_DEPTH = 0.3F;
+    public static final float NATURAL_DEPTH = SurfaceKind.natural(SurfaceKind.GROUND);
     /** Deepest a drift can grow. */
     public static final float DRIFT_DEPTH = 0.75F;
-    private static final float LEAVES_DEPTH = 0.1F;
-    private static final float ON_SNOW_DEPTH = 0.2F;
     /** Snowfall at full strength settles this much per tick (about a pixel a minute). */
-    public static final float SNOW_RATE = 5.5E-5F;
+    public static final float SNOW_RATE = 7.0E-5F;
     /** Surface wind (blocks per tick) above which loose powder starts to move. */
     public static final float THRESHOLD = 0.14F;
     private static final float TRANSPORT = 6.0E-3F;
@@ -42,6 +40,9 @@ public final class SnowCover {
     public static final float LEVEL_STEP = 0.3F;
     private static final float MELT_COLD = 1.5E-3F;
     private static final float MELT_LIGHT = 2.5E-4F;
+    private static final float MELT_HOT = 0.01F;
+    /** Share of the loose snow under a foot that is pushed aside into a rim around the print. */
+    private static final float PUSHED = 0.35F;
     private static final int MELT_LIGHT_MIN = 11;
     private static final int MAX_DT = 600;
     private static final int PATCH_SEED = 0x5E0D;
@@ -216,8 +217,11 @@ public final class SnowCover {
                 continue;
             }
             float patch = Noise.value(cellX / 9.0, cellZ / 9.0, PATCH_SEED) * 0.7F + Noise.unit(cellX, cellZ, PATCH_SEED + 1) * 0.3F;
-            float depth = 0.025F + 0.07F * patch + 0.12F * terrain.shelter(bx, bz) + 0.08F * terrain.windward(bx, bz);
-            chunk.powder[i] = Math.min(depth, cap(chunk.kind[i], 0.0F, 0.0F) * 0.6F);
+            float shelter = terrain.shelter(bx, bz);
+            float windward = terrain.windward(bx, bz);
+            float natural = SurfaceKind.natural(chunk.kind[i]);
+            float depth = natural * (0.2F + 0.4F * patch) + 0.16F * shelter + 0.1F * windward;
+            chunk.powder[i] = Math.min(depth, cap(chunk.kind[i], shelter, windward) * 0.75F);
         }
         chunk.seeded = true;
         chunk.touchAll();
@@ -225,10 +229,11 @@ public final class SnowCover {
 
     /** The deepest snow that settles out of the air on a cell. */
     private static float cap(byte kind, float shelter, float windward) {
-        if (kind == CoverChunk.LEAVES) {
-            return LEAVES_DEPTH;
+        float natural = SurfaceKind.natural(kind);
+        if (kind != SurfaceKind.GROUND && kind != SurfaceKind.ON_SNOW) {
+            // Crowns, ice and glass do not hold a drift.
+            return natural;
         }
-        float natural = kind == CoverChunk.ON_SNOW ? ON_SNOW_DEPTH : NATURAL_DEPTH;
         return Math.min(DRIFT_DEPTH, natural * (1.0F + 1.1F * shelter + 0.9F * windward));
     }
 
@@ -275,6 +280,9 @@ public final class SnowCover {
             if (!snowy) {
                 melt += MELT_COLD;
             }
+            if (chunk.kind[i] == SurfaceKind.HOT) {
+                melt += MELT_HOT;
+            }
             int light = Math.max(0, heat[block]);
             if (light >= MELT_LIGHT_MIN) {
                 melt += MELT_LIGHT * (light - MELT_LIGHT_MIN + 1);
@@ -289,7 +297,8 @@ public final class SnowCover {
             float shelter = terrain.shelter(bx, bz) * sorting;
             float windward = terrain.windward(bx, bz) * sorting;
             float wind = air.surfaceSpeed(bx, bz);
-            float sweep = Mth.clamp((wind - THRESHOLD) / THRESHOLD, 0.0F, 1.0F);
+            float threshold = THRESHOLD * SurfaceKind.grip(chunk.kind[i]);
+            float sweep = Mth.clamp((wind - threshold) / threshold, 0.0F, 1.0F);
             // Settling out of the snowfall, unevenly: a light snowfall dusts the ground in patches first.
             if (snow > 0.0F) {
                 int cellX = chunk.x * CoverChunk.SIZE + lx;
@@ -304,8 +313,8 @@ public final class SnowCover {
                 }
             }
             // Wind lifts the loose powder and carries it.
-            if (wind > THRESHOLD && chunk.powder[i] > 0.002F && chunk.kind[i] != CoverChunk.LEAVES) {
-                float lift = Math.min(chunk.powder[i] * 0.6F, TRANSPORT * wind * wind * (wind - THRESHOLD) * dt);
+            if (wind > threshold && chunk.powder[i] > 0.002F && chunk.kind[i] != SurfaceKind.LEAVES) {
+                float lift = Math.min(chunk.powder[i] * 0.6F, TRANSPORT * wind * wind * (wind - threshold) * dt);
                 if (lift > 1.0E-5F) {
                     chunk.powder[i] -= lift;
                     chunk.changed(i, lift, false);
@@ -445,19 +454,22 @@ public final class SnowCover {
     // ------------------------------------------------------------------------------------------------------------
 
     /**
-     * A foot comes down: the loose snow under it is pressed into packed snow, about a quarter of its depth.
+     * A foot comes down: the loose snow under it is pressed into packed snow (about a third of its depth) and partly
+     * pushed aside into a rim around the print; on ice the foot only scuffs the thin dusting, most of it skids away.
      *
      * @return the powder that was pressed (how deep the foot sank)
      */
     public float press(double x, double z, double footWidth, double footLength, float dirX, float dirZ) {
         float sank = 0.0F;
+        float pushed = 0.0F;
         int cells = 0;
         double halfW = footWidth * 0.5;
         double halfL = footLength * 0.5;
-        int minX = cell(x - Math.max(halfW, halfL));
-        int maxX = cell(x + Math.max(halfW, halfL));
-        int minZ = cell(z - Math.max(halfW, halfL));
-        int maxZ = cell(z + Math.max(halfW, halfL));
+        double reach = Math.max(halfW, halfL) + CELL;
+        int minX = cell(x - reach);
+        int maxX = cell(x + reach);
+        int minZ = cell(z - reach);
+        int maxZ = cell(z + reach);
         for (int cz = minZ; cz <= maxZ; cz++) {
             for (int cx = minX; cx <= maxX; cx++) {
                 double ox = (cx + 0.5) * CELL - x;
@@ -477,13 +489,39 @@ public final class SnowCover {
                     continue;
                 }
                 chunk.powder[i] = 0.0F;
-                chunk.packed[i] += powder * 0.28F;
+                chunk.packed[i] += powder * SurfaceKind.packing(chunk.kind[i]);
                 chunk.changed(i, powder, true);
+                pushed += powder * PUSHED;
                 sank += powder;
                 cells++;
             }
         }
+        if (pushed > 0.0F) {
+            // The rim: both sides of the print and a little in front of the toe.
+            double side = halfW + CELL * 0.7;
+            int steps = Math.max(1, (int) Math.ceil(halfL * 2.0 / CELL));
+            int rims = steps * 2 + 1;
+            float share = pushed / rims;
+            for (int k = 0; k < steps; k++) {
+                double along = -halfL + (k + 0.5) * (halfL * 2.0 / steps);
+                for (int sign = -1; sign <= 1; sign += 2) {
+                    deposit(cell(x + dirX * along - dirZ * side * sign), cell(z + dirZ * along + dirX * side * sign), share);
+                }
+            }
+            deposit(cell(x + dirX * (halfL + CELL * 0.7)), cell(z + dirZ * (halfL + CELL * 0.7)), share);
+        }
         return cells == 0 ? 0.0F : sank / cells;
+    }
+
+    /** Leaves the shape of a foot in the snow it pressed (drawn as a print until new snow fills it in). */
+    public void addPrint(double x, double z, float yaw, float size, byte shape) {
+        CoverChunk chunk = chunk(Mth.floor(x) >> 4, Mth.floor(z) >> 4);
+        float top = topAt(x, z);
+        if (chunk == null || Float.isNaN(top)) {
+            return;
+        }
+        chunk.addPrint(x, z, yaw, size, shape, top);
+        chunk.changed(index(cell(x), cell(z)), 1.0F, true);
     }
 
     /**

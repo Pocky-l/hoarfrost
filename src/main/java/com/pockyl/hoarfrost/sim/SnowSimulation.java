@@ -100,6 +100,7 @@ public final class SnowSimulation {
         if (settings.cover) {
             if (settings.drifting) {
                 blowPowder();
+                shedCrowns();
             }
             updateCover(level);
         }
@@ -450,6 +451,11 @@ public final class SnowSimulation {
 
     /** A grain of powder at a position with a velocity, alive for a while. */
     private void grain(double x, double y, double z, float vx, float vy, float vz, int life) {
+        grain(x, y, z, vx, vy, vz, life, 0.6F + random.next() * 0.7F);
+    }
+
+    /** A grain or clump of snow of a given size in pixels. */
+    private void grain(double x, double y, double z, float vx, float vy, float vz, int life, float size) {
         if (grains >= pool.capacity / MAX_GRAINS_SHARE) {
             return;
         }
@@ -458,8 +464,8 @@ public final class SnowSimulation {
             return;
         }
         grains++;
-        pool.size[i] = 0.6F + random.next() * 0.7F;
-        pool.sprite[i] = 0;
+        pool.size[i] = size;
+        pool.sprite[i] = (byte) (size > 1.4F ? 1 : 0);
         pool.vx[i] = vx;
         pool.vy[i] = vy;
         pool.vz[i] = vz;
@@ -519,6 +525,47 @@ public final class SnowSimulation {
         }
     }
 
+    /**
+     * Gusts shake the snow off the crowns of trees: a cap of snow on the leaves near the camera lets go now and then
+     * and falls through the branches as a shower of clumps.
+     */
+    private void shedCrowns() {
+        float speed = weather.windSpeed();
+        if (speed < 0.03F) {
+            return;
+        }
+        for (int k = 0; k < 6; k++) {
+            float angle = random.next() * Mth.TWO_PI;
+            float r = 16.0F * Mth.sqrt(random.next());
+            double x = camX + Mth.cos(angle) * r;
+            double z = camZ + Mth.sin(angle) * r;
+            int cx = Mth.floor(x / SnowCover.CELL);
+            int cz = Mth.floor(z / SnowCover.CELL);
+            CoverChunk chunk = cover.chunkAtCell(cx, cz);
+            if (chunk == null) {
+                continue;
+            }
+            int i = SnowCover.index(cx, cz);
+            if (chunk.kind[i] != SurfaceKind.LEAVES || chunk.powder[i] < 0.02F) {
+                continue;
+            }
+            float gust = speed * air.gust(x, z);
+            if (random.next() > (gust - 0.03F) * 0.6F) {
+                continue;
+            }
+            float released = chunk.powder[i] * (0.4F + 0.4F * random.next());
+            chunk.powder[i] -= released;
+            chunk.changed(i, released, false);
+            float top = chunk.top(i);
+            int count = (int) Math.min(14, 3 + released * 150.0F);
+            for (int c = 0; c < count; c++) {
+                grain(x + (random.next() - 0.5F) * 0.6, top - random.next() * 0.6, z + (random.next() - 0.5F) * 0.6,
+                        weather.windX * 0.5F, -0.02F - random.next() * 0.03F, weather.windZ * 0.5F, 160 + (int) (random.next() * 140),
+                        1.2F + random.next() * 1.6F);
+            }
+        }
+    }
+
     // ------------------------------------------------------------------------------------------------------------
     // Disturbances
     // ------------------------------------------------------------------------------------------------------------
@@ -529,12 +576,15 @@ public final class SnowSimulation {
     }
 
     /**
-     * A foot comes down in the snow: a print is pressed beside the body's center line ({@code side} -1 or 1) and a
-     * quick walker kicks up some powder.
+     * A foot comes down in the snow: a print is pressed beside the body's center line ({@code side} -1 or 1), the snow
+     * it pushes aside forms a rim, and the foot kicks up clumps of powder - a few when walking, a spray when running,
+     * none when sneaking.
      *
+     * @param shape the print's shape, one of the {@code CoverChunk.PRINT_*} constants
      * @return how deep the foot sank into loose snow (0 when there was none)
      */
-    public float step(double x, double y, double z, float dirX, float dirZ, float width, int side, float speed, boolean sneaking) {
+    public float step(double x, double y, double z, float dirX, float dirZ, float width, int side, float speed, boolean sneaking,
+            byte shape) {
         if (!settings.cover || !settings.footprints) {
             return 0.0F;
         }
@@ -544,13 +594,21 @@ public final class SnowSimulation {
         if (Float.isNaN(top) || Math.abs(top - y) > 0.9) {
             return 0.0F;
         }
-        float sank = cover.press(footX, footZ, Math.max(0.2, width * 0.42), Math.max(0.25, width * 0.55), dirX, dirZ);
-        if (sank > 0.02F && !sneaking && speed > 0.08F) {
-            int count = (int) Math.min(18, sank * 60.0F * speed * 6.0F);
+        float footWidth = Math.max(0.16F, width * 0.3F);
+        float footLength = Math.max(0.22F, width * 0.5F);
+        float sank = cover.press(footX, footZ, footWidth, footLength, dirX, dirZ);
+        if (sank > 0.012F) {
+            cover.addPrint(footX, footZ, (float) Math.atan2(dirZ, dirX), Math.max(0.28F, width * 0.6F), shape);
+        }
+        if (sank > 0.02F && !sneaking) {
+            float kick = 0.3F + speed * 6.0F;
+            int count = (int) Math.min(40, sank * 90.0F * kick);
             for (int c = 0; c < count; c++) {
+                float forward = speed * (0.5F + random.next() * 0.9F);
                 grain(footX + (random.next() - 0.5F) * 0.3, top + 0.03, footZ + (random.next() - 0.5F) * 0.3,
-                        dirX * speed * (0.4F + random.next() * 0.6F) + (random.next() - 0.5F) * 0.04F, 0.05F + random.next() * 0.07F,
-                        dirZ * speed * (0.4F + random.next() * 0.6F) + (random.next() - 0.5F) * 0.04F, 20 + (int) (random.next() * 20));
+                        dirX * forward + (random.next() - 0.5F) * 0.05F, 0.04F + random.next() * 0.06F * kick,
+                        dirZ * forward + (random.next() - 0.5F) * 0.05F, 18 + (int) (random.next() * 22),
+                        0.8F + random.next() * random.next() * 1.8F);
             }
         }
         return sank;

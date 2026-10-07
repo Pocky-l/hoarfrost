@@ -223,13 +223,13 @@ public final class Terrain {
      * fence post, the step of a stair, the visible top of a snow layer), leaves included - crowns turn white. Plants and
      * other blocks without collision are skipped, snow covers their base. NaN over water, lava and unloaded ground.
      *
-     * @param kind receives {@link CoverChunk#LEAVES}, {@link CoverChunk#ON_SNOW} or 0
+     * @param kind receives the {@link SurfaceKind} of the surface
      */
     public double surface(double x, double z, byte[] kind) {
         int bx = Mth.floor(x);
         int bz = Mth.floor(z);
         int top = height(bx, bz);
-        kind[0] = 0;
+        kind[0] = SurfaceKind.GROUND;
         cursor.set(bx, top, bz);
         if (!level.isLoaded(cursor)) {
             return Double.NaN;
@@ -263,11 +263,7 @@ public final class Terrain {
                 // Between the posts of a fence or the bars of a pane: the snow falls through to the ground.
                 continue;
             }
-            if (state.is(BlockTags.LEAVES)) {
-                kind[0] = CoverChunk.LEAVES;
-            } else if (layer || state.is(Blocks.SNOW_BLOCK)) {
-                kind[0] = CoverChunk.ON_SNOW;
-            }
+            kind[0] = SurfaceKind.of(state);
             return by + best;
         }
         return Double.NaN;
