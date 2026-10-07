@@ -37,6 +37,14 @@ public final class SnowSimulation {
     private static final float FAR_EXTRA = 30.0F;
     private static final float FAR_BELOW = 12.0F;
     private static final float FAR_ABOVE = 28.0F;
+    /**
+     * The dense stream of snow right around the camera: light flakes (moving like the ones in the middle distance) in a
+     * box this wide - most of what one sees of a heavy snowfall or a blizzard. Their number grows with the square of the
+     * snowfall's density, so it is a thin scatter in light snow and a thick stream in a blizzard.
+     */
+    private static final float CLOUD_RADIUS = 12.0F;
+    private static final float CLOUD_BELOW = 5.0F;
+    private static final float CLOUD_ABOVE = 10.0F;
 
     private final SnowSettings settings;
     private final SnowWeather weather = new SnowWeather();
@@ -52,6 +60,7 @@ public final class SnowSimulation {
     private int falling;
     private int nearFalling;
     private int farFalling;
+    private int cloudFalling;
     private int grains;
     private double camX;
     private double camY;
@@ -59,7 +68,7 @@ public final class SnowSimulation {
 
     public SnowSimulation(SnowSettings settings) {
         this.settings = settings;
-        this.pool = new FlakePool(settings.maxFlakes + settings.farFlakes);
+        this.pool = new FlakePool(settings.maxFlakes + settings.farFlakes + settings.cloudFlakes);
     }
 
     public SnowSettings settings() {
@@ -193,6 +202,7 @@ public final class SnowSimulation {
         int fallingNow = 0;
         int nearNow = 0;
         int farNow = 0;
+        int cloudNow = 0;
         int grainsNow = 0;
         for (int i = 0, high = p.highWater(); i < high; i++) {
             byte state = p.state[i];
@@ -230,7 +240,12 @@ public final class SnowSimulation {
             }
             if (p.zone[i] == 2) {
                 farNow++;
-                moveFar(i);
+                moveLight(i, settings.radius + FAR_EXTRA, FAR_BELOW, FAR_ABOVE, 7);
+                continue;
+            }
+            if (p.zone[i] == 3) {
+                cloudNow++;
+                moveLight(i, CLOUD_RADIUS, CLOUD_BELOW, CLOUD_ABOVE, 1);
                 continue;
             }
             double x = p.x[i];
@@ -328,6 +343,7 @@ public final class SnowSimulation {
         falling = fallingNow;
         nearFalling = nearNow;
         farFalling = farNow;
+        cloudFalling = cloudNow;
         grains = grainsNow;
     }
 
@@ -392,16 +408,19 @@ public final class SnowSimulation {
         int target = targetFlakes();
         int nearTarget = (int) (target * NEAR_SHARE);
         spawnZone(1, nearFalling, nearTarget);
-        spawnZone(0, falling - nearFalling - farFalling, target - nearTarget);
-        float amount = weather.snow * weather.density * Mth.clamp(weather.gust, 0.5F, 1.5F) * settings.farDensity;
-        spawnZone(2, farFalling, (int) Math.min(settings.farFlakes, settings.farFlakes * amount));
+        spawnZone(0, falling - nearFalling - farFalling - cloudFalling, target - nearTarget);
+        float amount = weather.snow * weather.density * Mth.clamp(weather.gust, 0.5F, 1.5F);
+        spawnZone(2, farFalling, (int) Math.min(settings.farFlakes, settings.farFlakes * amount * settings.farDensity));
+        float cloud = amount * weather.density * settings.flakeDensity;
+        spawnZone(3, cloudFalling, (int) Math.min(settings.cloudFlakes, settings.cloudFlakes * cloud));
     }
 
     /**
-     * One tick of a flake in the middle distance: it falls and drifts with the wind (a little faster up high), swaying;
-     * where it reaches the ground or leaves the ring it starts again at the top on the other side.
+     * One tick of a light flake (the middle distance, the stream around the camera): it falls and drifts with the wind,
+     * swaying; where it reaches the ground or a roof ({@code check} masks the ticks it looks) or leaves its box, it
+     * starts again at the top of the box on the other side.
      */
-    private void moveFar(int i) {
+    private void moveLight(int i, float reach, float below, float above, int check) {
         FlakePool p = pool;
         p.phase[i] += p.rate[i];
         float sway = weather.flutter * Mth.sin(p.phase[i]);
@@ -412,7 +431,6 @@ public final class SnowSimulation {
         double nx = p.x[i] + p.vx[i];
         double ny = p.y[i] + p.vy[i];
         double nz = p.z[i] + p.vz[i];
-        float reach = settings.radius + FAR_EXTRA;
         double ox = nx - camX;
         double oz = nz - camZ;
         boolean wrapped = false;
@@ -426,10 +444,10 @@ public final class SnowSimulation {
         }
         int bx = Mth.floor(nx);
         int bz = Mth.floor(nz);
-        if (wrapped || ny < camY - FAR_BELOW || ((i + tick) & 7) == 0 && ny < terrain.height(bx, bz)) {
-            if (wrapped || ny < terrain.height(bx, bz) || ny < camY - FAR_BELOW) {
+        if (wrapped || ny < camY - below || ((i + tick) & check) == 0 && ny < terrain.height(bx, bz)) {
+            if (wrapped || ny < terrain.height(bx, bz) || ny < camY - below) {
                 // Landed or left: back in at the top.
-                ny = camY + FAR_ABOVE - random.next() * 2.0;
+                ny = camY + above - random.next() * 2.0;
                 if (ny < terrain.height(bx, bz) || !terrain.snowy(bx, bz)) {
                     p.remove(i);
                     return;
@@ -481,7 +499,12 @@ public final class SnowSimulation {
         double z;
         double top;
         double bottom;
-        if (zone == 2) {
+        if (zone == 3) {
+            x = camX + (random.next() * 2.0F - 1.0F) * CLOUD_RADIUS;
+            z = camZ + (random.next() * 2.0F - 1.0F) * CLOUD_RADIUS;
+            top = camY + CLOUD_ABOVE;
+            bottom = camY - CLOUD_BELOW;
+        } else if (zone == 2) {
             float reach = settings.radius + FAR_EXTRA;
             x = camX + (random.next() * 2.0F - 1.0F) * reach;
             z = camZ + (random.next() * 2.0F - 1.0F) * reach;

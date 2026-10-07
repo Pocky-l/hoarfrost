@@ -11,6 +11,8 @@ public final class SnowSettings {
     public float radius = 22.0F;
     /** Flakes in the middle distance, beyond the simulated ones (they only fall and drift). */
     public int farFlakes = 6000;
+    /** Light flakes in the dense stream right around the camera. */
+    public int cloudFlakes = 16000;
     /** Multiplier for the number of flakes in the middle distance (0 = none). */
     public float farDensity = 1.0F;
     /** Multiplier for the number of flakes. */

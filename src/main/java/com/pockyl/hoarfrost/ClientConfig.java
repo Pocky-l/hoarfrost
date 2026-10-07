@@ -8,11 +8,11 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 public final class ClientConfig {
     /** Budgets that scale with the hardware. Individual options below multiply on top of these. */
     public enum Quality {
-        // maxFlakes, flakeRadius, coverRadius, coverChunksPerTick, farFlakes
-        LOW(4500, 14.0F, 40.0F, 1, 3000),
-        MEDIUM(9000, 18.0F, 56.0F, 2, 6000),
-        HIGH(18000, 22.0F, 80.0F, 2, 12000),
-        ULTRA(30000, 28.0F, 112.0F, 3, 20000);
+        // maxFlakes, flakeRadius, coverRadius, coverChunksPerTick, farFlakes, cloudFlakes
+        LOW(3000, 14.0F, 40.0F, 1, 3000, 6000),
+        MEDIUM(6000, 18.0F, 56.0F, 2, 6000, 12000),
+        HIGH(9000, 22.0F, 80.0F, 2, 12000, 24000),
+        ULTRA(14000, 28.0F, 112.0F, 3, 20000, 40000);
 
         public final int maxFlakes;
         public final float flakeRadius;
@@ -20,13 +20,16 @@ public final class ClientConfig {
         public final int coverChunksPerTick;
         /** Flakes falling in the middle distance beyond the simulated ones. */
         public final int farFlakes;
+        /** Light flakes in the dense stream around the camera (heavy snow and blizzards). */
+        public final int cloudFlakes;
 
-        Quality(int maxFlakes, float flakeRadius, float coverRadius, int coverChunksPerTick, int farFlakes) {
+        Quality(int maxFlakes, float flakeRadius, float coverRadius, int coverChunksPerTick, int farFlakes, int cloudFlakes) {
             this.maxFlakes = maxFlakes;
             this.flakeRadius = flakeRadius;
             this.coverRadius = coverRadius;
             this.coverChunksPerTick = coverChunksPerTick;
             this.farFlakes = farFlakes;
+            this.cloudFlakes = cloudFlakes;
         }
     }
 

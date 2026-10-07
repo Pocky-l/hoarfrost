@@ -39,8 +39,12 @@ final class FlakeRenderer {
         return lastCount;
     }
 
+    /**
+     * @param view cosine of the angle from the view direction to the corners of the screen (with a margin): flakes
+     *        outside that cone are not in view and cost nothing to draw
+     */
     void render(BufferBuilder builder, FlakePool pool, double camX, double camY, double camZ, float partialTick, Vector3f left, Vector3f up,
-            Vector3f look) {
+            Vector3f look, float view) {
         int count = 0;
         for (int i = 0, high = pool.highWater(); i < high; i++) {
             byte state = pool.state[i];
@@ -55,6 +59,9 @@ final class FlakeRenderer {
                 continue;
             }
             float distance = Mth.sqrt(x * x + y * y + z * z);
+            if (ahead < distance * view && distance > 1.0F) {
+                continue;
+            }
             float alpha = pool.alpha[i] * (state == FlakePool.GRAIN ? 0.85F : 0.95F);
             int sprite = pool.sprite[i];
             if (state == FlakePool.GRAIN) {

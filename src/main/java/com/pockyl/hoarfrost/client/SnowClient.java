@@ -96,9 +96,10 @@ public final class SnowClient {
 
     private static void applyConfig() {
         ClientConfig.Quality quality = ClientConfig.quality();
-        int capacity = SETTINGS.maxFlakes + SETTINGS.farFlakes;
+        int capacity = SETTINGS.maxFlakes + SETTINGS.farFlakes + SETTINGS.cloudFlakes;
         SETTINGS.maxFlakes = quality.maxFlakes;
         SETTINGS.farFlakes = quality.farFlakes;
+        SETTINGS.cloudFlakes = quality.cloudFlakes;
         SETTINGS.radius = quality.flakeRadius;
         SETTINGS.coverRadius = quality.coverRadius;
         SETTINGS.coverChunksPerTick = quality.coverChunksPerTick;
@@ -107,7 +108,7 @@ public final class SnowClient {
         SETTINGS.cover = ClientConfig.COVER.get();
         SETTINGS.drifting = ClientConfig.DRIFTING.get();
         SETTINGS.footprints = ClientConfig.FOOTPRINTS.get();
-        if (capacity != SETTINGS.maxFlakes + SETTINGS.farFlakes || !SETTINGS.cover) {
+        if (capacity != SETTINGS.maxFlakes + SETTINGS.farFlakes + SETTINGS.cloudFlakes || !SETTINGS.cover) {
             reset();
         }
     }

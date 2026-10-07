@@ -56,13 +56,23 @@ public final class SnowRenderer implements AutoCloseable {
         RenderSystem.setShaderTexture(0, FlakeRenderer.TEXTURE);
         BufferBuilder builder = new BufferBuilder(flakeBytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
         flakes.render(builder, simulation.pool(), camX, camY, camZ, partialTick, camera.getLeftVector(), camera.getUpVector(),
-                camera.getLookVector());
+                camera.getLookVector(), viewCone());
         draw(builder);
 
         RenderSystem.enableCull();
         RenderSystem.depthMask(true);
         RenderSystem.disableBlend();
         lightTexture.turnOffLightLayer();
+    }
+
+    /** Cosine of the half angle of a cone around the view direction that holds the whole screen, with a margin. */
+    private static float viewCone() {
+        Minecraft minecraft = Minecraft.getInstance();
+        // The field of view widens when sprinting or flying fast: allow for it.
+        double vertical = Math.toRadians(minecraft.options.fov().get() * 1.3);
+        double aspect = (double) minecraft.getWindow().getWidth() / Math.max(1, minecraft.getWindow().getHeight());
+        double diagonal = Math.atan(Math.tan(vertical * 0.5) * Math.sqrt(1.0 + aspect * aspect));
+        return (float) Math.cos(Math.min(diagonal + 0.15, Math.PI * 0.5));
     }
 
     private static void draw(BufferBuilder builder) {
