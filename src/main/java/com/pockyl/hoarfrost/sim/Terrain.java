@@ -236,7 +236,9 @@ public final class Terrain {
         }
         double lx = x - bx;
         double lz = z - bz;
-        for (int by = top - 1; by >= top - 4; by--) {
+        // From the heightmap's own block: snow layers, carpets and the like do not count as blocking motion, so they
+        // sit right at the height the heightmap gives and would be missed starting one below.
+        for (int by = top; by >= top - 4; by--) {
             cursor.set(bx, by, bz);
             BlockState state = level.getBlockState(cursor);
             if (state.isAir()) {

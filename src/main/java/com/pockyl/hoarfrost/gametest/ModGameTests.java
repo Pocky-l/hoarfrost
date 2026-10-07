@@ -214,6 +214,23 @@ public final class ModGameTests {
     }
 
     @GameTest(template = "field", skyAccess = true)
+    public static void snowLiesOnVanillaSnowLayers(GameTestHelper helper) {
+        floor(helper);
+        helper.setBlock(new BlockPos(12, 1, 12), Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 2));
+        SnowSimulation sim = simulation(helper);
+        calm(sim, SnowType.SNOWFALL);
+        Vec3 on = helper.absoluteVec(new Vec3(12.5, 1.25, 12.5));
+        float top = sim.cover().topAt(on.x, on.z);
+        helper.assertTrue(Math.abs(top - on.y) < 0.01, "snow lies on the layer's top, not under it: " + (top - on.y));
+        int flake = sim.addFlake(on.x, on.y + 4.0, on.z, 1.5F);
+        for (int t = 0; t < 400 && sim.pool().state[flake] == FlakePool.FALLING; t++) {
+            sim.stepFlakes(helper.getLevel(), on.x, on.y + 2.0, on.z);
+        }
+        helper.assertTrue(Math.abs(sim.pool().y[flake] - on.y) < 0.05, "flake lands on the layer at " + (sim.pool().y[flake] - on.y));
+        helper.succeed();
+    }
+
+    @GameTest(template = "field", skyAccess = true)
     public static void flakeLandsOnTheGround(GameTestHelper helper) {
         floor(helper);
         SnowSimulation sim = simulation(helper);
