@@ -409,7 +409,7 @@ public final class SnowClient {
             return;
         }
         float far = event.getFarPlaneDistance();
-        float target = ClientSnow.visibility * 0.7F;
+        float target = ClientSnow.visibility * 1.2F;
         if (target >= far) {
             return;
         }
@@ -422,7 +422,8 @@ public final class SnowClient {
             return;
         }
         float near = event.getNearPlaneDistance();
-        float newNear = Math.min(near, newFar * (0.35F - 0.3F * k));
+        // The haze thickens gradually from just in front of the camera instead of standing as a wall.
+        float newNear = Math.min(near, newFar * (0.2F - 0.15F * k));
         event.setFarPlaneDistance(newFar);
         event.setNearPlaneDistance(Math.max(0.0F, newNear));
         event.setCanceled(true);

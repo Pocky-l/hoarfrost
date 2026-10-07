@@ -37,16 +37,16 @@ public final class SnowSky {
         return 1.0F / Mth.lerp(presence, 1.0F, Math.max(0.2F, kept));
     }
 
-    /** The sky colour: a light, slightly blue milky white of the brightness the time of day gives. */
+    /** The sky colour: an overcast, slightly blue grey of the brightness the time of day gives. */
     public static Vec3 skyColor(Vec3 color, float partialTick) {
         ClientLevel level = Minecraft.getInstance().level;
-        float k = ClientSnow.snow() * 0.75F;
+        float k = ClientSnow.snow() * 0.6F;
         if (!enabled() || level == null || k <= 0.0F) {
             return color;
         }
         // Vanilla greys the sky by 0.3 x rain and 0.6 x thunder of its brightness.
-        float l = Math.min(1.0F, luma(color.x, color.y, color.z) * restore(level, partialTick, 0.3F, 0.6F) * 1.12F + 0.02F);
-        return color.lerp(new Vec3(l * 0.92F, l * 0.955F, l), k);
+        float l = Math.min(1.0F, luma(color.x, color.y, color.z) * restore(level, partialTick, 0.3F, 0.6F) * 0.95F);
+        return color.lerp(new Vec3(l * 0.86F, l * 0.93F, l * 1.04F), k);
     }
 
     /** Snow clouds are pale grey, not the dark grey of rain clouds. */
@@ -82,8 +82,8 @@ public final class SnowSky {
     }
 
     /**
-     * Fog colour: the haze of falling snow is white-blue and lighter than the air - pale by day, a faint glow at night -
-     * instead of vanilla's darkened grey.
+     * Fog colour: the haze of falling snow is a cool blue-grey of the brightness of the sky - not vanilla's dark grey,
+     * and not a white wall either: the land shows through it in layers.
      */
     public static float[] fogColor(float r, float g, float b, float partialTick) {
         ClientLevel level = Minecraft.getInstance().level;
@@ -99,13 +99,11 @@ public final class SnowSky {
         if (k <= 0.0F) {
             return new float[] {r, g, b};
         }
-        float l = luma(r, g, b);
-        float bright = Math.min(1.0F, l * 1.25F + 0.03F);
-        float whiteout = Mth.clamp((260.0F - ClientSnow.visibility) / 220.0F, 0.0F, 1.0F);
-        float mix = k * (0.5F + 0.35F * whiteout);
+        float l = Math.min(1.0F, luma(r, g, b) * 0.95F);
+        float mix = k * 0.45F;
         return new float[] {
-                Mth.lerp(mix, r, bright * 0.91F),
-                Mth.lerp(mix, g, bright * 0.95F),
-                Mth.lerp(mix, b, bright)};
+                Mth.lerp(mix, r, l * 0.84F),
+                Mth.lerp(mix, g, l * 0.92F),
+                Mth.lerp(mix, b, Math.min(1.0F, l * 1.05F))};
     }
 }
