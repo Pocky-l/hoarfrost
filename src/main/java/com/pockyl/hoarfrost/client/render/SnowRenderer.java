@@ -45,7 +45,8 @@ public final class SnowRenderer implements AutoCloseable {
     public void renderSnowfall(LightTexture lightTexture, Camera camera, float partialTick, double camX, double camY, double camZ) {
         boolean anyFlakes = simulation.pool().count() > 0;
         float curtainStrength = ClientConfig.CURTAINS.get()
-                ? ClientSnow.curtains * ClientSnow.snow() * ClientSnow.skyView(partialTick) * Math.min(1.0F, simulation.settings().flakeDensity)
+                ? ClientSnow.curtains * ClientSnow.snow() * ClientSnow.skyView(partialTick)
+                        * Math.min(1.0F, simulation.settings().flakeDensity)
                 : 0.0F;
         if (!anyFlakes && curtainStrength <= 0.01F) {
             return;
@@ -70,7 +71,8 @@ public final class SnowRenderer implements AutoCloseable {
             Minecraft.getInstance().getTextureManager().getTexture(SnowCurtains.TEXTURE).setFilter(true, false);
             RenderSystem.setShaderTexture(0, SnowCurtains.TEXTURE);
             BufferBuilder builder = new BufferBuilder(flakeBytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
-            curtains.render(builder, simulation.terrain(), camX, camY, camZ, simulation.settings().radius, ClientConfig.quality().curtainRings,
+            curtains.render(builder, simulation.terrain(), camX, camY, camZ, simulation.settings().radius,
+                    ClientConfig.quality().curtainRings,
                     curtainStrength, ClientSnow.driftX(partialTick), ClientSnow.driftZ(partialTick), ClientSnow.fallen(partialTick),
                     ClientSnow.windX(), ClientSnow.windZ(), ClientSnow.fallSpeed(),
                     Math.clamp((ClientSnow.windSpeed() - 0.15F) / 0.4F, 0.0F, 1.0F));

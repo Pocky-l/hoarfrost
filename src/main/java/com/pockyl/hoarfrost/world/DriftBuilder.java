@@ -29,7 +29,9 @@ public final class DriftBuilder {
         int ground = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
         float lee = 0.0F;
         for (int d = 1; d <= LEE_REACH; d++) {
-            int h = level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(x + 0.5F - dirX * d), Mth.floor(z + 0.5F - dirZ * d)) - ground;
+            int upwindX = Mth.floor(x + 0.5F - dirX * d);
+            int upwindZ = Mth.floor(z + 0.5F - dirZ * d);
+            int h = level.getHeight(Heightmap.Types.MOTION_BLOCKING, upwindX, upwindZ) - ground;
             if (h > 0) {
                 lee = Math.max(lee, Terrain.leeStrength(h, d));
             }

@@ -31,7 +31,10 @@ import java.util.zip.GZIPOutputStream;
  * (small files) and written by a background thread from a snapshot.
  */
 final class CoverStorage implements AutoCloseable {
-    /** Bumped when natural seeding changes, so that ground seen before is seeded again (5: sheltered ground under crowns, roofs and in tunnels). */
+    /**
+     * Bumped when natural seeding or the data changes, so that ground seen before is seeded again (5: sheltered ground
+     * under crowns, roofs and in tunnels).
+     */
     private static final int FORMAT = 5;
 
     private final Path directory;

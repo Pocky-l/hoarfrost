@@ -313,7 +313,8 @@ public final class SnowClient {
             }
             for (int cx = camChunkX - reach; cx <= camChunkX + reach; cx++) {
                 for (int cz = camChunkZ - reach; cz <= camChunkZ + reach; cz++) {
-                    if (cover.chunk(cx, cz) != null || chunkDistanceSq(cx, cz, camera) > loadSq || !level.getChunkSource().hasChunk(cx, cz)) {
+                    if (cover.chunk(cx, cz) != null || chunkDistanceSq(cx, cz, camera) > loadSq
+                            || !level.getChunkSource().hasChunk(cx, cz)) {
                         continue;
                     }
                     CoverChunk chunk = storage.load(cx, cz);

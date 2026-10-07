@@ -689,7 +689,8 @@ final class CoverRenderer implements AutoCloseable {
     }
 
     /** One corner of the top surface with a normal from the slopes of the cell's edges; lit like vanilla faces. */
-    private void topVertex(BufferBuilder builder, float x, float y, float z, float u, float v, int light, float riseX, float riseZ, int tint) {
+    private void topVertex(BufferBuilder builder, float x, float y, float z, float u, float v, int light, float riseX, float riseZ,
+            int tint) {
         float slopeX = riseX / SnowCover.CELL;
         float slopeZ = riseZ / SnowCover.CELL;
         float length = Mth.sqrt(slopeX * slopeX + 1.0F + slopeZ * slopeZ);
