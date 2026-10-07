@@ -10,9 +10,9 @@ import java.util.Locale;
  */
 public enum SnowType {
     // density, fall, sizeMin, sizeMax, flutter, wind, gust, visibility, accumulation, hush
-    FLURRIES(0.22F, 0.045F, 1.0F, 1.6F, 0.022F, 0.035F, 0.45F, 300.0F, 0.3F, 0.3F),
-    SNOWFALL(0.6F, 0.05F, 1.0F, 2.4F, 0.026F, 0.05F, 0.35F, 170.0F, 1.0F, 0.6F),
-    LARGE_FLAKES(0.42F, 0.036F, 2.0F, 4.2F, 0.034F, 0.022F, 0.15F, 130.0F, 1.4F, 0.85F),
+    FLURRIES(0.15F, 0.045F, 1.0F, 1.6F, 0.022F, 0.035F, 0.45F, 300.0F, 0.3F, 0.3F),
+    SNOWFALL(0.4F, 0.05F, 1.0F, 2.4F, 0.026F, 0.05F, 0.35F, 170.0F, 1.0F, 0.6F),
+    LARGE_FLAKES(0.28F, 0.036F, 2.0F, 4.2F, 0.034F, 0.022F, 0.15F, 130.0F, 1.4F, 0.85F),
     BLIZZARD(1.0F, 0.07F, 0.8F, 1.9F, 0.012F, 0.75F, 0.9F, 70.0F, 1.3F, 0.25F);
 
     private static final SnowType[] VALUES = values();

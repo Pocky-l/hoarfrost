@@ -538,7 +538,7 @@ public final class SnowSimulation {
         pool.rate[i] = 0.05F + 0.09F * random.next();
         // Light, calm snow comes down as single crystals; heavier snow as clumps of them, a blizzard as fine specks.
         float calm = 1.0F - Mth.clamp(weather.windSpeed() / 0.2F, 0.0F, 1.0F);
-        float crystals = Mth.clamp(0.8F - weather.density, 0.05F, 0.6F) * calm;
+        float crystals = Mth.clamp(0.75F - 1.3F * weather.density, 0.05F, 0.6F) * calm;
         byte sprite;
         if (random.next() < crystals) {
             sprite = (byte) (2 + (int) (random.next() * 3.0F));

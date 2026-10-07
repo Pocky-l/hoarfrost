@@ -25,10 +25,10 @@ final class FlakeRenderer {
     private static final int BLOB = 5;
     private static final int GRAIN = 6;
     private static final int STREAK = 7;
-    /** Blocks per unit of a flake's size (the simulation's sizes are in "pixels"): size 1 is about 7 mm. */
-    private static final float SCALE = 0.007F;
-    /** Smallest size on screen, as a share of the distance: about a pixel and a half at 1080p. */
-    private static final float MIN_ANGLE = 0.0017F;
+    /** Blocks per unit of a flake's size (the simulation's sizes are in "pixels"): size 1 is about 11 mm. */
+    private static final float SCALE = 0.011F;
+    /** Smallest size on screen, as a share of the distance: about two pixels at 1080p. */
+    private static final float MIN_ANGLE = 0.0024F;
     /** The shapes fill this much of their sprite. */
     private static final float FILL = 0.7F;
     private static final float NEAR = 0.45F;
@@ -68,7 +68,7 @@ final class FlakeRenderer {
                 alpha *= 0.1F + 0.5F * distance / NEAR;
             }
             // Smaller than its minimum on screen: drawn at the minimum, but fainter, like a speck.
-            alpha *= Math.min(1.0F, 0.45F + pool.size[i] * SCALE / Math.max(1.0E-4F, distance * MIN_ANGLE));
+            alpha *= Math.min(1.0F, 0.65F + pool.size[i] * SCALE / Math.max(1.0E-4F, distance * MIN_ANGLE));
             if (alpha < 0.02F) {
                 continue;
             }
