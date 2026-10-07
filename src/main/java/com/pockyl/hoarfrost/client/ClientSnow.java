@@ -11,6 +11,7 @@ import net.minecraft.world.phys.Vec3;
 
 import com.pockyl.hoarfrost.Config;
 import com.pockyl.hoarfrost.sim.SnowWeather;
+import com.pockyl.hoarfrost.weather.Noise;
 import com.pockyl.hoarfrost.weather.SnowSchedule;
 import com.pockyl.hoarfrost.weather.SnowType;
 
@@ -27,6 +28,7 @@ import com.pockyl.hoarfrost.weather.SnowType;
 public final class ClientSnow {
     private static final int SERVER_TIMEOUT = 200;
     private static final float BLEND = 0.006F;
+    private static final int WANDER_SEED = 0x3A7D;
 
     private static long ticks;
     private static long lastSync = Long.MIN_VALUE;
@@ -102,7 +104,9 @@ public final class ClientSnow {
         }
         double time = level.getGameTime();
         gust = SnowSchedule.gust(time, BLENDED.gustiness);
-        float angle = SnowSchedule.windAngle(time);
+        // The wind wanders around its course over seconds - widely in a blizzard, a little in calm snow.
+        float wander = (Noise.value(time / 110.0, WANDER_SEED) - 0.5F) * 2.0F + (Noise.value(time / 37.0, WANDER_SEED + 1) - 0.5F);
+        float angle = SnowSchedule.windAngle(time) + wander * 0.5F * BLENDED.gustiness;
         float speed = SnowSchedule.windSpeed(time, windBase, BLENDED.gustiness) * (0.3F + 0.7F * worldSnow);
         windX = Mth.cos(angle) * speed;
         windZ = Mth.sin(angle) * speed;

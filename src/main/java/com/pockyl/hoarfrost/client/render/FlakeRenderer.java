@@ -72,7 +72,7 @@ final class FlakeRenderer {
                 // Too close to focus on.
                 sprite = BLOB;
                 world *= 2.5F;
-                alpha *= 0.1F + 0.5F * distance / NEAR;
+                alpha *= 0.25F + 0.45F * distance / NEAR;
             }
             // Smaller than its minimum on screen: drawn at the minimum, but fainter, like a speck.
             alpha *= Math.min(1.0F, 0.65F + pool.size[i] * SCALE / Math.max(1.0E-4F, distance * MIN_ANGLE));

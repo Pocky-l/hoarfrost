@@ -294,14 +294,7 @@ public final class AirField {
         out[1] = vy;
         out[2] = dirZ * u;
         if (turbulence) {
-            // Eddies drifting with the wind; calm air still moves a little.
-            float amplitude = 0.006F + speed * 0.35F * (0.4F + 0.6F * weather.gustiness) * (1.0F + lee);
-            double sx = (x - weather.driftX) / 3.5;
-            double sy = y / 3.5 + time * 0.006;
-            double sz = (z - weather.driftZ) / 3.5;
-            out[0] += (Noise.value(sx, sy, sz, TURBULENCE_SEED) - 0.5F) * 2.0F * amplitude;
-            out[1] += (Noise.value(sx, sy, sz, TURBULENCE_SEED + 1) - 0.5F) * 1.2F * amplitude;
-            out[2] += (Noise.value(sx, sy, sz, TURBULENCE_SEED + 2) - 0.5F) * 2.0F * amplitude;
+            addEddies(x, y, z, 1.0F + lee, out);
         }
 
         for (int w = 0; w < whirls.size(); w++) {
@@ -313,6 +306,28 @@ public final class AirField {
         for (int w = 0; w < wakeCount; w++) {
             addWake(w * 7, x, y, z, out);
         }
+    }
+
+    /**
+     * Eddies drifting with the wind, stronger in gusty weather (and by {@code boost}); calm air still moves a little.
+     * Added to {@code out[0..2]}.
+     */
+    private void addEddies(double x, double y, double z, float boost, float[] out) {
+        float amplitude = 0.006F + speed * 0.35F * (0.4F + 0.6F * weather.gustiness) * boost;
+        double sx = (x - weather.driftX) / 3.5;
+        double sy = y / 3.5 + time * 0.006;
+        double sz = (z - weather.driftZ) / 3.5;
+        out[0] += (Noise.value(sx, sy, sz, TURBULENCE_SEED) - 0.5F) * 2.0F * amplitude;
+        out[1] += (Noise.value(sx, sy, sz, TURBULENCE_SEED + 1) - 0.5F) * 1.2F * amplitude;
+        out[2] += (Noise.value(sx, sy, sz, TURBULENCE_SEED + 2) - 0.5F) * 2.0F * amplitude;
+    }
+
+    /** Only the eddies of the air at a point (for flakes that do not need the shape of the land), into {@code out[0..2]}. */
+    public void eddies(double x, double y, double z, float[] out) {
+        out[0] = 0.0F;
+        out[1] = 0.0F;
+        out[2] = 0.0F;
+        addEddies(x, y, z, 1.0F, out);
     }
 
     private void addWake(int w, double x, double y, double z, float[] out) {

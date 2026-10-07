@@ -45,6 +45,11 @@ public final class SnowSimulation {
     private static final float CLOUD_RADIUS = 12.0F;
     private static final float CLOUD_BELOW = 5.0F;
     private static final float CLOUD_ABOVE = 10.0F;
+    /** Snow flying right past the face: a small, dense box around the camera. */
+    private static final float FACE_RADIUS = 3.5F;
+    private static final float FACE_BELOW = 2.5F;
+    private static final float FACE_ABOVE = 3.0F;
+    private static final float FACE_SHARE = 0.12F;
 
     private final SnowSettings settings;
     private final SnowWeather weather = new SnowWeather();
@@ -61,6 +66,7 @@ public final class SnowSimulation {
     private int nearFalling;
     private int farFalling;
     private int cloudFalling;
+    private int faceFalling;
     private int grains;
     private double camX;
     private double camY;
@@ -203,6 +209,7 @@ public final class SnowSimulation {
         int nearNow = 0;
         int farNow = 0;
         int cloudNow = 0;
+        int faceNow = 0;
         int grainsNow = 0;
         for (int i = 0, high = p.highWater(); i < high; i++) {
             byte state = p.state[i];
@@ -246,6 +253,11 @@ public final class SnowSimulation {
             if (p.zone[i] == 3) {
                 cloudNow++;
                 moveLight(i, CLOUD_RADIUS, CLOUD_BELOW, CLOUD_ABOVE, 1);
+                continue;
+            }
+            if (p.zone[i] == 4) {
+                faceNow++;
+                moveLight(i, FACE_RADIUS, FACE_BELOW, FACE_ABOVE, 1);
                 continue;
             }
             double x = p.x[i];
@@ -344,6 +356,7 @@ public final class SnowSimulation {
         nearFalling = nearNow;
         farFalling = farNow;
         cloudFalling = cloudNow;
+        faceFalling = faceNow;
         grains = grainsNow;
     }
 
@@ -408,11 +421,14 @@ public final class SnowSimulation {
         int target = targetFlakes();
         int nearTarget = (int) (target * NEAR_SHARE);
         spawnZone(1, nearFalling, nearTarget);
-        spawnZone(0, falling - nearFalling - farFalling - cloudFalling, target - nearTarget);
+        spawnZone(0, falling - nearFalling - farFalling - cloudFalling - faceFalling, target - nearTarget);
         float amount = weather.snow * weather.density * Mth.clamp(weather.gust, 0.5F, 1.5F);
         spawnZone(2, farFalling, (int) Math.min(settings.farFlakes, settings.farFlakes * amount * settings.farDensity));
         float cloud = amount * weather.density * settings.flakeDensity;
-        spawnZone(3, cloudFalling, (int) Math.min(settings.cloudFlakes, settings.cloudFlakes * cloud));
+        int cloudTarget = (int) Math.min(settings.cloudFlakes, settings.cloudFlakes * cloud);
+        int faceTarget = (int) (cloudTarget * FACE_SHARE);
+        spawnZone(3, cloudFalling, cloudTarget - faceTarget);
+        spawnZone(4, faceFalling, faceTarget);
     }
 
     /**
@@ -423,11 +439,19 @@ public final class SnowSimulation {
     private void moveLight(int i, float reach, float below, float above, int check) {
         FlakePool p = pool;
         p.phase[i] += p.rate[i];
+        if (((i + tick) & 3) == 0) {
+            // The eddies of the air, looked up now and then: the snow swirls and changes direction like the air.
+            air.eddies(p.x[i], p.y[i], p.z[i], sample);
+            p.airX[i] = sample[0];
+            p.airY[i] = sample[1];
+            p.airZ[i] = sample[2];
+        }
         float sway = weather.flutter * Mth.sin(p.phase[i]);
         float gust = 0.85F + 0.3F * Mth.sin(p.phase[i] * 0.13F + i);
-        p.vx[i] = weather.windX * gust + sway;
-        p.vy[i] = -weather.fallSpeed * p.fall[i];
-        p.vz[i] = weather.windZ * gust + sway * 0.6F;
+        float response = 0.25F;
+        p.vx[i] += (weather.windX * gust + p.airX[i] + sway - p.vx[i]) * response;
+        p.vy[i] += (-weather.fallSpeed * p.fall[i] + p.airY[i] * 0.6F - p.vy[i]) * response;
+        p.vz[i] += (weather.windZ * gust + p.airZ[i] + sway * 0.6F - p.vz[i]) * response;
         double nx = p.x[i] + p.vx[i];
         double ny = p.y[i] + p.vy[i];
         double nz = p.z[i] + p.vz[i];
@@ -444,19 +468,23 @@ public final class SnowSimulation {
         }
         int bx = Mth.floor(nx);
         int bz = Mth.floor(nz);
-        if (wrapped || ny < camY - below || ((i + tick) & check) == 0 && ny < terrain.height(bx, bz)) {
-            if (wrapped || ny < terrain.height(bx, bz) || ny < camY - below) {
-                // Landed or left: back in at the top.
-                ny = camY + above - random.next() * 2.0;
-                if (ny < terrain.height(bx, bz) || !terrain.snowy(bx, bz)) {
-                    p.remove(i);
-                    return;
-                }
-                p.prevX[i] = nx;
-                p.prevY[i] = ny;
-                p.prevZ[i] = nz;
-                p.alpha[i] = 0.0F;
+        if (wrapped) {
+            // Out on one side, in on the other at the same height (the stream keeps flowing, no fading in).
+            p.prevX[i] = nx - p.vx[i];
+            p.prevZ[i] = nz - p.vz[i];
+        }
+        boolean landed = (wrapped || ((i + tick) & check) == 0) && ny < terrain.height(bx, bz);
+        if (landed || ny < camY - below || ny > camY + above + 2.0) {
+            // Landed, or out of the box below: back in at the top.
+            ny = camY + above - random.next() * 2.0;
+            if (ny < terrain.height(bx, bz) || !terrain.snowy(bx, bz)) {
+                p.remove(i);
+                return;
             }
+            p.prevX[i] = nx;
+            p.prevY[i] = ny;
+            p.prevZ[i] = nz;
+            p.alpha[i] = 0.0F;
         }
         p.x[i] = nx;
         p.y[i] = ny;
@@ -499,7 +527,12 @@ public final class SnowSimulation {
         double z;
         double top;
         double bottom;
-        if (zone == 3) {
+        if (zone == 4) {
+            x = camX + (random.next() * 2.0F - 1.0F) * FACE_RADIUS;
+            z = camZ + (random.next() * 2.0F - 1.0F) * FACE_RADIUS;
+            top = camY + FACE_ABOVE;
+            bottom = camY - FACE_BELOW;
+        } else if (zone == 3) {
             x = camX + (random.next() * 2.0F - 1.0F) * CLOUD_RADIUS;
             z = camZ + (random.next() * 2.0F - 1.0F) * CLOUD_RADIUS;
             top = camY + CLOUD_ABOVE;
