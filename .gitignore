@@ -37,3 +37,4 @@ run-server/
 repo/
 !**/src/**/repo/
 logs/
+tools/.cache/
