@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   heavy blizzard - each with its own flakes, fall speed, wind, haze and sound, blending into each other.
 - A wind that turns and wanders, with gusts and lulls rolling over the land, a boundary layer near the ground, rising
   over and calm behind obstacles with a back eddy, flowing around them and barely reaching under cover; shared course
-  with Petrichor's rain.
+  with [Petrichor](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms)'s rain.
 - Simulated flakes (crystals, clumps, grains, streaks in a gale), snow in the middle distance and a stream of flakes past
   the face in storms.
 - Snow on the ground as a smooth surface: drifts in the lee, hollows, swept ridges, even cover under crowns, caps on
@@ -28,6 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to the outdoors.
 - Soundscape: silent light snow, breeze, wind, storm roar, howl, passing gusts, muffled indoors; hush of falling snow;
   snow footsteps.
-- Optional Serene Seasons integration.
-- The snowy haze works with Distant Horizons and covers its distant land too.
+- Optional [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons) integration.
+- The snowy haze works with [Distant Horizons](https://www.curseforge.com/minecraft/mc-mods/distant-horizons) and covers its distant land too.
 - `/hoarfrost weather <kind> [seconds]`, `/hoarfrost weather clear`, `/hoarfrost status`.
