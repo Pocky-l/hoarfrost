@@ -1,7 +1,6 @@
 package com.pockyl.hoarfrost.client;
 
 import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -39,42 +38,46 @@ import net.neoforged.neoforge.client.event.sound.PlayStreamingSourceEvent;
 
 import com.pockyl.hoarfrost.ClientConfig;
 import com.pockyl.hoarfrost.Hoarfrost;
-import com.pockyl.hoarfrost.client.render.SnowRenderer;
+import com.pockyl.hoarfrost.client.render.CoverRenderer;
+import com.pockyl.hoarfrost.client.render.FlakeRenderer;
 import com.pockyl.hoarfrost.client.render.SnowSky;
 import com.pockyl.hoarfrost.client.sound.Hush;
-import com.pockyl.hoarfrost.client.sound.SnowSounds;
+import com.pockyl.hoarfrost.client.sound.Soundscape;
 import com.pockyl.hoarfrost.sim.CoverChunk;
+import com.pockyl.hoarfrost.sim.Flakes;
 import com.pockyl.hoarfrost.sim.SnowCover;
 import com.pockyl.hoarfrost.sim.SnowSettings;
 import com.pockyl.hoarfrost.sim.SnowSimulation;
+import com.pockyl.hoarfrost.weather.SnowConditions;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * Owns the client-side snow: the simulation for the current level, the snow cover around the camera (loaded, seeded,
- * saved), feeds it entities, footsteps, landings, explosions and block changes, and drives drawing, fog and sound.
+ * Owns the client-side snow: the simulation for the current level and the snow on the ground around the camera (loaded,
+ * surveyed, seeded, saved); feeds it moving creatures, footsteps, landings, blasts and block changes; drives drawing, fog
+ * and sound.
  */
 @EventBusSubscriber(modid = Hoarfrost.MOD_ID, value = Dist.CLIENT)
 public final class SnowClient {
     private static final double TELEPORT_DISTANCE = 4.0;
     private static final double STEP_RANGE = 48.0;
     private static final int SAVE_INTERVAL = 20 * 30;
-    private static final long SEED_BUDGET_NANOS = 4_000_000L;
     private static final float STEP_VOLUME = 0.25F;
     /** How far one sees in the heart of a squall of snow. */
-    private static final float SQUALL_VISIBILITY = 14.0F;
+    private static final float SQUALL_VISIBILITY = 12.0F;
 
     private static final SnowSettings SETTINGS = new SnowSettings();
-    /** Distance walked since the last footprint and which foot is next, per entity. */
+    /** Distance walked since the last footprint, and the fall speed of the tick before, per entity. */
     private static final Int2FloatOpenHashMap STRIDE = new Int2FloatOpenHashMap();
-    private static final Int2IntOpenHashMap FOOT = new Int2IntOpenHashMap();
     private static final Int2FloatOpenHashMap LAST_FALL = new Int2FloatOpenHashMap();
 
     private static volatile boolean configChanged = true;
     private static SnowSimulation simulation;
-    private static SnowRenderer renderer;
+    private static FlakeRenderer flakeRenderer;
+    private static CoverRenderer coverRenderer;
     private static CoverStorage storage;
     private static ClientLevel level;
     private static int ticks;
@@ -98,19 +101,23 @@ public final class SnowClient {
 
     private static void applyConfig() {
         ClientConfig.Quality quality = ClientConfig.quality();
-        int capacity = SETTINGS.maxFlakes + SETTINGS.farFlakes + SETTINGS.cloudFlakes;
-        SETTINGS.maxFlakes = quality.maxFlakes;
+        int capacity = SETTINGS.nearFlakes + SETTINGS.farFlakes + SETTINGS.streamFlakes + SETTINGS.powderGrains;
+        boolean hadCover = SETTINGS.cover;
+        SETTINGS.nearFlakes = quality.nearFlakes;
+        SETTINGS.radius = quality.radius;
         SETTINGS.farFlakes = quality.farFlakes;
-        SETTINGS.cloudFlakes = quality.cloudFlakes;
-        SETTINGS.radius = quality.flakeRadius;
+        SETTINGS.farRadius = quality.farRadius;
+        SETTINGS.streamFlakes = ClientConfig.STREAM.get() ? quality.streamFlakes : 0;
+        SETTINGS.powderGrains = quality.powderGrains;
         SETTINGS.coverRadius = quality.coverRadius;
-        SETTINGS.coverChunksPerTick = quality.coverChunksPerTick;
-        SETTINGS.flakeDensity = ClientConfig.SNOWFALL.get() ? (float) (double) ClientConfig.DENSITY.get() : 0.0F;
-        SETTINGS.farDensity = ClientConfig.CURTAINS.get() ? SETTINGS.flakeDensity : 0.0F;
+        SETTINGS.surveyBudget = quality.surveyMillis * 1_000_000L;
+        SETTINGS.density = ClientConfig.SNOWFALL.get() ? (float) (double) ClientConfig.DENSITY.get() : 0.0F;
+        SETTINGS.farDensity = ClientConfig.DISTANT.get() ? 1.0F : 0.0F;
         SETTINGS.cover = ClientConfig.COVER.get();
-        SETTINGS.drifting = ClientConfig.DRIFTING.get();
         SETTINGS.footprints = ClientConfig.FOOTPRINTS.get();
-        if (capacity != SETTINGS.maxFlakes + SETTINGS.farFlakes + SETTINGS.cloudFlakes || !SETTINGS.cover) {
+        SETTINGS.powder = ClientConfig.POWDER.get();
+        if (capacity != SETTINGS.nearFlakes + SETTINGS.farFlakes + SETTINGS.streamFlakes + SETTINGS.powderGrains
+                || hadCover != SETTINGS.cover) {
             reset();
         }
     }
@@ -129,37 +136,35 @@ public final class SnowClient {
         if (minecraft.level != level) {
             reset();
             level = minecraft.level;
-            ClientSnow.reset();
+            ClientWeather.reset();
         }
         if (!hasWeather(level)) {
-            SnowSounds.stopAll();
+            Soundscape.stopAll();
             return;
         }
         if (minecraft.isPaused()) {
             return;
         }
         ticks++;
-        ClientSnow.tick(level);
+        Vec3 camera = cameraPosition(minecraft);
+        ClientWeather.tick(level, camera);
         if (simulation == null) {
-            simulation = new SnowSimulation(SETTINGS);
-            renderer = new SnowRenderer(simulation);
+            simulation = new SnowSimulation(SETTINGS, ClientWeather.conditions());
+            flakeRenderer = new FlakeRenderer();
+            coverRenderer = new CoverRenderer(simulation.cover());
             storage = new CoverStorage(storageDirectory(minecraft, level));
         }
-        Vec3 camera = cameraPosition(minecraft);
-        ClientSnow.apply(simulation.weather());
-        simulation.begin(level);
         if (SETTINGS.cover) {
             updateCoverChunks(camera);
         }
         feedEntities(camera);
         simulation.tick(level, camera.x, camera.y, camera.z);
-        SnowSounds.tick(level, camera, simulation.air().gusts());
+        Soundscape.tick(level, camera);
         if (ticks % SAVE_INTERVAL == 0) {
             save(camera);
         }
         if (ticks % 200 == 0) {
             STRIDE.clear();
-            FOOT.clear();
             LAST_FALL.clear();
         }
     }
@@ -167,8 +172,8 @@ public final class SnowClient {
     @SubscribeEvent
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         reset();
-        ClientSnow.reset();
-        SnowSounds.stopAll();
+        ClientWeather.reset();
+        Soundscape.stopAll();
     }
 
     private static void reset() {
@@ -181,13 +186,16 @@ public final class SnowClient {
             storage.close();
         }
         storage = null;
-        if (renderer != null) {
-            renderer.close();
-            renderer = null;
+        if (coverRenderer != null) {
+            coverRenderer.close();
+            coverRenderer = null;
+        }
+        if (flakeRenderer != null) {
+            flakeRenderer.close();
+            flakeRenderer = null;
         }
         simulation = null;
         STRIDE.clear();
-        FOOT.clear();
         LAST_FALL.clear();
     }
 
@@ -199,7 +207,7 @@ public final class SnowClient {
         return minecraft.player != null ? minecraft.player.getEyePosition() : Vec3.ZERO;
     }
 
-    /** Moving entities stir the air, and where they walk or land in snow they leave prints. */
+    /** Moving creatures stir the air; where they walk or land in snow they press prints and kick up powder. */
     private static void feedEntities(Vec3 camera) {
         double wakeRange = SETTINGS.radius + 4.0;
         for (Entity entity : level.entitiesForRendering()) {
@@ -218,7 +226,8 @@ public final class SnowClient {
             }
             float width = entity.getBbWidth();
             if (distanceSq < wakeRange * wakeRange) {
-                simulation.disturb(entity.getX(), entity.getY(), entity.getZ(), moveX, moveZ, width, entity.getBbHeight());
+                simulation.wake(entity.getX(), entity.getY(), entity.getZ(), (float) moveX, (float) moveY, (float) moveZ, width,
+                        entity.getBbHeight());
             }
             int id = entity.getId();
             float lastFall = LAST_FALL.get(id);
@@ -227,6 +236,7 @@ public final class SnowClient {
             if (!entity.onGround() || flying) {
                 continue;
             }
+            float weight = Math.clamp(width * entity.getBbHeight() / 1.08F, 0.4F, 2.5F);
             if (lastFall < -0.3F) {
                 simulation.land(entity.getX(), entity.getY(), entity.getZ(), width, -lastFall);
             }
@@ -238,17 +248,18 @@ public final class SnowClient {
             float walked = STRIDE.get(id) + horizontal;
             if (walked >= stride) {
                 walked = walked > stride * 2.0F ? 0.0F : walked - stride;
-                int foot = FOOT.get(id) == 1 ? -1 : 1;
-                FOOT.put(id, foot);
-                simulation.step(entity.getX(), entity.getY(), entity.getZ(), (float) moveX / horizontal, (float) moveZ / horizontal, width,
-                        foot, horizontal, entity.isCrouching());
+                // Alternate feet a little to each side of the path.
+                float side = (ticks + id) % 2 == 0 ? 0.13F : -0.13F;
+                double footX = entity.getX() - moveZ / horizontal * side * width / 0.6F;
+                double footZ = entity.getZ() + moveX / horizontal * side * width / 0.6F;
+                simulation.step(footX, entity.getY(), footZ, (float) moveX, (float) moveZ, 0.17F * Math.max(1.0F, width / 0.6F), weight);
             }
             STRIDE.put(id, walked);
         }
     }
 
     // ------------------------------------------------------------------------------------------------------------
-    // Cover chunks: load around the camera, seed new ground, save and unload far away
+    // Snow on the ground: load around the camera, survey and seed new land, save and unload far away
     // ------------------------------------------------------------------------------------------------------------
 
     private static void updateCoverChunks(Vec3 camera) {
@@ -284,11 +295,11 @@ public final class SnowClient {
                 }
             }
         }
-        // Surfaces and first snow nearest first, within a time budget per tick, once the neighbors are there (the
-        // shelter of a column looks at the land around it).
+        // Land is surveyed nearest first, within a time budget per tick, once its neighbours are there (the lee looks
+        // into them).
         List<CoverChunk> pending = new ArrayList<>();
         for (CoverChunk chunk : cover.chunks()) {
-            if ((!chunk.hasSurfaces() || !chunk.seeded()) && neighborsLoaded(chunk.x, chunk.z)) {
+            if ((!chunk.surveyed() || !chunk.seeded()) && neighborsLoaded(chunk.x, chunk.z)) {
                 pending.add(chunk);
             }
         }
@@ -296,9 +307,9 @@ public final class SnowClient {
             return;
         }
         pending.sort((a, b) -> Double.compare(chunkDistanceSq(a.x, a.z, camera), chunkDistanceSq(b.x, b.z, camera)));
-        long deadline = System.nanoTime() + SEED_BUDGET_NANOS;
+        long deadline = System.nanoTime() + SETTINGS.surveyBudget;
         for (CoverChunk chunk : pending) {
-            simulation.prepare(chunk);
+            simulation.prepare(level, chunk);
             if (System.nanoTime() > deadline) {
                 break;
             }
@@ -351,25 +362,31 @@ public final class SnowClient {
     // Hooks from mixins
     // ------------------------------------------------------------------------------------------------------------
 
-    /** A block changed: the snow on its column finds its surface again (and the light around may have changed). */
+    /** A block changed: the land around is surveyed again. */
     public static void onBlockChanged(ClientLevel changed, BlockPos pos, BlockState oldState, BlockState newState) {
         if (simulation == null || changed != level || oldState == newState) {
             return;
         }
         int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING, pos.getX(), pos.getZ());
-        if (pos.getY() < top - 5) {
+        if (pos.getY() < top - 48) {
             return;
         }
         simulation.cover().blockChanged(pos.getX(), pos.getZ());
     }
 
-    /** Explosions and wind charges blow the snow away and fill the air with powder. */
+    /**
+     * Explosions and wind charges: the air bursts out, carrying the flakes with it, and the snow around is blown up into
+     * a cloud of powder.
+     */
     public static void onExplosion(ClientboundExplodePacket packet) {
         if (simulation == null) {
             return;
         }
         boolean windCharge = isGust(packet.getSmallExplosionParticles()) || isGust(packet.getLargeExplosionParticles());
-        simulation.explode(packet.getX(), packet.getY(), packet.getZ(), packet.getPower(), windCharge);
+        float power = packet.getPower();
+        float radius = windCharge ? 1.6F + power * 0.9F : 1.2F + power * 1.25F;
+        float strength = windCharge ? 0.42F + power * 0.04F : 0.55F + power * 0.08F;
+        simulation.blast(packet.getX(), packet.getY(), packet.getZ(), radius, strength);
     }
 
     private static boolean isGust(ParticleOptions particle) {
@@ -383,19 +400,19 @@ public final class SnowClient {
 
     /** Draws the falling snow at the start of the vanilla weather pass. */
     public static void renderSnowfall(LightTexture lightTexture, float partialTick, double camX, double camY, double camZ) {
-        if (!ownsSnowfall() || renderer == null) {
+        if (!ownsSnowfall() || flakeRenderer == null) {
             return;
         }
         Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
-        renderer.renderSnowfall(lightTexture, camera, partialTick, camX, camY, camZ);
+        flakeRenderer.render(simulation.flakes(), lightTexture, camera, partialTick, camX, camY, camZ);
     }
 
     @SubscribeEvent
     public static void onRenderStage(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_CUTOUT_BLOCKS || renderer == null || !SETTINGS.cover) {
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_CUTOUT_BLOCKS || coverRenderer == null || !SETTINGS.cover) {
             return;
         }
-        renderer.renderCover(event.getCamera(), event.getFrustum(), event.getModelViewMatrix(), event.getProjectionMatrix(),
+        coverRenderer.render(event.getCamera(), event.getFrustum(), event.getModelViewMatrix(), event.getProjectionMatrix(),
                 Math.min(SETTINGS.coverRadius, Minecraft.getInstance().options.getEffectiveRenderDistance() * 16.0));
     }
 
@@ -405,43 +422,41 @@ public final class SnowClient {
             return;
         }
         float partialTick = (float) event.getPartialTick();
-        float snow = ClientSnow.snow() * ClientSnow.skyView(partialTick);
+        float open = ClientWeather.skyView(partialTick);
+        float snow = ClientWeather.snow() * open;
         double strength = ClientConfig.FOG.get();
         if (snow <= 0.0F || strength <= 0.0) {
             return;
         }
+        SnowConditions weather = ClientWeather.conditions();
         float far = event.getFarPlaneDistance();
-        float newFar = far;
-        float target = ClientSnow.visibility * 1.2F;
-        float k = (float) Math.min(1.0, snow * Math.sqrt(Math.max(ClientSnow.gust(), 0.0F)) * strength);
-        if (target < far) {
-            newFar = far + (target - far) * k;
-        }
-        // Inside a squall of snow the world is gone for a moment.
-        Vec3 eye = event.getCamera().getPosition();
-        float squall = simulation == null ? 0.0F
-                : simulation.air().gustAt(eye.x, eye.y, eye.z) * ClientSnow.skyView(partialTick) * (float) Math.min(1.0, strength);
+        // Gusts thicken the air, lulls clear it a little.
+        float gust = ClientWeather.gust();
+        float target = weather.visibility * 1.15F / Mth.lerp(weather.gustiness, 1.0F, Math.clamp(gust, 0.6F, 1.8F));
+        float k = (float) Math.min(1.0, snow * strength);
+        float newFar = target < far ? far + (target - far) * k : far;
+        // In the heart of a squall of snow the world is gone for a moment.
+        float squall = Math.clamp((gust - 1.35F) / 0.6F, 0.0F, 1.0F) * Math.clamp((weather.gustiness - 0.5F) * 2.0F, 0.0F, 1.0F) * snow
+                * (float) Math.min(1.0, strength);
         if (squall > 0.0F) {
-            newFar = Math.min(newFar, Mth.lerp(Math.min(1.0F, squall * 1.6F), far, SQUALL_VISIBILITY));
+            newFar = Math.min(newFar, Mth.lerp(squall, far, SQUALL_VISIBILITY));
             k = Math.max(k, squall);
         }
         if (newFar >= far) {
             return;
         }
         if (event.getMode() == FogRenderer.FogMode.FOG_SKY) {
-            // The sky itself disappears in a whiteout.
+            // The sky itself fades into the snowy air.
             event.setFarPlaneDistance(newFar);
             event.setCanceled(true);
             return;
         }
-        float near = event.getNearPlaneDistance();
         // The haze thickens gradually from just in front of the camera instead of standing as a wall.
-        float newNear = Math.min(near, newFar * (0.2F - 0.15F * k));
+        float newNear = Math.min(event.getNearPlaneDistance(), newFar * (0.18F - 0.14F * k));
         event.setFarPlaneDistance(newFar);
         event.setNearPlaneDistance(Math.max(0.0F, newNear));
         event.setCanceled(true);
     }
-
 
     @SubscribeEvent
     public static void onFogColor(ViewportEvent.ComputeFogColor event) {
@@ -478,21 +493,22 @@ public final class SnowClient {
             return;
         }
         double x = sound.getX();
+        double y = sound.getY();
         double z = sound.getZ();
         SnowCover cover = simulation.cover();
-        float depth = cover.depthNear(x, sound.getY(), z);
-        float powder = cover.powderNear(x, sound.getY(), z);
+        float depth = cover.depthAt(x, y + 0.1, z);
+        float packed = cover.packedAt(x, y + 0.1, z);
         boolean vanillaSnow = event.getName().equals("block.snow.step") || event.getName().equals("block.powder_snow.step");
-        SoundEvent replacement = SnowSounds.stepSound(depth, depth > 0.0F ? 1.0F - powder / depth : 0.0F, vanillaSnow);
+        SoundEvent replacement = Soundscape.stepSound(depth, packed, vanillaSnow);
         if (replacement == null) {
             return;
         }
-        // The vanilla instance is not resolved yet at this point (its volume and pitch are not known): ours are fixed.
-        // Deeper snow crunches louder.
+        // The vanilla instance is not resolved yet (its volume and pitch are unknown): ours are fixed. Deeper snow crunches
+        // louder.
         float volume = STEP_VOLUME * (0.7F + 0.8F * Math.min(1.0F, depth / 0.2F));
         event.setSound(new SimpleSoundInstance(replacement.getLocation(), sound.getSource(), volume,
                 0.9F + level.random.nextFloat() * 0.2F, SoundInstance.createUnseededRandom(), false, 0,
-                SoundInstance.Attenuation.LINEAR, x, sound.getY(), z, false));
+                SoundInstance.Attenuation.LINEAR, x, y, z, false));
     }
 
     // ------------------------------------------------------------------------------------------------------------
@@ -505,18 +521,22 @@ public final class SnowClient {
         if (!minecraft.getDebugOverlay().showDebugScreen() || simulation == null || !hasWeather(minecraft.level)) {
             return;
         }
+        SnowConditions weather = ClientWeather.conditions();
+        Flakes flakes = simulation.flakes();
         event.getRight().add("");
-        event.getRight().add(String.format("Hoarfrost: %s%s, snow %.2f (land %.2f), wind %.2f, hush %.2f",
-                ClientSnow.type().id(), ClientSnow.syncedWithServer() ? " (server)" : "", ClientSnow.worldSnow(), ClientSnow.presence(),
-                ClientSnow.windSpeed(), ClientSnow.hush));
-        event.getRight().add(String.format("Flakes %d, grains %d, drawn %d, cover chunks %d, quads %d, whirls %d",
-                simulation.fallingCount(), simulation.grainCount(), renderer.flakesDrawn(), simulation.cover().chunks().size(),
-                renderer.coverQuads(), simulation.air().whirls().size()));
+        event.getRight().add(String.format(Locale.ROOT, "Hoarfrost: %s%s, snow %.2f (land %.2f), wind %.1f m/s, gust %.2f",
+                ClientWeather.kind().id(), ClientWeather.syncedWithServer() ? " (server)" : "", ClientWeather.worldSnow(),
+                ClientWeather.presence(), weather.windSpeed * 20.0F, ClientWeather.gust()));
+        event.getRight().add(String.format(Locale.ROOT, "Flakes %d near, %d far, %d stream, %d powder; drawn %d",
+                flakes.count(Flakes.NEAR), flakes.count(Flakes.FAR), flakes.count(Flakes.STREAM), flakes.count(Flakes.POWDER),
+                flakeRenderer.lastCount()));
+        event.getRight().add(String.format(Locale.ROOT, "Snow chunks %d, meshes %d, quads %d", simulation.cover().chunks().size(),
+                coverRenderer.meshCount(), coverRenderer.lastQuads()));
         if (minecraft.player != null) {
             Vec3 feet = minecraft.player.position();
-            event.getRight().add(String.format("Snow here %.3f (powder %.3f), shelter %.2f, sound: %s",
-                    simulation.cover().depthAt(feet.x, feet.z), simulation.cover().powderAt(feet.x, feet.z),
-                    simulation.terrain().shelter(Mth.floor(feet.x), Mth.floor(feet.z)), SnowSounds.debugSummary()));
+            event.getRight().add(String.format(Locale.ROOT, "Snow here %.3f (trodden %.2f), %s",
+                    simulation.cover().depthAt(feet.x, feet.y + 0.2, feet.z), simulation.cover().packedAt(feet.x, feet.y + 0.2, feet.z),
+                    Soundscape.debugSummary()));
         }
     }
 }

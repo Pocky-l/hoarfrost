@@ -21,6 +21,14 @@ sourceSets.main.resources {
 }
 
 repositories {
+    maven {
+        // Serene Seasons (optional integration).
+        name = 'Glitchfiend'
+        url = 'https://maven.minecraftforge.net/'
+        content {
+            includeGroup 'com.github.glitchfiend'
+        }
+    }
 }
 
 neoForge {
@@ -76,6 +84,8 @@ configurations {
 }
 
 dependencies {
+    // Optional: snow follows the seasons when Serene Seasons is installed. Not needed to run the mod.
+    compileOnly "com.github.glitchfiend:SereneSeasons-neoforge:${serene_seasons_version}"
 }
 
 var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {

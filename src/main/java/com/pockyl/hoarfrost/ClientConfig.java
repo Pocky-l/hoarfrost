@@ -8,28 +8,36 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 public final class ClientConfig {
     /** Budgets that scale with the hardware. Individual options below multiply on top of these. */
     public enum Quality {
-        // maxFlakes, flakeRadius, coverRadius, coverChunksPerTick, farFlakes, cloudFlakes
-        LOW(3000, 14.0F, 40.0F, 1, 3000, 6000),
-        MEDIUM(6000, 18.0F, 56.0F, 2, 6000, 12000),
-        HIGH(9000, 22.0F, 80.0F, 2, 12000, 24000),
-        ULTRA(14000, 28.0F, 112.0F, 3, 20000, 40000);
+        LOW(3000, 18.0F, 4000, 48.0F, 2500, 2000, 48.0F, 2),
+        MEDIUM(5000, 22.0F, 7000, 60.0F, 4500, 4000, 64.0F, 2),
+        HIGH(7000, 24.0F, 10000, 72.0F, 7000, 6000, 80.0F, 3),
+        ULTRA(10000, 28.0F, 16000, 72.0F, 10000, 9000, 112.0F, 4);
 
-        public final int maxFlakes;
-        public final float flakeRadius;
-        public final float coverRadius;
-        public final int coverChunksPerTick;
-        /** Flakes falling in the middle distance beyond the simulated ones. */
+        /** Simulated flakes around the camera and how far out they go. */
+        public final int nearFlakes;
+        public final float radius;
+        /** Flakes in the middle distance and how far out they go. */
         public final int farFlakes;
-        /** Light flakes in the dense stream around the camera (heavy snow and blizzards). */
-        public final int cloudFlakes;
+        public final float farRadius;
+        /** Light flakes in the stream past the face (heavy snow and blizzards). */
+        public final int streamFlakes;
+        /** Grains of powder lifted from the snow. */
+        public final int powderGrains;
+        /** Snow on the ground is drawn out to this distance. */
+        public final float coverRadius;
+        /** Milliseconds per tick for looking at new land. */
+        public final int surveyMillis;
 
-        Quality(int maxFlakes, float flakeRadius, float coverRadius, int coverChunksPerTick, int farFlakes, int cloudFlakes) {
-            this.maxFlakes = maxFlakes;
-            this.flakeRadius = flakeRadius;
-            this.coverRadius = coverRadius;
-            this.coverChunksPerTick = coverChunksPerTick;
+        Quality(int nearFlakes, float radius, int farFlakes, float farRadius, int streamFlakes, int powderGrains, float coverRadius,
+                int surveyMillis) {
+            this.nearFlakes = nearFlakes;
+            this.radius = radius;
             this.farFlakes = farFlakes;
-            this.cloudFlakes = cloudFlakes;
+            this.farRadius = farRadius;
+            this.streamFlakes = streamFlakes;
+            this.powderGrains = powderGrains;
+            this.coverRadius = coverRadius;
+            this.surveyMillis = surveyMillis;
         }
     }
 
@@ -53,10 +61,14 @@ public final class ClientConfig {
             .comment("Multiplier for the number of flakes.")
             .translation(key("density"))
             .defineInRange("density", 1.0, 0.1, 3.0);
-    public static final ModConfigSpec.BooleanValue CURTAINS = BUILDER
+    public static final ModConfigSpec.BooleanValue DISTANT = BUILDER
             .comment("Snow falling in the middle distance, beyond the simulated flakes.")
-            .translation(key("curtains"))
-            .define("curtains", true);
+            .translation(key("distant"))
+            .define("distant", true);
+    public static final ModConfigSpec.BooleanValue STREAM = BUILDER
+            .comment("In heavy snow and blizzards, a dense stream of light flakes rushes past the face.")
+            .translation(key("stream"))
+            .define("stream", true);
 
     static {
         BUILDER.pop();
@@ -64,17 +76,18 @@ public final class ClientConfig {
     }
 
     public static final ModConfigSpec.BooleanValue COVER = BUILDER
-            .comment("Snow settles on the ground, roofs, crowns, fences and stairs, grows during a snowfall and melts near lamps.")
+            .comment("Snow settles on the ground, roofs, crowns and posts: more in the lee and in hollows, less on windswept "
+                    + "ridges, a little under crowns and in cave mouths. Melts near lamps and in warm land.")
             .translation(key("cover"))
             .define("cover", true);
-    public static final ModConfigSpec.BooleanValue DRIFTING = BUILDER
-            .comment("Strong wind blows the snow on the ground along and piles it up in drifts behind obstacles.")
-            .translation(key("drifting"))
-            .define("drifting", true);
     public static final ModConfigSpec.BooleanValue FOOTPRINTS = BUILDER
-            .comment("Feet leave prints in the snow and kick up powder; landings and explosions blow it away.")
+            .comment("Feet press dents into the snow and pack paths.")
             .translation(key("footprints"))
             .define("footprints", true);
+    public static final ModConfigSpec.BooleanValue POWDER = BUILDER
+            .comment("Gusts, wind charges, explosions and feet lift powder off the snow; it rises in a cloud and settles slowly.")
+            .translation(key("powder"))
+            .define("powder", true);
 
     static {
         BUILDER.pop();
@@ -82,11 +95,11 @@ public final class ClientConfig {
     }
 
     public static final ModConfigSpec.DoubleValue FOG = BUILDER
-            .comment("How much snow closes in the view distance (a blizzard becomes a whiteout). 0 = vanilla fog.")
+            .comment("How much falling snow closes in the view distance (a heavy blizzard becomes a whiteout). 0 = vanilla fog.")
             .translation(key("fog"))
             .defineInRange("fog", 1.0, 0.0, 2.0);
     public static final ModConfigSpec.BooleanValue BRIGHT_SKY = BUILDER
-            .comment("A snowy sky is milky and bright instead of the dark grey of rain.")
+            .comment("A snowy sky is soft and bright instead of the dark grey of rain.")
             .translation(key("brightSky"))
             .define("brightSky", true);
 
@@ -95,16 +108,16 @@ public final class ClientConfig {
         BUILDER.translation(key("sound")).push("sound");
     }
 
+    public static final ModConfigSpec.DoubleValue WIND_VOLUME = BUILDER
+            .comment("Volume of the wind of snowy weather. Light snow is always silent.")
+            .translation(key("windVolume"))
+            .defineInRange("windVolume", 1.0, 0.0, 2.0);
     public static final ModConfigSpec.DoubleValue HUSH = BUILDER
             .comment("How much falling snow hushes the sounds of the world outdoors. 0 = off.")
             .translation(key("hush"))
             .defineInRange("hush", 1.0, 0.0, 1.5);
-    public static final ModConfigSpec.DoubleValue WIND_VOLUME = BUILDER
-            .comment("Volume of the wind of snowstorms.")
-            .translation(key("windVolume"))
-            .defineInRange("windVolume", 1.0, 0.0, 2.0);
     public static final ModConfigSpec.BooleanValue SNOW_STEPS = BUILDER
-            .comment("Footsteps crunch in snow: fresh powder, packed snow and drifts sound different.")
+            .comment("Footsteps crunch in snow: fresh powder and trodden snow sound different.")
             .translation(key("snowSteps"))
             .define("snowSteps", true);
 

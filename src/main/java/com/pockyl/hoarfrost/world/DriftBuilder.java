@@ -4,45 +4,47 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
-import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 
-import com.pockyl.hoarfrost.sim.Terrain;
+import com.pockyl.hoarfrost.compat.Climate;
+import com.pockyl.hoarfrost.sim.CoverSurvey;
 
 /**
- * Real snow drifts on the server: while snow falls with wind, snow layers pile up where the wind drops its load - in
- * the lee of walls, trees and hills (deepest right behind them, tapering off over a wake several times as long as the
- * obstacle is high) and at the foot of walls facing the wind. Open, windswept ground gets nothing beyond what vanilla
- * snowfall adds. Only ever adds layers (never removes blocks), only under the open sky, never on leaves.
+ * Real snow drifts on the server: while snow falls with wind, snow layers pile up where the wind drops its load - in the
+ * lee of walls, trees and hills, deepest a little behind them and tapering off over a few times their height - the
+ * same lee the snow cover of the clients uses. Open, windswept ground gets nothing beyond what vanilla snowfall adds.
+ * Only ever adds layers (never removes blocks), only under the open sky, never on leaves.
  */
 public final class DriftBuilder {
-    private static final int LEE_REACH = 8;
+    private static final int LEE_REACH = 10;
 
     private DriftBuilder() {
     }
 
-    /** How many snow layers the wind would pile on the column (x, z), 0 when it is not a drift spot. */
-    public static int targetLayers(ServerLevel level, int x, int z, float dirX, float dirZ, int maxLayers) {
+    /** How strongly the wind piles snow on the column (x, z): 0 in the open, up to 1 in a deep lee. */
+    public static float lee(ServerLevel level, int x, int z, float dirX, float dirZ) {
         int ground = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
         float lee = 0.0F;
         for (int d = 1; d <= LEE_REACH; d++) {
             int upwindX = Mth.floor(x + 0.5F - dirX * d);
             int upwindZ = Mth.floor(z + 0.5F - dirZ * d);
-            int h = level.getHeight(Heightmap.Types.MOTION_BLOCKING, upwindX, upwindZ) - ground;
-            if (h > 0) {
-                lee = Math.max(lee, Terrain.leeStrength(h, d));
+            int solid = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, upwindX, upwindZ);
+            int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING, upwindX, upwindZ);
+            float height = solid + (top - solid) * 0.55F - ground;
+            if (height > 0.4F) {
+                lee = Math.max(lee, CoverSurvey.leeStrength(height, d));
             }
         }
-        float front = 0.0F;
-        int ahead = level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(x + 0.5F + dirX), Mth.floor(z + 0.5F + dirZ)) - ground;
-        if (ahead > 0) {
-            front = Math.min(ahead, 2) * 0.5F;
-        }
-        float strength = Math.max(lee * 0.95F, front * 0.75F);
-        return Mth.clamp(Math.round(strength * maxLayers), 0, maxLayers);
+        return lee;
+    }
+
+    /** How many snow layers the wind piles on the column. */
+    public static int targetLayers(ServerLevel level, int x, int z, float dirX, float dirZ, int maxLayers) {
+        float lee = lee(level, x, z, dirX, dirZ);
+        return Mth.clamp(Math.round((lee - 0.15F) / 0.75F * maxLayers), 0, maxLayers);
     }
 
     /**
@@ -73,12 +75,10 @@ public final class DriftBuilder {
         if (layers >= 8 || !level.canSeeSky(pos)) {
             return false;
         }
-        Biome biome = level.getBiome(pos).value();
-        if (!anyClimate && (!biome.hasPrecipitation() || biome.getPrecipitationAt(pos) != Biome.Precipitation.SNOW)) {
+        if (!anyClimate && !Climate.snowsAt(level, pos)) {
             return false;
         }
-        int target = targetLayers(level, x, z, dirX, dirZ, maxLayers);
-        if (layers >= target) {
+        if (layers >= targetLayers(level, x, z, dirX, dirZ, maxLayers)) {
             return false;
         }
         BlockState next = Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, layers + 1);

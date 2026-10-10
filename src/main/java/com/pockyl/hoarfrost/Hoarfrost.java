@@ -18,7 +18,7 @@ public final class Hoarfrost {
     public Hoarfrost(IEventBus modBus, ModContainer container) {
         // No items: nothing goes into the shared Pocky Mods tab.
         modBus.addListener(ModNetwork::register);
-        container.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        container.registerConfig(ModConfig.Type.SERVER, Config.SPEC);
         container.registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC);
     }
 

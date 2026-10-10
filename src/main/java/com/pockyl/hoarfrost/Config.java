@@ -2,9 +2,11 @@ package com.pockyl.hoarfrost;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
 
+import com.pockyl.hoarfrost.weather.SnowKind;
+
 /**
- * The weather itself and what the server does with it. Shared by server and clients: a client on a server without
- * the mod uses its own values for the course of the snowfall.
+ * The weather and what the server does with the world (server config). A client on a server without the mod has no
+ * server config: it follows the defaults for the course of the snowfall.
  */
 public final class Config {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
@@ -13,26 +15,23 @@ public final class Config {
         BUILDER.translation(key("weather")).push("weather");
     }
 
-    public static final ModConfigSpec.IntValue FLURRIES_WEIGHT = BUILDER
-            .comment("Relative chance of light flurries when it starts to snow and every five minutes of a snowfall.")
-            .translation(key("flurriesWeight"))
-            .defineInRange("flurriesWeight", 3, 0, 100);
-    public static final ModConfigSpec.IntValue SNOWFALL_WEIGHT = BUILDER
-            .comment("Relative chance of a steady snowfall.")
-            .translation(key("snowfallWeight"))
-            .defineInRange("snowfallWeight", 4, 0, 100);
-    public static final ModConfigSpec.IntValue LARGE_FLAKES_WEIGHT = BUILDER
-            .comment("Relative chance of slow, large flakes in calm air.")
-            .translation(key("largeFlakesWeight"))
-            .defineInRange("largeFlakesWeight", 2, 0, 100);
-    public static final ModConfigSpec.IntValue BLIZZARD_WEIGHT = BUILDER
-            .comment("Relative chance of a blizzard without a thunderstorm.")
-            .translation(key("blizzardWeight"))
-            .defineInRange("blizzardWeight", 1, 0, 100);
+    private static final ModConfigSpec.IntValue[] WEIGHTS = {
+            weight(SnowKind.LIGHT_SNOW, "Light snow: a few slow crystals in still air, silent.", 4),
+            weight(SnowKind.SNOW, "Snow: a steady snowfall with a soft breeze.", 5),
+            weight(SnowKind.HEAVY_SNOW, "Heavy snow: thick snowfall, the land fading into white.", 3),
+            weight(SnowKind.HEAVY_LARGE_FLAKES, "Heavy snow with large flakes tumbling down through calm air.", 2),
+            weight(SnowKind.LIGHT_BLIZZARD, "Light blizzard: fine snow driven by a fresh wind.", 2),
+            weight(SnowKind.BLIZZARD, "Blizzard: a howling snowstorm.", 1),
+            weight(SnowKind.HEAVY_BLIZZARD, "Heavy blizzard: a whiteout.", 0)};
     public static final ModConfigSpec.BooleanValue THUNDER_BLIZZARD = BUILDER
-            .comment("A thunderstorm in snowy land is a blizzard.")
+            .comment("A thunderstorm in snowy land is one of the blizzards.")
             .translation(key("thunderBlizzard"))
             .define("thunderBlizzard", true);
+    public static final ModConfigSpec.BooleanValue SEASONS = BUILDER
+            .comment("With Serene Seasons: snow falls and lies where the season makes it cold (temperate land in winter, none in "
+                    + "a warm summer), and deep winter brings heavier snow and blizzards.")
+            .translation(key("seasons"))
+            .define("followSeasons", true);
 
     static {
         BUILDER.pop();
@@ -40,8 +39,8 @@ public final class Config {
     }
 
     public static final ModConfigSpec.BooleanValue DRIFTS = BUILDER
-            .comment("Server: while it snows with wind, snow layers pile up in the lee of walls, trees and hills and at the foot of "
-                    + "walls facing the wind. Changes the world (snow layer blocks); only where the sky is open.")
+            .comment("While snow falls with wind, snow layers pile up in the lee of walls, trees and hills. Changes the world "
+                    + "(adds snow layer blocks, never removes anything); only under the open sky.")
             .translation(key("driftsEnabled"))
             .define("enabled", true);
     public static final ModConfigSpec.IntValue DRIFT_MAX_LAYERS = BUILDER
@@ -49,7 +48,7 @@ public final class Config {
             .translation(key("driftMaxLayers"))
             .defineInRange("maxLayers", 4, 1, 8);
     public static final ModConfigSpec.DoubleValue DRIFT_SPEED = BUILDER
-            .comment("How fast drifts grow. 1 = a drift of four layers takes a strong snowstorm of a few minutes.")
+            .comment("How fast drifts grow. 1 = a drift of four layers takes a blizzard of a few minutes.")
             .translation(key("driftSpeed"))
             .defineInRange("speed", 1.0, 0.0, 10.0);
 
@@ -62,9 +61,47 @@ public final class Config {
     private Config() {
     }
 
-    /** Relative chances of the snow types in {@link com.pockyl.hoarfrost.weather.SnowType} order. */
-    public static int[] typeWeights() {
-        return new int[] {FLURRIES_WEIGHT.get(), SNOWFALL_WEIGHT.get(), LARGE_FLAKES_WEIGHT.get(), BLIZZARD_WEIGHT.get()};
+    private static ModConfigSpec.IntValue weight(SnowKind kind, String comment, int value) {
+        String name = camel(kind.id()) + "Weight";
+        return BUILDER.comment(comment + " Relative chance when it starts to snow and every five minutes of a snowfall.")
+                .translation(key(name))
+                .defineInRange(name, value, 0, 100);
+    }
+
+    private static String camel(String id) {
+        StringBuilder out = new StringBuilder();
+        boolean upper = false;
+        for (char c : id.toCharArray()) {
+            if (c == '_') {
+                upper = true;
+            } else {
+                out.append(upper ? Character.toUpperCase(c) : c);
+                upper = false;
+            }
+        }
+        return out.toString();
+    }
+
+    /** Relative chances of the kinds in {@link SnowKind} order. */
+    public static int[] kindWeights() {
+        int[] weights = new int[WEIGHTS.length];
+        for (int i = 0; i < weights.length; i++) {
+            weights[i] = value(WEIGHTS[i]);
+        }
+        return weights;
+    }
+
+    public static boolean thunderBlizzard() {
+        return value(THUNDER_BLIZZARD);
+    }
+
+    public static boolean followSeasons() {
+        return value(SEASONS);
+    }
+
+    /** The value, or its default while the server config is not loaded (on a server without the mod). */
+    public static <T> T value(ModConfigSpec.ConfigValue<T> value) {
+        return SPEC.isLoaded() ? value.get() : value.getDefault();
     }
 
     static String key(String name) {

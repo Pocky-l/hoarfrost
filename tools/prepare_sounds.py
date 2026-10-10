@@ -1,12 +1,13 @@
 """Builds the sounds of Hoarfrost from CC0 field recordings on Freesound.
 
-Usage: python tools/prepare_sounds.py   (from the mod folder; needs numpy, scipy, soundfile)
+Usage: python tools/prepare_sounds.py [--steps]   (from the mod folder; needs numpy, scipy, soundfile)
 
 The recordings (all Creative Commons 0, see SOURCES) are downloaded into tools/.cache (not committed).
 
-* Wind loops: the steadiest stretch of a recording, rumble removed, made into a seamless mono loop (the game places
-  the wind upwind of the listener).
-* Gusts: the loudest swells of the storm recordings, cut with a natural fade in and out.
+* Wind loops, one pair per layer of the soundscape (a soft breeze, a fresh wind, the roar of a storm, its howl): the
+  steadiest stretches of a recording, rumble removed, made into seamless mono loops (the game plays most of the wind
+  all around the listener and a part from upwind).
+* Gusts: the loudest swells of the storm recordings and single gusts, cut with a natural fade in and out.
 * Footsteps: single steps found as clean onsets in recordings of walking in snow.
 
 Every file is normalized to a loudness that encodes how loud that sound is meant to be relative to the others.
@@ -14,6 +15,7 @@ Every file is normalized to a loudness that encodes how loud that sound is meant
 import math
 import os
 import re
+import sys
 import urllib.request
 
 import numpy as np
@@ -27,10 +29,20 @@ RATE = 44100
 
 # Freesound id -> (author, title). All CC0. Listed in the README credits.
 SOURCES = {
-    # Wind.
+    # A soft breeze.
+    181252: ("mario1298", "a gentle breeze, wind 3"),
+    697217: ("dhallcomposer", "Looping Gentle Wind Ambience on an Open Desert Plain"),
+    # A fresh wind.
+    117136: ("cobratronik", "Wind Artic Cold"),
+    521820: ("Fission9", "Polar Wind"),
+    # The roar of a storm.
     473815: ("guyburns", "Wind during snow storm #1"),
     574552: ("TRP", "Winter storm wind lashing snow"),
-    181252: ("mario1298", "a gentle breeze, wind 3"),
+    # The howl of a storm.
+    505999: ("DBlover", "Howling winter storm ambient sounds"),
+    405601: ("DBlover", "Howling Wind Ambience"),
+    # Single gusts.
+    80937: ("Tony B kksm", "gust of wind"),
     # Footsteps in fresh snow.
     432285: ("Nimlos", "snow footsteps (outside recording)"),
     453168: ("florianreichelt", "footsteps in fresh snow"),
@@ -212,15 +224,20 @@ def clean(folder):
 
 
 def main():
-    for folder in ("wind", "step"):
-        clean(folder)
-    # The roar of a snowstorm (two recordings, so the loop does not repeat audibly) and a soft breeze.
-    loops_from(473815, "wind/strong_a", 24, -20, variants=1, rumble_cut=40.0, air_cut=6000.0, air_cut_amount=0.3, rate=32000)
-    loops_from(574552, "wind/strong_b", 24, -20, variants=1, rumble_cut=40.0, air_cut=6000.0, air_cut_amount=0.3, rate=32000)
-    loops_from(181252, "wind/light", 24, -24, variants=2, rumble_cut=60.0, air_cut=5000.0, air_cut_amount=0.4, rate=32000)
-    gusts([473815, 574552], "wind/gust", 5)
-    steps([432285, 453168, 378056], "step/powder", 8)
-    steps([333422, 559459], "step/packed", 8)
+    clean("wind")
+    loops_from(181252, "wind/breeze_a", 24, -24, variants=1, rumble_cut=60.0, air_cut=5000.0, air_cut_amount=0.4, rate=32000)
+    loops_from(697217, "wind/breeze_b", 24, -24, variants=1, rumble_cut=60.0, air_cut=5000.0, air_cut_amount=0.4, rate=32000)
+    loops_from(117136, "wind/wind_a", 24, -21, variants=1, rumble_cut=50.0, air_cut=6000.0, air_cut_amount=0.35, rate=32000)
+    loops_from(521820, "wind/wind_b", 24, -21, variants=1, rumble_cut=50.0, air_cut=6000.0, air_cut_amount=0.35, rate=32000)
+    loops_from(473815, "wind/storm_a", 24, -20, variants=1, rumble_cut=40.0, air_cut=6000.0, air_cut_amount=0.3, rate=32000)
+    loops_from(574552, "wind/storm_b", 24, -20, variants=1, rumble_cut=40.0, air_cut=6000.0, air_cut_amount=0.3, rate=32000)
+    loops_from(505999, "wind/howl_a", 24, -22, variants=1, rumble_cut=120.0, air_cut=7000.0, air_cut_amount=0.3, rate=32000)
+    loops_from(405601, "wind/howl_b", 24, -22, variants=1, rumble_cut=120.0, air_cut=7000.0, air_cut_amount=0.3, rate=32000)
+    gusts([473815, 574552, 80937], "wind/gust", 6)
+    if "--steps" in sys.argv:
+        clean("step")
+        steps([432285, 453168, 378056], "step/powder", 8)
+        steps([333422, 559459], "step/packed", 8)
 
 
 if __name__ == "__main__":

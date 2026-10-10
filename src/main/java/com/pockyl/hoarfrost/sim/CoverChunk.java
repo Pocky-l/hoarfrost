@@ -1,246 +1,315 @@
 package com.pockyl.hoarfrost.sim;
 
-import java.io.DataInput;
-import java.io.DataOutput;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 
 /**
- * The snow lying on one chunk column: a 128x128 grid of cells, 8x8 per block, each with up to two surfaces - the top of
- * the column (open to the sky: ground, a roof, a crown) and the ground under it (beneath a crown, an overhang, the
- * roof of a tunnel or cave mouth). A surface knows its height, how much loose powder lies there and how much packed
- * snow (trodden, compressed), and what kind of surface it is. Indices below {@link #AREA} are top surfaces, the
- * index plus {@link #AREA} is the surface under it.
+ * The snow lying on one chunk column. Every block column has up to two surfaces snow can lie on: the top one (ground,
+ * roof, crown) and one under it (the ground under a crown or an overhang, the floor of a cave mouth). Each surface holds
+ * the height it lies at, how deep the snow is, how trodden, and what the land around it does to falling and blowing snow
+ * (see {@link CoverSurvey}). Footprints are kept as small dents on top of that.
  */
 public final class CoverChunk {
-    /** Cells per block along each side. */
-    public static final int PER_BLOCK = 8;
-    public static final int BLOCK_SHIFT = 3;
-    public static final int SIZE = 16 * PER_BLOCK;
-    public static final int SHIFT = 7;
-    public static final int MASK = SIZE - 1;
-    public static final int AREA = SIZE * SIZE;
-    public static final int CELLS = AREA * 2;
-    /** Render tiles are 32x32 cells (4x4 blocks). */
-    public static final int TILE = 32;
-    private static final int TILE_SHIFT = 5;
-    public static final int TILES = SIZE / TILE;
-    private static final int FORMAT = 6;
-    /** Depths are stored in 1/4096 of a block. */
-    private static final float QUANTUM = 1.0F / 4096.0F;
-    /** Changes of depth smaller than this (a fifth of a pixel) are not redrawn on their own. */
-    private static final float SHOWN_STEP = 0.012F;
-    /** No opening to the open air near a sheltered surface. */
-    public static final float NO_MOUTH = 99.0F;
+    public static final int SURFACES = 2;
+    public static final int TOP = 0;
+    public static final int UNDER = 1;
+    public static final int COLUMNS = 256;
+    public static final int ENTRIES = SURFACES * COLUMNS;
+    public static final int DIRECTIONS = 8;
+    /** Most dents kept per chunk; the oldest go first. */
+    public static final int MAX_DENTS = 96;
+
+    /** Flags of a surface. */
+    public static final byte LEAVES = 1;
+    /** A narrow top (fence, wall, post): the snow is a small rounded cap on it. */
+    public static final byte CAP = 2;
+    /** Snow falls here (cold land); otherwise it melts. */
+    public static final byte COLD = 4;
+    /** Near a lamp: snow melts. */
+    public static final byte LIT = 8;
+
+    /** Saved data of older layouts is ignored. */
+    private static final int DATA_VERSION = 1;
 
     public final int x;
     public final int z;
-    /** Height of the surface under the snow, NaN where there is none (water, nothing loaded, no ground below). */
-    public final float[] base = new float[CELLS];
-    public final float[] powder = new float[CELLS];
-    public final float[] packed = new float[CELLS];
-    public final byte[] kind = new byte[CELLS];
-    /** The depth of each surface as last drawn (set by the renderer): small changes wait until they can be seen. */
-    public final float[] shown = new float[CELLS];
-    /**
-     * Sheltered ground, per block column: share of the snowfall that comes through the crowns above (0 under a solid
-     * roof).
-     */
-    public final float[] through = new float[256];
-    /**
-     * Sheltered ground, per block column: distance in blocks to the nearest opening at the same level (the edge of an
-     * overhang, a tunnel or cave mouth) and the direction from there inwards. Snow blows in from there.
-     */
-    public final float[] mouth = new float[256];
-    public final float[] mouthX = new float[256];
-    public final float[] mouthZ = new float[256];
-    /** Incremented whenever the look of a tile changes; the renderer rebuilds tiles whose revision moved. */
-    public final int[] tileRevision = new int[TILES * TILES];
+    /** Height of the surface (world y of the top of the block it lies on), or NaN where there is none. */
+    final float[] base = new float[ENTRIES];
+    final float[] depth = new float[ENTRIES];
+    /** How trodden the snow is, 0 (fresh powder) .. 1 (packed path). */
+    final float[] packed = new float[ENTRIES];
+    final byte[] flags = new byte[ENTRIES];
+    /** How much of the falling snow settles here in still air, relative to open flat ground. */
+    final float[] calm = new float[ENTRIES];
+    /** The same in a full gale blowing towards each of the eight directions (east first, clockwise), in 1/64. */
+    final byte[] windy = new byte[ENTRIES * DIRECTIONS];
+    /** For caps: the top of the narrow block, in sixteenths: min x, max x, min z, max z. */
+    final byte[] capBox = new byte[ENTRIES * 4];
+    /** Packed light just above the surface. */
+    final int[] light = new int[ENTRIES];
 
-    boolean surfaces;
+    // Footprints: centre, the surface they are on, radius and how deep they press.
+    final float[] dentX = new float[MAX_DENTS];
+    final float[] dentZ = new float[MAX_DENTS];
+    final float[] dentRadius = new float[MAX_DENTS];
+    final float[] dentDepth = new float[MAX_DENTS];
+    final byte[] dentSurface = new byte[MAX_DENTS];
+    int dents;
+
+    boolean surveyed;
+    /** Depth and packing were set (seeded or loaded), so the chunk is not seeded again. */
     boolean seeded;
-    boolean dirty;
-    long lastUpdate = Long.MIN_VALUE;
+    /** Bumped whenever the snow changed enough to be drawn again. */
+    int revision;
+    private float change;
+    private boolean dirty;
+    /**
+     * Snow waiting for the next survey to find the surfaces it belongs to (after blocks changed, or read from disk):
+     * the old surface heights, the heights the snow reached and the packing.
+     */
+    private float[][] carried;
 
     public CoverChunk(int x, int z) {
         this.x = x;
         this.z = z;
         Arrays.fill(base, Float.NaN);
-        Arrays.fill(mouth, NO_MOUTH);
     }
 
-    /** The top surface of a cell. */
     public static int index(int localX, int localZ) {
-        return localZ << SHIFT | localX;
+        return (localZ & 15) << 4 | localX & 15;
     }
 
-    /** The cell (top surface index) of a surface index. */
-    public static int cell(int i) {
-        return i & (AREA - 1);
+    public float base(int surface, int column) {
+        return base[surface * COLUMNS + column];
     }
 
-    /** The block column (0..255) of a surface index. */
-    public static int block(int i) {
-        int cell = i & (AREA - 1);
-        return (cell >> SHIFT >> BLOCK_SHIFT) * 16 + ((cell & MASK) >> BLOCK_SHIFT);
+    public float depth(int surface, int column) {
+        return depth[surface * COLUMNS + column];
     }
 
-    public static boolean sheltered(int i) {
-        return i >= AREA;
+    public float packed(int surface, int column) {
+        return packed[surface * COLUMNS + column];
     }
 
-    public static int tile(int index) {
-        int cell = index & (AREA - 1);
-        return (cell >> SHIFT >> TILE_SHIFT) * TILES + ((cell & MASK) >> TILE_SHIFT);
+    public byte flags(int surface, int column) {
+        return flags[surface * COLUMNS + column];
     }
 
-    public float depth(int i) {
-        return powder[i] + packed[i];
+    public int light(int surface, int column) {
+        return light[surface * COLUMNS + column];
     }
 
-    public float top(int i) {
-        return base[i] + powder[i] + packed[i];
+    public boolean has(int surface, int column) {
+        return !Float.isNaN(base[surface * COLUMNS + column]);
     }
 
-    public boolean hasSurface(int i) {
-        return !Float.isNaN(base[i]);
-    }
-
-    /**
-     * The surface of a cell whose height is closest to {@code y}, if it is within {@code tolerance}; -1 otherwise.
-     */
-    public int near(int cell, float y, float tolerance) {
-        int best = -1;
-        float bestGap = tolerance;
-        for (int i = cell; i < CELLS; i += AREA) {
-            if (hasSurface(i)) {
-                float gap = Math.abs(base[i] - y);
-                if (gap <= bestGap) {
-                    best = i;
-                    bestGap = gap;
-                }
-            }
-        }
-        return best;
-    }
-
-    /** The surface of a cell whose snow something falling at height {@code y} lands on: the highest top not above it. */
-    public int below(int cell, float y) {
-        int best = -1;
-        float bestTop = Float.NEGATIVE_INFINITY;
-        for (int i = cell; i < CELLS; i += AREA) {
-            if (hasSurface(i)) {
-                float top = top(i);
-                if (top <= y && top > bestTop) {
-                    best = i;
-                    bestTop = top;
-                }
-            }
-        }
-        return best;
-    }
-
-    /**
-     * The surface of a cell that something at height {@code y} stands on: the highest ground not above it (its feet may
-     * be deep in the snow on it).
-     */
-    public int ground(int cell, float y) {
-        int best = -1;
-        float bestBase = Float.NEGATIVE_INFINITY;
-        for (int i = cell; i < CELLS; i += AREA) {
-            if (hasSurface(i) && base[i] <= y && base[i] > bestBase) {
-                best = i;
-                bestBase = base[i];
-            }
-        }
-        return best;
-    }
-
-    /** Changes whenever any tile changes. */
-    public int revision() {
-        int sum = 0;
-        for (int t = 0; t < tileRevision.length; t++) {
-            sum += tileRevision[t];
-        }
-        return sum;
+    public boolean surveyed() {
+        return surveyed;
     }
 
     public boolean seeded() {
         return seeded;
     }
 
-    public boolean hasSurfaces() {
-        return surfaces;
+    public int revision() {
+        return revision;
     }
 
-    /** Notes a change of depth in a surface; its tile is redrawn once the change can be seen (or right away). */
-    void changed(int i, float amount, boolean now) {
+    public int dentCount() {
+        return dents;
+    }
+
+    public float dentX(int i) {
+        return dentX[i];
+    }
+
+    public float dentZ(int i) {
+        return dentZ[i];
+    }
+
+    public float dentRadius(int i) {
+        return dentRadius[i];
+    }
+
+    public float dentDepth(int i) {
+        return dentDepth[i];
+    }
+
+    public int dentSurface(int i) {
+        return dentSurface[i];
+    }
+
+    /** The cap box of a narrow top in blocks: {@code k} = 0 min x, 1 max x, 2 min z, 3 max z. */
+    public float capBox(int surface, int column, int k) {
+        return capBox[(surface * COLUMNS + column) * 4 + k] / 16.0F;
+    }
+
+    /** Deposition at windiness {@code w} for a wind blowing at {@code angle} (radians, 0 = towards +x). */
+    float deposition(int entry, float angle, float w) {
+        float c = calm[entry];
+        if (w <= 0.001F) {
+            return c;
+        }
+        float sector = (float) (angle / (Math.PI * 2.0) * DIRECTIONS);
+        sector -= (float) Math.floor(sector / DIRECTIONS) * DIRECTIONS;
+        int a = (int) sector;
+        float t = sector - a;
+        int b = (a + 1) % DIRECTIONS;
+        a %= DIRECTIONS;
+        float windyA = (windy[entry * DIRECTIONS + a] & 0xFF) / 64.0F;
+        float windyB = (windy[entry * DIRECTIONS + b] & 0xFF) / 64.0F;
+        return c + (windyA + (windyB - windyA) * t - c) * w;
+    }
+
+    void addChange(float amount) {
+        change += amount;
         dirty = true;
-        if (now || Math.abs(powder[i] + packed[i] - shown[i]) > SHOWN_STEP) {
-            tileRevision[tile(i)]++;
+        if (change > 0.006F) {
+            change = 0.0F;
+            revision++;
         }
     }
 
-    void touchAll() {
-        for (int t = 0; t < tileRevision.length; t++) {
-            tileRevision[t]++;
-        }
+    void touched() {
+        change = 0.0F;
         dirty = true;
+        revision++;
     }
 
-    /** Whether the chunk changed since it was last saved; clears the flag. */
+    /** Whether the snow changed since it was last saved; clears the flag. */
     public boolean takeDirty() {
         boolean was = dirty;
         dirty = false;
         return was;
     }
 
-    public void write(DataOutput out) throws IOException {
-        out.writeByte(FORMAT);
-        out.writeInt(x);
-        out.writeInt(z);
-        out.writeBoolean(seeded);
-        int cells = 0;
-        for (int i = 0; i < CELLS; i++) {
-            if (powder[i] + packed[i] > 0.0F) {
-                cells++;
-            }
+    void addDent(float x, float z, int surface, float radius, float amount) {
+        if (dents == MAX_DENTS) {
+            // The oldest dent makes room.
+            System.arraycopy(dentX, 1, dentX, 0, MAX_DENTS - 1);
+            System.arraycopy(dentZ, 1, dentZ, 0, MAX_DENTS - 1);
+            System.arraycopy(dentRadius, 1, dentRadius, 0, MAX_DENTS - 1);
+            System.arraycopy(dentDepth, 1, dentDepth, 0, MAX_DENTS - 1);
+            System.arraycopy(dentSurface, 1, dentSurface, 0, MAX_DENTS - 1);
+            dents--;
         }
-        out.writeShort(cells);
-        for (int i = 0; i < CELLS; i++) {
-            if (powder[i] + packed[i] > 0.0F) {
-                out.writeShort(i);
-                out.writeFloat(base[i]);
-                out.writeShort(quantize(powder[i]));
-                out.writeShort(quantize(packed[i]));
-                out.writeByte(kind[i]);
-            }
-        }
+        dentX[dents] = x;
+        dentZ[dents] = z;
+        dentRadius[dents] = radius;
+        dentDepth[dents] = amount;
+        dentSurface[dents] = (byte) surface;
+        dents++;
+        touched();
     }
 
-    private static int quantize(float depth) {
-        return Math.min(0xFFFF, Math.round(depth / QUANTUM));
+    /** Fresh snow fills the dents; a dent that is gone is dropped. */
+    void fillDents(float amount) {
+        int kept = 0;
+        for (int i = 0; i < dents; i++) {
+            float left = dentDepth[i] - amount;
+            if (left > 0.004F) {
+                dentX[kept] = dentX[i];
+                dentZ[kept] = dentZ[i];
+                dentRadius[kept] = dentRadius[i];
+                dentDepth[kept] = left;
+                dentSurface[kept] = dentSurface[i];
+                kept++;
+            }
+        }
+        if (kept != dents || amount > 0.0F && dents > 0) {
+            addChange(amount * 2.0F);
+        }
+        dents = kept;
+    }
+
+    /** Drops the survey (blocks changed); the snow is kept to be matched to the new surfaces. */
+    void invalidateSurvey() {
+        if (!surveyed) {
+            return;
+        }
+        surveyed = false;
+        float[] tops = new float[ENTRIES];
+        for (int e = 0; e < ENTRIES; e++) {
+            tops[e] = Float.isNaN(base[e]) ? Float.NaN : base[e] + depth[e];
+        }
+        carried = new float[][] {base.clone(), tops, packed.clone()};
     }
 
     /**
-     * Reads a saved chunk. Surfaces are not trusted (blocks may have changed while the chunk was not watched): the
-     * snow is kept where the surface is still the same when they are computed again.
+     * After a survey: carries the snow over from the surfaces before by the height its top reached, so a block placed
+     * beside the snow or a vanilla snow layer growing under it does not change how high the snow lies; snow under a
+     * block placed on it is gone.
      */
-    public static CoverChunk read(DataInput in) throws IOException {
-        int format = in.readByte();
-        if (format != FORMAT) {
-            throw new IOException("Unknown snow cover format " + format);
+    void carryOver() {
+        if (carried == null) {
+            return;
         }
-        CoverChunk chunk = new CoverChunk(in.readInt(), in.readInt());
-        chunk.seeded = in.readBoolean();
-        int cells = in.readUnsignedShort();
-        for (int n = 0; n < cells; n++) {
-            int i = in.readUnsignedShort() & (CELLS - 1);
-            chunk.base[i] = in.readFloat();
-            chunk.powder[i] = in.readUnsignedShort() * QUANTUM;
-            chunk.packed[i] = in.readUnsignedShort() * QUANTUM;
-            chunk.kind[i] = in.readByte();
+        float[] oldBase = carried[0];
+        float[] oldTops = carried[1];
+        float[] oldPacked = carried[2];
+        carried = null;
+        for (int column = 0; column < COLUMNS; column++) {
+            for (int s = 0; s < SURFACES; s++) {
+                int e = s * COLUMNS + column;
+                depth[e] = 0.0F;
+                packed[e] = 0.0F;
+                if (Float.isNaN(base[e])) {
+                    continue;
+                }
+                float best = Float.MAX_VALUE;
+                for (int o = 0; o < SURFACES; o++) {
+                    int oe = o * COLUMNS + column;
+                    if (Float.isNaN(oldBase[oe]) || Float.isNaN(oldTops[oe])) {
+                        continue;
+                    }
+                    float distance = Math.abs(oldBase[oe] - base[e]);
+                    if (distance < 1.01F && distance < best && oldTops[oe] > base[e]) {
+                        best = distance;
+                        depth[e] = oldTops[oe] - base[e];
+                        packed[e] = oldPacked[oe];
+                    }
+                }
+            }
         }
+        touched();
+    }
+
+    public void write(DataOutputStream out) throws IOException {
+        out.writeByte(DATA_VERSION);
+        for (int e = 0; e < ENTRIES; e++) {
+            boolean has = !Float.isNaN(base[e]) && depth[e] > 0.0005F;
+            out.writeShort(has ? Math.round(base[e] * 16.0F) : Short.MIN_VALUE);
+            if (has) {
+                out.writeShort(Math.round(Math.min(depth[e], 30.0F) * 1000.0F));
+                out.writeByte(Math.round(packed[e] * 255.0F));
+            }
+        }
+    }
+
+    /** Reads saved snow; it is matched to the surfaces once the chunk is surveyed. */
+    public static CoverChunk read(int x, int z, DataInputStream in) throws IOException {
+        if (in.readByte() != DATA_VERSION) {
+            return null;
+        }
+        CoverChunk chunk = new CoverChunk(x, z);
+        float[] oldBase = new float[ENTRIES];
+        float[] tops = new float[ENTRIES];
+        float[] oldPacked = new float[ENTRIES];
+        for (int e = 0; e < ENTRIES; e++) {
+            short b = in.readShort();
+            if (b == Short.MIN_VALUE) {
+                oldBase[e] = Float.NaN;
+                tops[e] = Float.NaN;
+                continue;
+            }
+            oldBase[e] = b / 16.0F;
+            tops[e] = oldBase[e] + (in.readShort() & 0xFFFF) / 1000.0F;
+            oldPacked[e] = (in.readByte() & 0xFF) / 255.0F;
+        }
+        chunk.carried = new float[][] {oldBase, tops, oldPacked};
+        chunk.seeded = true;
         return chunk;
     }
 }

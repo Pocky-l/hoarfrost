@@ -1,7 +1,9 @@
 package com.pockyl.hoarfrost.client.sound;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.AbstractTickableSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
+import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
@@ -48,6 +50,28 @@ final class LoopSound extends AbstractTickableSoundInstance implements Hush.Muff
         this.y = targetY = y;
         this.z = targetZ = z;
         this.highs = targetHighs = appliedHighs = highs;
+    }
+
+    /**
+     * Keeps a loop playing at a volume: starts it when it becomes audible, lets it fade and stop itself when not.
+     *
+     * @return the loop now playing, or null
+     */
+    static LoopSound drive(LoopSound loop, SoundEvent sound, float volume, double x, double y, double z, float highs, boolean around,
+            RandomSource random) {
+        SoundManager sounds = Minecraft.getInstance().getSoundManager();
+        if (loop != null && (loop.isStopped() || !sounds.isActive(loop))) {
+            loop = null;
+        }
+        if (loop == null) {
+            if (volume < 0.004F) {
+                return null;
+            }
+            loop = new LoopSound(sound, x, y, z, highs, around, random);
+            sounds.play(loop);
+        }
+        loop.setTarget(volume, x, y, z, highs);
+        return loop;
     }
 
     void setTarget(float volume, double x, double y, double z, float highs) {

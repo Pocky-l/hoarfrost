@@ -4,6 +4,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.SnowLayerBlock;
@@ -13,31 +14,31 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import com.pockyl.hoarfrost.Hoarfrost;
+import com.pockyl.hoarfrost.compat.Climate;
+import com.pockyl.hoarfrost.sim.AirFlow;
 import com.pockyl.hoarfrost.sim.CoverChunk;
-import com.pockyl.hoarfrost.sim.FlakePool;
+import com.pockyl.hoarfrost.sim.Flakes;
 import com.pockyl.hoarfrost.sim.SnowCover;
 import com.pockyl.hoarfrost.sim.SnowSettings;
 import com.pockyl.hoarfrost.sim.SnowSimulation;
-import com.pockyl.hoarfrost.sim.SurfaceKind;
+import com.pockyl.hoarfrost.weather.Noise;
+import com.pockyl.hoarfrost.weather.SnowConditions;
+import com.pockyl.hoarfrost.weather.SnowKind;
 import com.pockyl.hoarfrost.weather.SnowSchedule;
-import com.pockyl.hoarfrost.weather.SnowType;
+import com.pockyl.hoarfrost.weather.Wind;
 import com.pockyl.hoarfrost.world.DriftBuilder;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.util.Arrays;
 
 /**
  * In-game tests, run headless by {@code gradlew runGameTestServer}. The snow simulation only needs a {@code Level}, so it
  * runs here against real blocks, stepped synchronously; the test world is warm, so the tests let it snow everywhere.
- * Most tests use the 24x10x24 {@code field} structure with a stone floor at relative y = 0, so snow lies at y = 1.
+ * Most tests use the 40x14x40 {@code arena} structure with a stone floor at relative y = 0, so snow lies at y = 1.
  */
 @GameTestHolder(Hoarfrost.MOD_ID)
 @PrefixGameTestTemplate(false)
 public final class ModGameTests {
-    private static final int SIZE = 24;
+    private static final int SIZE = 40;
     /** Game time advanced per cover update in the tests. */
     private static final int DT = 100;
 
@@ -50,481 +51,336 @@ public final class ModGameTests {
     }
 
     @GameTest(template = "empty")
-    public static void scheduleFollowsWeightsAndThunder(GameTestHelper helper) {
-        helper.assertTrue(SnowSchedule.naturalType(12345L, true, true, new int[] {1, 1, 1, 0}) == SnowType.BLIZZARD,
-                "a thunderstorm in snowy land is a blizzard");
-        helper.assertTrue(SnowSchedule.naturalType(12345L, true, false, new int[] {0, 1, 0, 0}) == SnowType.SNOWFALL,
-                "without the option thunder does not force a blizzard");
-        for (long t = 0; t < 200_000L; t += 6000L) {
-            helper.assertTrue(SnowSchedule.naturalType(t, false, true, new int[] {0, 0, 5, 0}) == SnowType.LARGE_FLAKES,
-                    "only the weighted type is rolled");
+    public static void kindsAndScheduleAreShared(GameTestHelper helper) {
+        for (SnowKind kind : SnowKind.values()) {
+            helper.assertTrue(SnowKind.byId(kind.id()) == kind, "kind id round trip for " + kind);
         }
-        helper.assertTrue(SnowSchedule.naturalType(7L, false, true, new int[] {0, 0, 0, 0}) == SnowType.SNOWFALL,
-                "no weights fall back to a snowfall");
-        helper.assertTrue(SnowSchedule.windSpeed(5000.0, 0.4F, 0.9F) == SnowSchedule.windSpeed(5000.0, 0.4F, 0.9F),
-                "the wind is the same for everyone at the same time");
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void snowSettlesOverTheGround(GameTestHelper helper) {
-        floor(helper);
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        long time = weather(helper, sim, 30);
-        double min = Double.MAX_VALUE;
-        double max = 0.0;
+        helper.assertTrue(SnowKind.byId("heavy_large_flakes") == SnowKind.HEAVY_LARGE_FLAKES, "command ids are lower case");
+        int[] weights = {1, 1, 1, 1, 1, 1, 1};
+        for (long t = 0; t < 400_000L; t += 6000L) {
+            helper.assertTrue(SnowSchedule.naturalKind(t, true, true, weights).blizzard(), "a thunderstorm is one of the blizzards");
+            helper.assertTrue(SnowSchedule.naturalKind(t, false, true, new int[] {0, 0, 0, 5, 0, 0, 0}) == SnowKind.HEAVY_LARGE_FLAKES,
+                    "only the weighted kind is rolled");
+        }
+        helper.assertTrue(SnowSchedule.naturalKind(7L, false, true, new int[7]) == SnowKind.SNOW, "no weights fall back to snow");
+        helper.assertTrue(Arrays.equals(SnowSchedule.seasonWeights(weights, -1.0F), weights), "without seasons the weights stay");
+        int[] deepWinter = SnowSchedule.seasonWeights(weights, 1.0F);
+        int[] earlyWinter = SnowSchedule.seasonWeights(weights, 0.0F);
+        helper.assertTrue(deepWinter[SnowKind.BLIZZARD.ordinal()] > earlyWinter[SnowKind.BLIZZARD.ordinal()],
+                "deep winter brings more blizzards");
+        helper.assertTrue(earlyWinter[SnowKind.LIGHT_SNOW.ordinal()] > deepWinter[SnowKind.LIGHT_SNOW.ordinal()],
+                "the edges of winter bring more light snow");
+        // The course of the wind is Petrichor's, so rain and snow blow the same way.
+        for (double t = 0; t < 200_000.0; t += 12_345.0) {
+            float petrichor = (float) (Noise.value(t / 24000.0, 0x5EED_0003) * Math.PI * 4.0);
+            helper.assertTrue(Wind.course(t) == petrichor, "the wind's course matches the rain's");
+        }
+        // Gusts and lulls average out around the mean wind.
         double sum = 0.0;
-        int cells = 0;
-        for (double x = 2.125; x < SIZE - 2; x += SnowCover.CELL) {
-            for (double z = 2.125; z < SIZE - 2; z += SnowCover.CELL) {
-                double depth = depth(helper, sim, x, z);
-                min = Math.min(min, depth);
-                max = Math.max(max, depth);
-                sum += depth;
-                cells++;
+        int n = 0;
+        for (int x = 0; x < 2000; x += 7) {
+            for (int z = 0; z < 2000; z += 11) {
+                sum += Wind.gust(x, z, 0.0, 0.0, 1.0F, 0.0F, 0.8F);
+                n++;
             }
         }
-        double mean = sum / cells;
-        helper.assertTrue(min > 0.02, "every cell got snow, least " + min);
-        helper.assertTrue(max <= SnowCover.NATURAL_DEPTH + 1.0E-4, "no cell beyond the natural depth, most " + max);
-        helper.assertTrue(mean > 0.08 && mean < 0.25, "after " + time + " ticks of snowfall the snow is " + mean + " deep");
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void driftsGrowInTheLeeOfAWall(GameTestHelper helper) {
-        floor(helper);
-        wall(helper, 8, 3);
-        SnowSimulation sim = simulation(helper);
-        sim.weather().snapTo(SnowType.BLIZZARD);
-        sim.weather().snow = 1.0F;
-        sim.weather().windX = 0.45F;
-        sim.weather().windZ = 0.0F;
-        weather(helper, sim, 60);
-        double lee = meanDepth(helper, sim, 9, 12);
-        double open = meanDepth(helper, sim, 17, 21);
-        helper.assertTrue(lee > 2.0 * open, "lee " + lee + " vs open " + open);
-        helper.assertTrue(sim.cover().takeTransported() > 0.0F, "the wind moved snow");
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void snowSlidesDownToItsAngleOfRepose(GameTestHelper helper) {
-        floor(helper);
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        sim.weather().snow = 0.0F;
-        Vec3 heap = helper.absoluteVec(new Vec3(12.125, 1.0, 12.125));
-        sim.cover().addPowder(heap.x, heap.z, 0.7F);
-        double before = sim.cover().total();
-        weather(helper, sim, 40);
-        double after = sim.cover().total();
-        helper.assertTrue(Math.abs(after - before) < before * 0.01, "snow is conserved: " + before + " -> " + after);
-        float top = sim.cover().topAt(heap.x, heap.z);
-        float next = sim.cover().topAt(heap.x + SnowCover.CELL, heap.z);
-        helper.assertTrue(top - next <= SnowCover.REPOSE + 0.03F, "heap is still steeper than repose: " + (top - next));
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void snowSpillsOffAnEdge(GameTestHelper helper) {
-        floor(helper);
-        helper.setBlock(new BlockPos(10, 1, 10), Blocks.STONE);
-        helper.setBlock(new BlockPos(10, 2, 10), Blocks.STONE);
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        sim.weather().snow = 0.0F;
-        Vec3 corner = helper.absoluteVec(new Vec3(10.125, 3.0, 10.125));
-        sim.cover().addPowder(corner.x, corner.z, 0.6F);
-        weather(helper, sim, 30);
-        float left = sim.cover().depthAt(corner.x, corner.z);
-        helper.assertTrue(left <= SnowCover.EDGE_DEPTH + 0.01F, "the edge holds " + left);
-        float below = sim.cover().depthAt(corner.x - SnowCover.CELL, corner.z) + sim.cover().depthAt(corner.x, corner.z - SnowCover.CELL);
-        helper.assertTrue(below > 0.05F, "the snow fell to the ground below, " + below);
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void footPacksTheSnow(GameTestHelper helper) {
-        floor(helper);
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        powder(helper, sim, 10, 15, 0.2F);
-        Vec3 foot = helper.absoluteVec(new Vec3(12.5, 1.0, 12.5));
-        float before = sim.cover().depthAt(foot.x, foot.z);
-        float topBefore = sim.cover().topAt(foot.x, foot.z);
-        float sank = sim.step(foot.x, foot.y, foot.z, 1.0F, 0.0F, 0.6F, 1, 0.1F, false);
-        helper.assertTrue(sank > 0.15F, "the foot sank " + sank + " into " + before + ", top " + topBefore + " at foot y " + foot.y);
-        double footZ = foot.z + 0.6 * 0.22;
-        float depth = sim.cover().depthAt(foot.x, footZ);
-        float powder = sim.cover().powderAt(foot.x, footZ);
-        helper.assertTrue(powder == 0.0F && depth > 0.04F && depth < 0.08F, "print holds " + depth + " (powder " + powder + ")");
-        float aside = sim.cover().depthAt(foot.x + 1.5, foot.z + 1.5);
-        helper.assertTrue(Math.abs(aside - 0.2F) < 0.001F, "snow beside the print is untouched: " + aside);
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void footPushesARim(GameTestHelper helper) {
-        floor(helper);
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        powder(helper, sim, 8, 17, 0.2F);
-        Vec3 foot = helper.absoluteVec(new Vec3(12.5, 1.0, 12.5));
-        sim.step(foot.x, foot.y, foot.z, 1.0F, 0.0F, 0.6F, 1, 0.1F, false);
-        double footZ = foot.z + 0.6 * 0.22;
-        float rim = 0.0F;
-        for (double dx = -0.5; dx <= 0.5; dx += SnowCover.CELL) {
-            for (double dz = -0.5; dz <= 0.5; dz += SnowCover.CELL) {
-                rim = Math.max(rim, sim.cover().depthAt(foot.x + dx, footZ + dz));
-            }
-        }
-        helper.assertTrue(rim > 0.201F, "snow pushed aside forms a rim, deepest beside the print " + rim);
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void iceHoldsOnlyADusting(GameTestHelper helper) {
-        floor(helper);
-        for (int x = 2; x < 12; x++) {
-            for (int z = 2; z < 22; z++) {
-                helper.setBlock(new BlockPos(x, 0, z), Blocks.PACKED_ICE);
-            }
-        }
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        weather(helper, sim, 40);
-        double ice = meanDepth(helper, sim, 4, 9);
-        double ground = meanDepth(helper, sim, 15, 20);
-        helper.assertTrue(ice <= 0.051 && ice > 0.01, "ice holds a dusting of " + ice);
-        helper.assertTrue(ground > 3.0 * ice, "ground holds more: " + ground);
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void hotBlocksMeltTheSnow(GameTestHelper helper) {
-        floor(helper);
-        helper.setBlock(new BlockPos(12, 0, 12), Blocks.MAGMA_BLOCK);
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        powder(helper, sim, 10, 15, 0.2F);
-        weather(helper, sim, 5);
-        Vec3 magma = helper.absoluteVec(new Vec3(12.5, 1.0, 12.5));
-        helper.assertTrue(sim.cover().depthAt(magma.x, magma.z) < 0.01F, "snow on magma melted");
-        helper.assertTrue(sim.cover().depthAt(magma.x + 2.0, magma.z) > 0.19F, "snow on stone stays");
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void snowUnderACrownIsThinner(GameTestHelper helper) {
-        floor(helper);
-        for (int x = 3; x <= 11; x++) {
-            for (int z = 3; z <= 20; z++) {
-                helper.setBlock(new BlockPos(x, 5, z), Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true));
-            }
-        }
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        weather(helper, sim, 40);
-        double under = meanDepth(helper, sim, 6, 8);
-        double open = meanDepth(helper, sim, 16, 19);
-        Vec3 crown = helper.absoluteVec(new Vec3(7.5, 6.0, 12.5));
-        helper.assertTrue(under > 0.02, "snow gets through the crown: " + under);
-        helper.assertTrue(under < 0.7 * open, "less under the crown (" + under + ") than in the open (" + open + ")");
-        helper.assertTrue(sim.cover().depthAt(crown.x, crown.z) > 0.02F, "the crown has a cap of snow");
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void windBlowsSnowIntoATunnel(GameTestHelper helper) {
-        floor(helper);
-        // A tunnel along +x: walls two thick, a roof, open at x = 10, closed at x = 21.
-        for (int x = 10; x <= 21; x++) {
-            for (int z = 6; z <= 18; z++) {
-                boolean wall = z <= 7 || z >= 17 || x == 21;
-                for (int y = 1; y <= 3; y++) {
-                    if (wall) {
-                        helper.setBlock(new BlockPos(x, y, z), Blocks.STONE);
-                    }
-                }
-                helper.setBlock(new BlockPos(x, 4, z), Blocks.STONE);
-            }
-        }
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        sim.weather().windX = 0.4F;
-        weather(helper, sim, 40);
-        double mouth = meanDepthAt(helper, sim, 10, 11, 12);
-        double deep = meanDepthAt(helper, sim, 18, 19, 12);
-        helper.assertTrue(mouth > 0.02, "snow blown into the mouth: " + mouth);
-        helper.assertTrue(deep < 0.25 * mouth, "little reaches deep inside: " + deep + " vs " + mouth);
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void flakeFallsThroughACrownToTheGround(GameTestHelper helper) {
-        floor(helper);
-        for (int x = 8; x <= 16; x++) {
-            for (int z = 8; z <= 16; z++) {
-                helper.setBlock(new BlockPos(x, 6, z), Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true));
-            }
-        }
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        Vec3 start = helper.absoluteVec(new Vec3(12.5, 4.5, 12.5));
-        int flake = sim.addFlake(start.x, start.y, start.z, 1.0F);
-        for (int t = 0; t < 400 && sim.pool().state[flake] == FlakePool.FALLING; t++) {
-            sim.stepFlakes(helper.getLevel(), start.x, start.y, start.z);
-        }
-        double ground = helper.absoluteVec(new Vec3(0.0, 1.0, 0.0)).y;
-        helper.assertTrue(sim.pool().state[flake] == FlakePool.SETTLED && Math.abs(sim.pool().y[flake] - ground) < 0.05,
-                "flake lies on the ground under the crown, at " + (sim.pool().y[flake] - ground));
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void windLeavesACrustOnIce(GameTestHelper helper) {
-        floor(helper);
-        for (int x = 2; x < 22; x++) {
-            for (int z = 2; z < 22; z++) {
-                helper.setBlock(new BlockPos(x, 0, z), Blocks.PACKED_ICE);
-            }
-        }
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        powder(helper, sim, 2, 22, 0.05F);
-        sim.weather().snow = 0.0F;
-        sim.weather().windX = 0.6F;
-        weather(helper, sim, 40);
-        double ice = meanDepth(helper, sim, 8, 12);
-        helper.assertTrue(ice >= SnowCover.CRUST * 0.9, "a thin crust stays on the ice: " + ice);
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void explosionBlowsTheSnowAway(GameTestHelper helper) {
-        floor(helper);
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        powder(helper, sim, 1, 23, 0.2F);
-        Vec3 center = helper.absoluteVec(new Vec3(12.0, 1.0, 12.0));
-        sim.explode(center.x, center.y, center.z, 3.0F, false);
-        helper.assertTrue(sim.cover().depthAt(center.x + 0.5, center.z + 0.5) < 0.02F, "snow left at the center");
-        helper.assertTrue(Math.abs(sim.cover().depthAt(center.x + 10.5, center.z + 10.5) - 0.2F) < 0.001F, "far snow is untouched");
-        helper.assertTrue(sim.grainCount() > 0 || sim.pool().count() > 0, "a cloud of powder");
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true, timeoutTicks = 200)
-    public static void lampsMeltTheSnow(GameTestHelper helper) {
-        floor(helper);
-        helper.setBlock(new BlockPos(12, 1, 12), Blocks.GLOWSTONE);
-        // Light spreads over the next ticks.
-        helper.runAfterDelay(20, () -> {
-            SnowSimulation sim = simulation(helper);
-            calm(sim, SnowType.SNOWFALL);
-            sim.weather().snow = 0.0F;
-            powder(helper, sim, 1, 23, 0.2F);
-            weather(helper, sim, 10);
-            Vec3 near = helper.absoluteVec(new Vec3(13.5, 1.0, 12.5));
-            Vec3 far = helper.absoluteVec(new Vec3(20.5, 1.0, 20.5));
-            helper.assertTrue(sim.cover().depthAt(near.x, near.z) < 0.01F, "snow next to the lamp melted");
-            helper.assertTrue(sim.cover().depthAt(far.x, far.z) > 0.19F, "snow away from the lamp stays");
-            helper.succeed();
-        });
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void blockPlacedOnSnowStartsClean(GameTestHelper helper) {
-        floor(helper);
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        powder(helper, sim, 8, 16, 0.2F);
-        helper.setBlock(new BlockPos(12, 1, 12), Blocks.STONE);
-        BlockPos block = helper.absolutePos(new BlockPos(12, 1, 12));
-        sim.begin(helper.getLevel());
-        sim.cover().blockChanged(block.getX(), block.getZ());
-        Vec3 on = helper.absoluteVec(new Vec3(12.5, 2.0, 12.5));
-        helper.assertTrue(sim.cover().depthAt(on.x, on.z) == 0.0F, "the new block top is bare");
-        helper.assertTrue(Math.abs(sim.cover().topAt(on.x, on.z) - on.y) < 0.01, "the cell lies on the new block");
-        helper.assertTrue(Math.abs(sim.cover().depthAt(on.x + 1.0, on.z) - 0.2F) < 0.001F, "snow next to it stays");
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void snowLiesOnVanillaSnowLayers(GameTestHelper helper) {
-        floor(helper);
-        // A patch of layers, so the flake (which sways and drifts a little) lands on it wherever it comes down.
-        for (int x = 10; x <= 14; x++) {
-            for (int z = 10; z <= 14; z++) {
-                helper.setBlock(new BlockPos(x, 1, z), Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 2));
-            }
-        }
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        Vec3 on = helper.absoluteVec(new Vec3(12.5, 1.25, 12.5));
-        float top = sim.cover().topAt(on.x, on.z);
-        helper.assertTrue(Math.abs(top - on.y) < 0.01, "snow lies on the layer's top, not under it: " + (top - on.y));
-        int flake = sim.addFlake(on.x, on.y + 4.0, on.z, 1.5F);
-        for (int t = 0; t < 400 && sim.pool().state[flake] == FlakePool.FALLING; t++) {
-            sim.stepFlakes(helper.getLevel(), on.x, on.y + 2.0, on.z);
-        }
-        helper.assertTrue(Math.abs(sim.pool().y[flake] - on.y) < 0.05, "flake lands on the layer at " + (sim.pool().y[flake] - on.y));
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void snowLiesOnPowderSnow(GameTestHelper helper) {
-        floor(helper);
-        helper.setBlock(new BlockPos(12, 1, 12), Blocks.POWDER_SNOW);
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        Vec3 on = helper.absoluteVec(new Vec3(12.5, 2.0, 12.5));
-        float top = sim.cover().topAt(on.x, on.z);
-        helper.assertTrue(Math.abs(top - on.y) < 0.01, "snow lies on the powder snow, not under it: " + (top - on.y));
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void flakeLandsOnTheGround(GameTestHelper helper) {
-        floor(helper);
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        Vec3 start = helper.absoluteVec(new Vec3(12.5, 7.0, 12.5));
-        int flake = sim.addFlake(start.x, start.y, start.z, 1.5F);
-        FlakePool pool = sim.pool();
-        for (int t = 0; t < 400 && pool.state[flake] == FlakePool.FALLING; t++) {
-            sim.stepFlakes(helper.getLevel(), start.x, start.y - 4.0, start.z);
-        }
-        helper.assertTrue(pool.state[flake] == FlakePool.SETTLED, "flake did not land, state " + pool.state[flake]);
-        double ground = helper.absoluteVec(new Vec3(0.0, 1.0, 0.0)).y;
-        helper.assertTrue(Math.abs(pool.y[flake] - ground) < 0.05, "flake lies at " + (pool.y[flake] - ground) + " above the ground");
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void flakesDoNotPassThroughWalls(GameTestHelper helper) {
-        floor(helper);
-        wall(helper, 12, 9);
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        sim.weather().windX = 0.12F;
-        double wallX = helper.absoluteVec(new Vec3(12.0, 0.0, 0.0)).x;
-        double wallTop = helper.absoluteVec(new Vec3(0.0, 10.0, 0.0)).y;
-        FlakePool pool = sim.pool();
-        int[] flakes = new int[12];
-        for (int k = 0; k < flakes.length; k++) {
-            Vec3 start = helper.absoluteVec(new Vec3(6.5 + k * 0.4, 3.0 + k * 0.4, 4.5 + k));
-            flakes[k] = sim.addFlake(start.x, start.y, start.z, 1.5F);
-        }
-        Vec3 camera = helper.absoluteVec(new Vec3(12.0, 4.0, 12.0));
-        for (int t = 0; t < 300; t++) {
-            sim.stepFlakes(helper.getLevel(), camera.x, camera.y, camera.z);
-            for (int flake : flakes) {
-                if (pool.state[flake] != FlakePool.FREE && pool.y[flake] < wallTop) {
-                    helper.assertTrue(pool.x[flake] < wallX + 0.01, "a flake went through the wall at tick " + t);
-                }
-            }
-        }
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void airIsCalmInTheLee(GameTestHelper helper) {
-        floor(helper);
-        wall(helper, 8, 3);
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        sim.weather().windX = 0.3F;
-        Vec3 camera = helper.absoluteVec(new Vec3(12.0, 4.0, 12.0));
-        sim.stepFlakes(helper.getLevel(), camera.x, camera.y, camera.z);
-        sim.air().setTurbulence(false);
-        float[] out = new float[3];
-        double lee = 0.0;
-        double open = 0.0;
-        for (int z = 3; z <= 20; z++) {
-            Vec3 a = helper.absoluteVec(new Vec3(9.5, 1.6, z + 0.5));
-            Vec3 b = helper.absoluteVec(new Vec3(20.5, 1.6, z + 0.5));
-            sim.air().sample(a.x, a.y, a.z, out);
-            lee += out[0];
-            sim.air().sample(b.x, b.y, b.z, out);
-            open += out[0];
-        }
-        helper.assertTrue(open > 0.0 && lee < 0.4 * open, "wind behind the wall " + lee + " vs open " + open);
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void serverDriftsPileUpInTheLee(GameTestHelper helper) {
-        floor(helper);
-        wall(helper, 8, 3);
-        // A roof over open ground: no drift under it.
-        for (int x = 15; x <= 17; x++) {
-            for (int z = 11; z <= 13; z++) {
-                helper.setBlock(new BlockPos(x, 5, z), Blocks.STONE);
-            }
-        }
-        helper.setBlock(new BlockPos(14, 1, 12), Blocks.STONE);
-        helper.setBlock(new BlockPos(14, 2, 12), Blocks.STONE);
-        helper.setBlock(new BlockPos(14, 3, 12), Blocks.STONE);
-        helper.setBlock(new BlockPos(14, 4, 12), Blocks.STONE);
-        ServerLevel level = helper.getLevel();
-        BlockPos lee = helper.absolutePos(new BlockPos(9, 1, 12));
-        BlockPos open = helper.absolutePos(new BlockPos(21, 1, 6));
-        BlockPos roofed = helper.absolutePos(new BlockPos(16, 1, 12));
-        for (int n = 0; n < 20; n++) {
-            DriftBuilder.grow(level, lee.getX(), lee.getZ(), 1.0F, 0.0F, 4, true);
-            DriftBuilder.grow(level, open.getX(), open.getZ(), 1.0F, 0.0F, 4, true);
-            DriftBuilder.grow(level, roofed.getX(), roofed.getZ(), 1.0F, 0.0F, 4, true);
-        }
-        BlockState drift = level.getBlockState(lee);
-        helper.assertTrue(drift.is(Blocks.SNOW) && drift.getValue(SnowLayerBlock.LAYERS) >= 2,
-                "lee of the wall has " + drift);
-        helper.assertTrue(level.getBlockState(open).isAir(), "open ground stays bare");
-        helper.assertTrue(level.getBlockState(roofed).isAir(), "no drift under a roof");
-        helper.succeed();
-    }
-
-    @GameTest(template = "field", skyAccess = true)
-    public static void squallCarriesTheAirAlong(GameTestHelper helper) {
-        floor(helper);
-        SnowSimulation sim = simulation(helper);
-        calm(sim, SnowType.SNOWFALL);
-        sim.air().setTurbulence(false);
-        Vec3 center = helper.absoluteVec(new Vec3(12.0, 3.0, 12.0));
-        sim.air().addGust(center.x, center.y, center.z, 1.0F, 0.0F, 0.4F, 5.0F, 3.0F, 400);
-        float[] out = new float[3];
-        sim.air().sample(center.x, center.y, center.z, out);
-        float inside = out[0];
-        sim.air().sample(center.x, center.y, center.z + 9.0, out);
-        float outside = out[0];
-        helper.assertTrue(inside > 0.2F && inside > outside + 0.2F, "wind in the squall " + inside + " vs beside it " + outside);
-        helper.assertTrue(sim.air().gustAt(center.x, center.y, center.z) > 0.5F, "the heart of the squall is dense");
-        helper.assertTrue(sim.air().gustAt(center.x, center.y, center.z + 9.0) == 0.0F, "beside it there is nothing");
+        double mean = sum / n;
+        helper.assertTrue(mean > 0.9 && mean < 1.1, "gusts average to the mean wind, got " + mean);
         helper.succeed();
     }
 
     @GameTest(template = "empty")
-    public static void coverSurvivesSaving(GameTestHelper helper) {
-        CoverChunk chunk = new CoverChunk(3, -7);
-        chunk.base[100] = 64.5F;
-        chunk.powder[100] = 0.21F;
-        chunk.packed[100] = 0.05F;
-        chunk.kind[100] = SurfaceKind.LEAVES;
-        chunk.base[CoverChunk.AREA + 7] = 60.0F;
-        chunk.powder[CoverChunk.AREA + 7] = 0.1F;
-        try {
-            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-            chunk.write(new DataOutputStream(bytes));
-            CoverChunk read = CoverChunk.read(new DataInputStream(new ByteArrayInputStream(bytes.toByteArray())));
-            helper.assertTrue(read.x == 3 && read.z == -7, "position");
-            helper.assertTrue(read.base[100] == 64.5F && read.kind[100] == SurfaceKind.LEAVES, "surface");
-            helper.assertTrue(Math.abs(read.powder[CoverChunk.AREA + 7] - 0.1F) < 0.001F, "the sheltered surface");
-            helper.assertTrue(Math.abs(read.powder[100] - 0.21F) < 0.001F && Math.abs(read.packed[100] - 0.05F) < 0.001F, "depths");
-        } catch (IOException e) {
-            helper.fail("could not write or read: " + e);
+    public static void worksWithoutSereneSeasons(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos pos = helper.absolutePos(new BlockPos(1, 1, 1));
+        helper.assertFalse(Climate.seasons(), "Serene Seasons is not installed in the test run");
+        helper.assertTrue(Climate.winter(level) < 0.0F, "no season without Serene Seasons");
+        helper.assertTrue(Climate.seasonName(level) == null, "no season name without Serene Seasons");
+        Biome biome = level.getBiome(pos).value();
+        Biome.Precipitation vanilla = biome.hasPrecipitation() ? biome.getPrecipitationAt(pos) : Biome.Precipitation.NONE;
+        helper.assertTrue(Climate.precipitationAt(level, pos) == vanilla, "the biome's own climate decides");
+        helper.succeed();
+    }
+
+    @GameTest(template = "arena", skyAccess = true)
+    public static void calmSnowLiesEvenly(GameTestHelper helper) {
+        floor(helper);
+        SnowSimulation sim = simulation(helper);
+        calm(sim, SnowKind.SNOW);
+        weather(sim, 60);
+        double min = Double.MAX_VALUE;
+        double max = 0.0;
+        double sum = 0.0;
+        int count = 0;
+        double step = 0.0;
+        for (int x = 8; x < SIZE - 8; x++) {
+            for (int z = 8; z < SIZE - 8; z++) {
+                double depth = depth(helper, sim, x, 1, z);
+                min = Math.min(min, depth);
+                max = Math.max(max, depth);
+                sum += depth;
+                count++;
+                step = Math.max(step, Math.abs(depth - depth(helper, sim, x + 1, 1, z)));
+            }
         }
+        double mean = sum / count;
+        helper.assertTrue(mean > 0.12 && mean < SnowCover.OPEN_DEPTH, "after a calm snowfall the snow is " + mean + " deep");
+        helper.assertTrue(max - min < 0.01, "open flat ground is even: " + min + " .. " + max);
+        helper.assertTrue(step < 0.002, "no steps between columns: " + step);
+        helper.succeed();
+    }
+
+    @GameTest(template = "arena", skyAccess = true)
+    public static void driftSettlesSmoothlyInTheLee(GameTestHelper helper) {
+        floor(helper);
+        for (int z = 4; z < SIZE - 4; z++) {
+            for (int y = 1; y <= 3; y++) {
+                helper.setBlock(new BlockPos(10, y, z), Blocks.STONE);
+            }
+        }
+        SnowSimulation sim = simulation(helper);
+        storm(sim, SnowKind.BLIZZARD, 1.0F, 0.0F);
+        weather(sim, 80);
+        int z = SIZE / 2;
+        double lee = 0.0;
+        for (int x = 12; x <= 16; x++) {
+            lee += depth(helper, sim, x, 1, z) / 5.0;
+        }
+        double open = 0.0;
+        for (int x = 28; x <= 33; x++) {
+            open += depth(helper, sim, x, 1, z) / 6.0;
+        }
+        helper.assertTrue(lee > 1.6 * open, "the lee collects snow: lee " + lee + " vs open " + open);
+        // One rounded drift tapering off downwind, no ripples or steps.
+        int peaks = 0;
+        double steepest = 0.0;
+        for (int x = 12; x <= 30; x++) {
+            double here = depth(helper, sim, x, 1, z);
+            double before = depth(helper, sim, x - 1, 1, z);
+            double after = depth(helper, sim, x + 1, 1, z);
+            if (here > before + 1.0E-4 && here > after + 1.0E-4) {
+                peaks++;
+            }
+            steepest = Math.max(steepest, Math.abs(after - here));
+        }
+        helper.assertTrue(peaks <= 1, "a single drift without ripples, peaks: " + peaks);
+        helper.assertTrue(steepest < 0.12, "the drift has no steps, steepest " + steepest);
+        // Across the wind the drift is even.
+        double spread = Math.abs(depth(helper, sim, 14, 1, z - 6) - depth(helper, sim, 14, 1, z + 6));
+        helper.assertTrue(spread < 0.02, "even along the wall: " + spread);
+        helper.succeed();
+    }
+
+    @GameTest(template = "arena", skyAccess = true)
+    public static void windFillsACaveMouthAndFades(GameTestHelper helper) {
+        floor(helper);
+        // A hill of stone with a tunnel 4 wide and 3 high, its mouth facing the wind.
+        for (int x = 8; x < 36; x++) {
+            for (int z = 10; z < 30; z++) {
+                for (int y = 1; y <= 7; y++) {
+                    boolean tunnel = x < 34 && z >= 18 && z <= 21 && y <= 3;
+                    if (!tunnel) {
+                        helper.setBlock(new BlockPos(x, y, z), Blocks.STONE);
+                    }
+                }
+            }
+        }
+        SnowSimulation sim = simulation(helper);
+        storm(sim, SnowKind.BLIZZARD, 1.0F, 0.0F);
+        weather(sim, 120);
+        double outside = depth(helper, sim, 4, 1, 19);
+        double[] inside = new double[25];
+        for (int k = 0; k < inside.length; k++) {
+            inside[k] = (depth(helper, sim, 8 + k, 1, 19) + depth(helper, sim, 8 + k, 1, 20)) * 0.5;
+        }
+        helper.assertTrue(outside > 0.1, "snow lies outside the mouth: " + outside);
+        helper.assertTrue(inside[0] > 0.05 && inside[2] > 0.03, "the wind blows snow into the mouth: " + inside[0] + ", " + inside[2]);
+        helper.assertTrue(inside[10] < inside[1] * 0.25, "it fades with depth: " + inside[1] + " at 1, " + inside[10] + " at 10");
+        helper.assertTrue(inside[16] < 0.006, "no snake of snow deep in the tunnel: " + inside[16] + " at 16");
+        for (int k = 3; k < inside.length - 1; k++) {
+            helper.assertTrue(inside[k + 1] <= inside[k] + 0.002, "never more snow further in, at " + k + ": " + Arrays.toString(inside));
+        }
+        // Across the tunnel the snow is even: a floor of snow, not a strip.
+        double wall = depth(helper, sim, 10, 1, 18);
+        double middle = depth(helper, sim, 10, 1, 20);
+        helper.assertTrue(Math.abs(wall - middle) < Math.max(0.02, middle * 0.6), "even across the tunnel: " + wall + " vs " + middle);
+        helper.succeed();
+    }
+
+    @GameTest(template = "arena", skyAccess = true)
+    public static void evenCalmSnowUnderACrown(GameTestHelper helper) {
+        floor(helper);
+        int cx = 20;
+        int cz = 20;
+        for (int y = 1; y <= 5; y++) {
+            helper.setBlock(new BlockPos(cx, y, cz), Blocks.OAK_LOG);
+        }
+        BlockState leaves = Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
+        for (int x = cx - 4; x <= cx + 4; x++) {
+            for (int z = cz - 4; z <= cz + 4; z++) {
+                for (int y = 5; y <= 7; y++) {
+                    if ((x != cx || z != cz || y > 5) && (Math.abs(x - cx) + Math.abs(z - cz) <= 6 || y == 6)) {
+                        helper.setBlock(new BlockPos(x, y, z), leaves);
+                    }
+                }
+            }
+        }
+        SnowSimulation sim = simulation(helper);
+        calm(sim, SnowKind.HEAVY_SNOW);
+        weather(sim, 60);
+        double open = depth(helper, sim, 6, 1, 6);
+        double min = Double.MAX_VALUE;
+        double max = 0.0;
+        double step = 0.0;
+        for (int x = cx - 2; x <= cx + 2; x++) {
+            for (int z = cz - 2; z <= cz + 2; z++) {
+                if (x == cx && z == cz) {
+                    continue;
+                }
+                double depth = depth(helper, sim, x, 1, z);
+                min = Math.min(min, depth);
+                max = Math.max(max, depth);
+                if (x + 1 <= cx + 2 && (x + 1 != cx || z != cz)) {
+                    step = Math.max(step, Math.abs(depth - depth(helper, sim, x + 1, 1, z)));
+                }
+            }
+        }
+        helper.assertTrue(min > 0.005, "some snow comes through the crown: " + min);
+        helper.assertTrue(max < open * 0.6, "less under the crown than in the open: " + max + " vs " + open);
+        helper.assertTrue(max - min < Math.max(0.02, max * 0.4), "even under the crown: " + min + " .. " + max);
+        helper.assertTrue(step < 0.015, "no waves under the crown: " + step);
+        helper.assertTrue(depth(helper, sim, cx + 1, 8, cz) > 0.05, "snow lies on the crown");
+        helper.succeed();
+    }
+
+    @GameTest(template = "arena", skyAccess = true)
+    public static void noSnowInAClosedRoom(GameTestHelper helper) {
+        floor(helper);
+        for (int x = 14; x <= 22; x++) {
+            for (int z = 14; z <= 22; z++) {
+                for (int y = 1; y <= 5; y++) {
+                    boolean shell = x == 14 || x == 22 || z == 14 || z == 22 || y == 5;
+                    if (shell) {
+                        helper.setBlock(new BlockPos(x, y, z), Blocks.SPRUCE_PLANKS);
+                    }
+                }
+            }
+        }
+        SnowSimulation sim = simulation(helper);
+        storm(sim, SnowKind.HEAVY_BLIZZARD, 0.0F, 1.0F);
+        weather(sim, 80);
+        double inside = 0.0;
+        for (int x = 15; x <= 21; x++) {
+            for (int z = 15; z <= 21; z++) {
+                inside = Math.max(inside, depth(helper, sim, x, 1, z));
+            }
+        }
+        helper.assertTrue(inside == 0.0, "no snow inside: " + inside);
+        helper.assertTrue(depth(helper, sim, 18, 6, 18) > 0.02, "snow on the roof");
+        helper.assertTrue(depth(helper, sim, 6, 1, 6) > 0.05, "snow outside");
+        helper.succeed();
+    }
+
+    @GameTest(template = "arena", skyAccess = true)
+    public static void airFlowsOverAndAroundAWall(GameTestHelper helper) {
+        floor(helper);
+        for (int z = 4; z < SIZE - 4; z++) {
+            for (int y = 1; y <= 4; y++) {
+                helper.setBlock(new BlockPos(16, y, z), Blocks.STONE);
+            }
+        }
+        SnowSettings settings = settings();
+        SnowSimulation sim = new SnowSimulation(settings);
+        SnowConditions weather = sim.weather();
+        weather.snapTo(SnowKind.BLIZZARD);
+        weather.gustiness = 0.0F;
+        weather.turbulence = 0.0F;
+        weather.setWind(1.0F, 0.0F, 0.5F);
+        Vec3 center = helper.absoluteVec(new Vec3(20.0, 2.0, 20.0));
+        AirFlow air = sim.air();
+        air.update(helper.getLevel(), weather, center.x, center.y, center.z, sim.cold());
+        // Upwind of the open spot the arena is clear for more than the reach of a lee (other tests stand beyond it).
+        float[] open = sample(helper, air, 13.0, 8.0, 20.0);
+        float[] windward = sample(helper, air, 15.4, 2.0, 20.0);
+        float[] lee = sample(helper, air, 18.0, 1.5, 20.0);
+        float[] low = sample(helper, air, 13.0, 1.3, 20.0);
+        helper.assertTrue(open[0] > 0.4F, "the wind blows in the open: " + open[0]);
+        helper.assertTrue(low[0] < open[0] * 0.8F, "it slows down near the ground: " + low[0]);
+        helper.assertTrue(windward[1] > 0.05F, "it rises up the windward side: " + windward[1]);
+        helper.assertTrue(lee[0] < open[0] * 0.3F, "it is calm in the lee: " + lee[0]);
+        helper.assertTrue(lee[0] < 0.05F, "an eddy rolls back towards the wall in the lee: " + lee[0]);
+        helper.succeed();
+    }
+
+    @GameTest(template = "arena", skyAccess = true)
+    public static void windChargeLiftsPowderThatSettles(GameTestHelper helper) {
+        floor(helper);
+        SnowSimulation sim = simulation(helper);
+        calm(sim, SnowKind.HEAVY_SNOW);
+        weather(sim, 40);
+        sim.weather().snow = 0.0F;
+        Vec3 blast = helper.absoluteVec(new Vec3(20.0, 1.3, 20.0));
+        double before = sim.cover().total();
+        double centre = depth(helper, sim, 20, 1, 20);
+        sim.blast(blast.x, blast.y, blast.z, 2.6F, 0.45F);
+        helper.assertTrue(depth(helper, sim, 20, 1, 20) < centre * 0.3, "the blast clears the snow around it");
+        helper.assertTrue(sim.cover().total() < before, "snow was blown off the ground");
+        Flakes flakes = sim.flakes();
+        int lifted = flakes.count(Flakes.POWDER);
+        helper.assertTrue(lifted > 150, "a cloud of powder rises: " + lifted);
+        for (int t = 0; t < 8; t++) {
+            sim.tick(helper.getLevel(), blast.x, blast.y + 1.5, blast.z);
+        }
+        double highest = 0.0;
+        for (int i = 0; i < flakes.highWater(); i++) {
+            if (flakes.kind[i] == Flakes.POWDER) {
+                highest = Math.max(highest, flakes.y[i] - blast.y);
+            }
+        }
+        helper.assertTrue(highest > 1.5, "the powder is thrown up high: " + highest);
+        for (int t = 0; t < 400; t++) {
+            sim.tick(helper.getLevel(), blast.x, blast.y + 1.5, blast.z);
+        }
+        helper.assertTrue(flakes.count(Flakes.POWDER) == 0, "the powder settles again: " + flakes.count(Flakes.POWDER));
+        helper.succeed();
+    }
+
+    @GameTest(template = "arena", skyAccess = true)
+    public static void feetPressDentsAndPackPaths(GameTestHelper helper) {
+        floor(helper);
+        SnowSimulation sim = simulation(helper);
+        calm(sim, SnowKind.SNOW);
+        weather(sim, 40);
+        Vec3 foot = helper.absoluteVec(new Vec3(20.5, 1.0, 20.5));
+        double depth = sim.cover().depthAt(foot.x, foot.y, foot.z);
+        sim.step(foot.x, foot.y, foot.z, 0.2F, 0.0F, 0.17F, 1.0F);
+        CoverChunk chunk = sim.cover().chunkAt((int) Math.floor(foot.x), (int) Math.floor(foot.z));
+        helper.assertTrue(chunk.dentCount() == 1, "a dent is pressed");
+        helper.assertTrue(chunk.dentDepth(0) <= depth, "a dent goes no deeper than the snow");
+        helper.assertTrue(sim.cover().packedAt(foot.x, foot.y, foot.z) > 0.0F, "the snow is trodden");
+        helper.assertTrue(sim.cover().depthAt(foot.x, foot.y, foot.z) == depth, "a dent takes no snow away");
+        helper.succeed();
+    }
+
+    @GameTest(template = "arena", skyAccess = true)
+    public static void serverDriftsPileUpInTheLee(GameTestHelper helper) {
+        floor(helper);
+        for (int z = 4; z < SIZE - 4; z++) {
+            for (int y = 1; y <= 3; y++) {
+                helper.setBlock(new BlockPos(10, y, z), Blocks.STONE);
+            }
+        }
+        ServerLevel level = helper.getLevel();
+        BlockPos lee = helper.absolutePos(new BlockPos(13, 1, 20));
+        BlockPos open = helper.absolutePos(new BlockPos(32, 1, 20));
+        for (int n = 0; n < 12; n++) {
+            DriftBuilder.grow(level, lee.getX(), lee.getZ(), 1.0F, 0.0F, 4, true);
+            DriftBuilder.grow(level, open.getX(), open.getZ(), 1.0F, 0.0F, 4, true);
+        }
+        BlockState leeState = level.getBlockState(lee);
+        helper.assertTrue(leeState.getBlock() instanceof SnowLayerBlock && leeState.getValue(SnowLayerBlock.LAYERS) >= 2,
+                "a drift of snow layers in the lee");
+        helper.assertTrue(level.getBlockState(open).isAir(), "nothing on open ground");
         helper.succeed();
     }
 
@@ -540,94 +396,65 @@ public final class ModGameTests {
         }
     }
 
-    /** A wall across the whole field at relative x, from y = 1 up to {@code height}. */
-    private static void wall(GameTestHelper helper, int x, int height) {
-        for (int z = 0; z < SIZE; z++) {
-            for (int y = 1; y <= height; y++) {
-                helper.setBlock(new BlockPos(x, y, z), Blocks.STONE);
-            }
-        }
+    private static SnowSettings settings() {
+        SnowSettings settings = new SnowSettings();
+        settings.everywhereCold = true;
+        settings.seed = false;
+        return settings;
     }
 
-    /** A simulation over the field, built after the blocks are placed. */
+    /** A simulation over the arena and the land around it, surveyed and bare. */
     private static SnowSimulation simulation(GameTestHelper helper) {
-        SnowSettings settings = new SnowSettings();
-        settings.maxFlakes = 2000;
-        SnowSimulation sim = new SnowSimulation(settings);
-        sim.terrain().forceSnow(true);
-        sim.begin(helper.getLevel());
-        BlockPos min = helper.absolutePos(BlockPos.ZERO);
-        BlockPos max = helper.absolutePos(new BlockPos(SIZE - 1, 0, SIZE - 1));
-        for (int cx = (Math.min(min.getX(), max.getX()) >> 4) - 1; cx <= (Math.max(min.getX(), max.getX()) >> 4) + 1; cx++) {
-            for (int cz = (Math.min(min.getZ(), max.getZ()) >> 4) - 1; cz <= (Math.max(min.getZ(), max.getZ()) >> 4) + 1; cz++) {
+        SnowSimulation sim = new SnowSimulation(settings());
+        BlockPos a = helper.absolutePos(BlockPos.ZERO);
+        BlockPos b = helper.absolutePos(new BlockPos(SIZE - 1, 0, SIZE - 1));
+        int minX = (Math.min(a.getX(), b.getX()) >> 4) - 1;
+        int maxX = (Math.max(a.getX(), b.getX()) >> 4) + 1;
+        int minZ = (Math.min(a.getZ(), b.getZ()) >> 4) - 1;
+        int maxZ = (Math.max(a.getZ(), b.getZ()) >> 4) + 1;
+        for (int cx = minX; cx <= maxX; cx++) {
+            for (int cz = minZ; cz <= maxZ; cz++) {
                 CoverChunk chunk = new CoverChunk(cx, cz);
                 sim.cover().put(chunk);
-                sim.cover().computeSurfaces(chunk);
+                sim.prepare(helper.getLevel(), chunk);
             }
         }
         return sim;
     }
 
-    private static void calm(SnowSimulation sim, SnowType type) {
-        sim.weather().snapTo(type);
+    private static void calm(SnowSimulation sim, SnowKind kind) {
+        sim.weather().snapTo(kind);
         sim.weather().snow = 1.0F;
-        sim.weather().gust = 1.0F;
-        sim.weather().windX = 0.0F;
-        sim.weather().windZ = 0.0F;
+        sim.weather().setWind(1.0F, 0.0F, 0.0F);
     }
 
-    /** Lets the weather work on the cover for {@code updates} steps of {@link #DT} ticks; returns the game time reached. */
-    private static long weather(GameTestHelper helper, SnowSimulation sim, int updates) {
-        Vec3 camera = helper.absoluteVec(new Vec3(12.0, 4.0, 12.0));
-        long time = helper.getLevel().getGameTime();
-        sim.updateAllCover(time);
-        for (int n = 0; n < updates; n++) {
-            time += DT;
-            sim.stepFlakes(helper.getLevel(), camera.x, camera.y, camera.z);
-            sim.updateAllCover(time);
-        }
-        return time - helper.getLevel().getGameTime();
+    private static void storm(SnowSimulation sim, SnowKind kind, float dirX, float dirZ) {
+        sim.weather().snapTo(kind);
+        sim.weather().snow = 1.0F;
+        sim.weather().setWind(dirX, dirZ, kind.wind);
     }
 
-    private static void powder(GameTestHelper helper, SnowSimulation sim, int from, int to, float depth) {
-        for (double x = from + 0.125; x < to; x += SnowCover.CELL) {
-            for (double z = from + 0.125; z < to; z += SnowCover.CELL) {
-                Vec3 at = helper.absoluteVec(new Vec3(x, 1.0, z));
-                sim.cover().addPowder(at.x, at.z, depth);
+    /** Lets {@code steps} x {@link #DT} ticks of the weather act on the snow. */
+    private static void weather(SnowSimulation sim, int steps) {
+        SnowConditions weather = sim.weather();
+        float angle = (float) Math.atan2(weather.windDirZ, weather.windDirX);
+        for (int step = 0; step < steps; step++) {
+            for (CoverChunk chunk : sim.cover().chunks()) {
+                sim.cover().update(chunk, weather, angle, weather.windiness(), DT);
             }
         }
     }
 
-    /** Depth of the snow on the ground (relative y 1) at a point, under a crown or roof too. */
-    private static double depth(GameTestHelper helper, SnowSimulation sim, double x, double z) {
-        Vec3 at = helper.absoluteVec(new Vec3(x, 1.0, z));
-        return sim.cover().depthNear(at.x, at.y, at.z);
+    /** Depth of the snow on the surface at relative block (x, y - 1, z), in its middle. */
+    private static double depth(GameTestHelper helper, SnowSimulation sim, int x, int y, int z) {
+        Vec3 at = helper.absoluteVec(new Vec3(x + 0.5, y, z + 0.5));
+        return sim.cover().depthAt(at.x, at.y + 0.01, at.z);
     }
 
-    /** Mean depth of the lowest snow at the columns from relative x {@code from} to {@code to}, at relative z. */
-    private static double meanDepthAt(GameTestHelper helper, SnowSimulation sim, int from, int to, int z) {
-        double sum = 0.0;
-        int cells = 0;
-        for (double x = from + 0.125; x < to + 1; x += SnowCover.CELL) {
-            for (double dz = 0.125; dz < 1.0; dz += SnowCover.CELL) {
-                Vec3 at = helper.absoluteVec(new Vec3(x, 1.0, z + dz));
-                sum += sim.cover().depthNear(at.x, at.y, at.z);
-                cells++;
-            }
-        }
-        return sum / cells;
-    }
-
-    /** Mean depth over the columns from relative x {@code from} to {@code to}, across the middle of the field. */
-    private static double meanDepth(GameTestHelper helper, SnowSimulation sim, int from, int to) {
-        double sum = 0.0;
-        int cells = 0;
-        for (double x = from + 0.125; x < to + 1; x += SnowCover.CELL) {
-            for (double z = 4.125; z < SIZE - 4; z += SnowCover.CELL) {
-                sum += depth(helper, sim, x, z);
-                cells++;
-            }
-        }
-        return sum / cells;
+    private static float[] sample(GameTestHelper helper, AirFlow air, double x, double y, double z) {
+        Vec3 at = helper.absoluteVec(new Vec3(x, y, z));
+        float[] out = new float[3];
+        air.sample(at.x, at.y, at.z, out);
+        return out;
     }
 }

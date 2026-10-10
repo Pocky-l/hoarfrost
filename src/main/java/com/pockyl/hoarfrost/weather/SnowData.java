@@ -6,14 +6,15 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import com.pockyl.hoarfrost.Config;
+import com.pockyl.hoarfrost.compat.Climate;
 
-/** The server's snow state for one level: a snow type forced by command, saved with the world. */
+/** The server's snow state for one level: a kind of snow forced by command, saved with the world. */
 public final class SnowData extends SavedData {
     private static final String NAME = "hoarfrost_snow";
     private static final SavedData.Factory<SnowData> FACTORY = new SavedData.Factory<>(SnowData::new, SnowData::load);
 
-    private int overrideType = -1;
-    private long overrideUntil;
+    private int forcedKind = -1;
+    private long forcedUntil;
 
     public static SnowData get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(FACTORY, NAME);
@@ -26,41 +27,52 @@ public final class SnowData extends SavedData {
 
     private static SnowData load(CompoundTag tag, HolderLookup.Provider registries) {
         SnowData data = new SnowData();
-        data.overrideType = tag.contains("override") ? tag.getInt("override") : -1;
-        data.overrideUntil = tag.getLong("overrideUntil");
+        SnowKind kind = SnowKind.byId(tag.getString("forced"));
+        data.forcedKind = kind == null ? -1 : kind.ordinal();
+        data.forcedUntil = tag.getLong("forcedUntil");
         return data;
     }
 
     @Override
     public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
-        tag.putInt("override", overrideType);
-        tag.putLong("overrideUntil", overrideUntil);
+        SnowKind kind = SnowKind.byOrdinal(forcedKind);
+        tag.putString("forced", kind == null ? "" : kind.id());
+        tag.putLong("forcedUntil", forcedUntil);
         return tag;
     }
 
     /** The snow falling now where it snows, or {@code null} when there is no precipitation. */
-    public SnowType currentType(ServerLevel level) {
+    public SnowKind currentKind(ServerLevel level) {
         if (!level.getLevelData().isRaining()) {
             return null;
         }
-        SnowType forced = SnowType.byOrdinal(overrideType);
-        if (forced != null && level.getGameTime() < overrideUntil) {
+        SnowKind forced = forcedKind();
+        if (forced != null && level.getGameTime() < forcedUntil) {
             return forced;
         }
-        return SnowSchedule.naturalType(level.getGameTime(), level.getLevelData().isThundering(), Config.THUNDER_BLIZZARD.get(),
-                Config.typeWeights());
+        return SnowSchedule.naturalKind(level.getGameTime(), level.getLevelData().isThundering(), Config.thunderBlizzard(),
+                SnowSchedule.seasonWeights(Config.kindWeights(), Climate.winter(level)));
     }
 
-    public void forceType(SnowType type, long until) {
-        overrideType = type == null ? -1 : type.ordinal();
-        overrideUntil = until;
+    /** The kind forced by command, or {@code null}. */
+    public SnowKind forcedKind() {
+        return SnowKind.byOrdinal(forcedKind);
+    }
+
+    public long forcedUntil() {
+        return forcedUntil;
+    }
+
+    public void force(SnowKind kind, long until) {
+        forcedKind = kind == null ? -1 : kind.ordinal();
+        forcedUntil = until;
         setDirty();
     }
 
     /** Drops an expired override. */
     public void tick(ServerLevel level) {
-        if (overrideType >= 0 && (level.getGameTime() >= overrideUntil || !level.getLevelData().isRaining())) {
-            overrideType = -1;
+        if (forcedKind >= 0 && (level.getGameTime() >= forcedUntil || !level.getLevelData().isRaining())) {
+            forcedKind = -1;
             setDirty();
         }
     }

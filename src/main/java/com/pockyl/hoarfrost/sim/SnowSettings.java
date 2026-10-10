@@ -5,26 +5,34 @@ package com.pockyl.hoarfrost.sim;
  * directly; the client copies them from its config).
  */
 public final class SnowSettings {
-    /** Most flakes and grains in the air at once. */
-    public int maxFlakes = 6000;
+    /** Most simulated flakes in the air around the camera. */
+    public int nearFlakes = 7000;
     /** Flakes are simulated within this horizontal distance of the camera. */
-    public float radius = 22.0F;
-    /** Flakes in the middle distance, beyond the simulated ones (they only fall and drift). */
-    public int farFlakes = 6000;
-    /** Light flakes in the dense stream right around the camera. */
-    public int cloudFlakes = 16000;
-    /** Multiplier for the number of flakes in the middle distance (0 = none). */
-    public float farDensity = 1.0F;
+    public float radius = 24.0F;
+    /** Flakes falling in the middle distance, beyond the simulated ones. */
+    public int farFlakes = 10000;
+    /** Snow falls in the middle distance out to this distance. */
+    public float farRadius = 72.0F;
+    /** Light flakes in the stream rushing past the face in storms. */
+    public int streamFlakes = 7000;
+    /** Most grains of powder lifted from the snow at once. */
+    public int powderGrains = 6000;
     /** Multiplier for the number of flakes. */
-    public float flakeDensity = 1.0F;
-    /** Snow settling on the ground. */
+    public float density = 1.0F;
+    /** Multiplier for the flakes in the middle distance (0 = none). */
+    public float farDensity = 1.0F;
+    /** Snow lies on the ground. */
     public boolean cover = true;
-    /** Wind moves the snow on the ground (drifts) and blows powder along it. */
-    public boolean drifting = true;
-    /** Feet leave prints in the snow and kick up powder. */
+    /** Feet leave dents and pack paths. */
     public boolean footprints = true;
-    /** Snow on the ground is drawn and simulated out to this distance. */
-    public float coverRadius = 96.0F;
-    /** Cover chunks brought up to date per tick. */
-    public int coverChunksPerTick = 3;
+    /** Wind, blasts and feet lift powder off the snow. */
+    public boolean powder = true;
+    /** Snow on the ground is simulated and drawn out to this distance. */
+    public float coverRadius = 80.0F;
+    /** Time per tick for surveying land and seeding snow, in nanoseconds. */
+    public long surveyBudget = 3_000_000L;
+    /** New cold land starts with the snow a past snowfall would have left. */
+    public boolean seed = true;
+    /** Snow falls and lies everywhere (game tests: the test world is warm). */
+    public boolean everywhereCold;
 }

@@ -6,15 +6,16 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 
 import com.pockyl.hoarfrost.ClientConfig;
-import com.pockyl.hoarfrost.client.ClientSnow;
+import com.pockyl.hoarfrost.client.ClientWeather;
 
 /**
  * The look of a snowy sky and air. Vanilla treats every precipitation like rain, and a thunderstorm like a darker rain:
  * the sky, the clouds and the distance turn a dirty dark grey. Under snow clouds it is different - the sky is milky
- * and bright, a snowstorm by day is a pale grey-white whiteout, the light is soft but not dim (fresh snow throws it
+ * and bright, a snowstorm by day a soft blue-grey, the light is soft but not dim (fresh snow throws it
  * back, even moonlight at night), and the haze of falling snow is white-blue.
  *
- * <p>Everything here fades with the share of snowy land around the player, so rain elsewhere keeps its own look.
+ * <p>Everything here fades with the share of snowy land around the player, so rain elsewhere keeps its own look, and the
+ * haze with how open the sky above the camera is, so it never fills a room or a cave.
  */
 public final class SnowSky {
     private SnowSky() {
@@ -33,14 +34,14 @@ public final class SnowSky {
         float rain = level.getRainLevel(partialTick);
         float thunder = level.getThunderLevel(partialTick);
         float kept = (1.0F - rainLoss * rain) * (1.0F - thunderLoss * thunder);
-        float presence = ClientSnow.presence();
+        float presence = ClientWeather.presence();
         return 1.0F / Mth.lerp(presence, 1.0F, Math.max(0.2F, kept));
     }
 
     /** The sky colour: an overcast, slightly blue grey of the brightness the time of day gives. */
     public static Vec3 skyColor(Vec3 color, float partialTick) {
         ClientLevel level = Minecraft.getInstance().level;
-        float k = ClientSnow.snow() * 0.6F;
+        float k = ClientWeather.snow() * 0.6F;
         if (!enabled() || level == null || k <= 0.0F) {
             return color;
         }
@@ -52,7 +53,7 @@ public final class SnowSky {
     /** Snow clouds are pale grey, not the dark grey of rain clouds. */
     public static Vec3 cloudColor(Vec3 color, float partialTick) {
         ClientLevel level = Minecraft.getInstance().level;
-        float k = ClientSnow.snow() * 0.7F;
+        float k = ClientWeather.snow() * 0.7F;
         if (!enabled() || level == null || k <= 0.0F) {
             return color;
         }
@@ -65,7 +66,7 @@ public final class SnowSky {
      * not dim - and at night snowy land stays a little brighter, the snow throwing back the light of the moon.
      */
     public static float skyDarken(ClientLevel level, float darken, float partialTick) {
-        float presence = ClientSnow.presence();
+        float presence = ClientWeather.presence();
         if (!enabled() || presence <= 0.0F) {
             return darken;
         }
@@ -87,7 +88,7 @@ public final class SnowSky {
      */
     public static float[] fogColor(float r, float g, float b, float partialTick) {
         ClientLevel level = Minecraft.getInstance().level;
-        if (level == null || ClientSnow.presence() <= 0.0F) {
+        if (level == null || ClientWeather.presence() <= 0.0F) {
             return null;
         }
         // Vanilla multiplies the fog by 1 - 0.5 x rain (blue 0.4) and 1 - 0.5 x thunder.
@@ -95,7 +96,7 @@ public final class SnowSky {
         r = Math.min(1.0F, r * back);
         g = Math.min(1.0F, g * back);
         b = Math.min(1.0F, b * back);
-        float k = ClientSnow.snow() * ClientSnow.skyView(partialTick) * (float) Math.min(1.0, ClientConfig.FOG.get());
+        float k = ClientWeather.snow() * ClientWeather.skyView(partialTick) * (float) Math.min(1.0, ClientConfig.FOG.get());
         if (k <= 0.0F) {
             return new float[] {r, g, b};
         }

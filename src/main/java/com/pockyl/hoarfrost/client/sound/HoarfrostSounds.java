@@ -9,17 +9,19 @@ import com.pockyl.hoarfrost.Hoarfrost;
  * the mod; the client plays them directly.
  */
 public final class HoarfrostSounds {
-    /** A breeze carrying snow, soft and airy. */
-    public static final SoundEvent WIND_LIGHT = event("ambient.wind.light");
+    /** A soft breeze carrying snow. */
+    public static final SoundEvent BREEZE = event("ambient.breeze");
+    /** A fresh, steady wind over open snow. */
+    public static final SoundEvent WIND = event("ambient.wind");
     /** The roar of a snowstorm. */
-    public static final SoundEvent WIND_STRONG = event("ambient.wind.strong");
-    /** The roar of a squall of snow passing by. */
-    public static final SoundEvent SQUALL = event("ambient.wind.squall");
-    /** A single gust sweeping past. */
-    public static final SoundEvent GUST = event("ambient.wind.gust");
+    public static final SoundEvent STORM = event("ambient.storm");
+    /** The howl of a storm around corners and edges. */
+    public static final SoundEvent HOWL = event("ambient.howl");
+    /** A gust sweeping past. */
+    public static final SoundEvent GUST = event("ambient.gust");
     /** Feet in fresh powder: a soft, deep crunch. */
     public static final SoundEvent STEP_POWDER = event("step.snow.powder");
-    /** Feet on packed snow: a firm, squeaky crunch. */
+    /** Feet on trodden snow: a firm, squeaky crunch. */
     public static final SoundEvent STEP_PACKED = event("step.snow.packed");
 
     private HoarfrostSounds() {

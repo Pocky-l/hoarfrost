@@ -15,4 +15,14 @@ public final class FastRandom {
         seed ^= seed << 17;
         return (seed >>> 40) * 0x1.0p-24F;
     }
+
+    /** Uniform in [-1, 1). */
+    public float signed() {
+        return next() * 2.0F - 1.0F;
+    }
+
+    /** Uniform in [min, max). */
+    public float range(float min, float max) {
+        return min + (max - min) * next();
+    }
 }

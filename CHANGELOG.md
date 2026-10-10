@@ -7,4 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - Unreleased
 
 ### Added
-- Initial release.
+- Seven kinds of snowy weather - light snow, snow, heavy snow, heavy snow with large flakes, light blizzard, blizzard and
+  heavy blizzard - each with its own flakes, fall speed, wind, haze and sound, blending into each other.
+- A wind that turns and wanders, with gusts and lulls rolling over the land, a boundary layer near the ground, rising
+  over and calm behind obstacles with a back eddy, flowing around them and barely reaching under cover; shared course
+  with Petrichor's rain.
+- Simulated flakes (crystals, clumps, grains, streaks in a gale), snow in the middle distance and a stream of flakes past
+  the face in storms.
+- Snow on the ground as a smooth surface: drifts in the lee, hollows, swept ridges, even cover under crowns, caps on
+  posts, soft rims, a dusting where little falls, snow blown a few blocks into cave mouths; melts near lamps and in
+  warm land; saved per world.
+- Powder blown up by wind charges, explosions, gusts, running and landings, settling slowly.
+- Footprints as soft dents, packed paths.
+- Real snow layer drifts built by the server in windy snowfall.
+- Bright snowy sky and a cool blue-grey haze, gated to the outdoors.
+- Soundscape: silent light snow, breeze, wind, storm roar, howl, passing gusts, muffled indoors; hush of falling snow;
+  snow footsteps.
+- Optional Serene Seasons integration.
+- `/hoarfrost weather <kind> [seconds]`, `/hoarfrost weather clear`, `/hoarfrost status`.

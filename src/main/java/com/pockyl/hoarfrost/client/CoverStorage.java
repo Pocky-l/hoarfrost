@@ -31,11 +31,8 @@ import java.util.zip.GZIPOutputStream;
  * (small files) and written by a background thread from a snapshot.
  */
 final class CoverStorage implements AutoCloseable {
-    /**
-     * Bumped when natural seeding or the data changes, so that ground seen before is seeded again (5: sheltered ground
-     * under crowns, roofs and in tunnels; 6: square footprints; 7: 8x8 cells per block; 8: no prints).
-     */
-    private static final int FORMAT = 8;
+    /** Bumped when the data changes; snow saved in an older format is dropped and the ground seeded again. */
+    private static final int FORMAT = 9;
 
     private final Path directory;
     private final Long2ObjectOpenHashMap<Region> regions = new Long2ObjectOpenHashMap<>();
@@ -54,14 +51,14 @@ final class CoverStorage implements AutoCloseable {
         this.directory = directory;
     }
 
-    /** The saved litter of a chunk, or null if it was never saved. */
+    /** The saved snow of a chunk, or null if it was never saved. */
     CoverChunk load(int chunkX, int chunkZ) {
         byte[] bytes = region(chunkX >> 5, chunkZ >> 5).chunks.get(ChunkPos.asLong(chunkX, chunkZ));
         if (bytes == null) {
             return null;
         }
         try {
-            return CoverChunk.read(new DataInputStream(new ByteArrayInputStream(bytes)));
+            return CoverChunk.read(chunkX, chunkZ, new DataInputStream(new ByteArrayInputStream(bytes)));
         } catch (IOException e) {
             Hoarfrost.LOGGER.warn("Discarding unreadable snow cover of chunk {}, {}", chunkX, chunkZ, e);
             return null;

@@ -13,9 +13,9 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import com.pockyl.hoarfrost.Config;
 import com.pockyl.hoarfrost.Hoarfrost;
 import com.pockyl.hoarfrost.network.SnowSyncPayload;
+import com.pockyl.hoarfrost.weather.SnowConditions;
 import com.pockyl.hoarfrost.weather.SnowData;
-import com.pockyl.hoarfrost.weather.SnowSchedule;
-import com.pockyl.hoarfrost.weather.SnowType;
+import com.pockyl.hoarfrost.weather.SnowKind;
 import com.pockyl.hoarfrost.world.DriftBuilder;
 
 import java.util.Map;
@@ -26,10 +26,11 @@ import java.util.WeakHashMap;
 public final class SnowEvents {
     private static final int SYNC_INTERVAL = 40;
     /** Wind (blocks per tick) from which snow starts drifting. */
-    private static final float DRIFT_WIND = 0.12F;
+    private static final float DRIFT_WIND = 0.15F;
     private static final int DRIFT_RANGE = 40;
     private static final float DRIFT_ATTEMPTS = 8.0F;
-    private static final Map<ServerLevel, SnowType> LAST_SENT = new WeakHashMap<>();
+    private static final Map<ServerLevel, SnowKind> LAST_SENT = new WeakHashMap<>();
+    private static final Map<ServerLevel, SnowConditions> WIND = new WeakHashMap<>();
 
     private SnowEvents() {
     }
@@ -41,14 +42,14 @@ public final class SnowEvents {
         }
         SnowData data = SnowData.get(level);
         data.tick(level);
-        SnowType type = data.currentType(level);
-        boolean changed = !LAST_SENT.containsKey(level) || LAST_SENT.get(level) != type;
+        SnowKind kind = data.currentKind(level);
+        boolean changed = !LAST_SENT.containsKey(level) || LAST_SENT.get(level) != kind;
         if (changed || level.getGameTime() % SYNC_INTERVAL == 0) {
-            LAST_SENT.put(level, type);
-            PacketDistributor.sendToPlayersInDimension(level, new SnowSyncPayload(type == null ? -1 : type.ordinal()));
+            LAST_SENT.put(level, kind);
+            PacketDistributor.sendToPlayersInDimension(level, new SnowSyncPayload(kind == null ? -1 : kind.ordinal()));
         }
-        if (type != null && Config.DRIFTS.get()) {
-            buildDrifts(level, type);
+        if (kind != null && Config.value(Config.DRIFTS)) {
+            buildDrifts(level, wind(level, kind));
         }
     }
 
@@ -64,36 +65,34 @@ public final class SnowEvents {
 
     private static void sendTo(Player player) {
         if (player instanceof ServerPlayer serverPlayer && serverPlayer.level() instanceof ServerLevel level) {
-            SnowType type = SnowData.hasWeather(level) ? SnowData.get(level).currentType(level) : null;
-            PacketDistributor.sendToPlayer(serverPlayer, new SnowSyncPayload(type == null ? -1 : type.ordinal()));
+            SnowKind kind = SnowData.hasWeather(level) ? SnowData.get(level).currentKind(level) : null;
+            PacketDistributor.sendToPlayer(serverPlayer, new SnowSyncPayload(kind == null ? -1 : kind.ordinal()));
         }
     }
 
     /** Sends the current state right away (after a command changed it). */
     public static void syncLevel(ServerLevel level) {
-        SnowType type = SnowData.get(level).currentType(level);
-        LAST_SENT.put(level, type);
-        PacketDistributor.sendToPlayersInDimension(level, new SnowSyncPayload(type == null ? -1 : type.ordinal()));
+        SnowKind kind = SnowData.get(level).currentKind(level);
+        LAST_SENT.put(level, kind);
+        PacketDistributor.sendToPlayersInDimension(level, new SnowSyncPayload(kind == null ? -1 : kind.ordinal()));
     }
 
-    /** Wind speed of the snowfall in blocks per tick (the same the clients see). */
-    public static float windSpeed(ServerLevel level, SnowType type) {
-        if (type == null) {
-            return 0.0F;
+    /** The wind of the snowfall now (the same the clients feel). */
+    public static SnowConditions wind(ServerLevel level, SnowKind kind) {
+        SnowConditions conditions = WIND.computeIfAbsent(level, key -> new SnowConditions());
+        if (kind != null) {
+            conditions.blendTo(kind, 0.006F);
         }
-        return SnowSchedule.windSpeed(level.getGameTime(), type.wind, type.gustiness) * level.getRainLevel(1.0F);
+        conditions.advanceWind(level.getGameTime(), level.getRainLevel(1.0F));
+        return conditions;
     }
 
-    private static void buildDrifts(ServerLevel level, SnowType type) {
-        float wind = windSpeed(level, type);
-        float strength = Mth.clamp((wind - DRIFT_WIND) / 0.2F, 0.0F, 1.0F) * Config.DRIFT_SPEED.get().floatValue();
+    private static void buildDrifts(ServerLevel level, SnowConditions wind) {
+        float strength = Mth.clamp((wind.windSpeed - DRIFT_WIND) / 0.25F, 0.0F, 1.0F) * Config.value(Config.DRIFT_SPEED).floatValue();
         if (strength <= 0.0F) {
             return;
         }
-        float angle = SnowSchedule.windAngle(level.getGameTime());
-        float dirX = Mth.cos(angle);
-        float dirZ = Mth.sin(angle);
-        int maxLayers = Config.DRIFT_MAX_LAYERS.get();
+        int maxLayers = Config.value(Config.DRIFT_MAX_LAYERS);
         for (ServerPlayer player : level.players()) {
             if (player.isSpectator()) {
                 continue;
@@ -103,7 +102,7 @@ public final class SnowEvents {
             for (int k = 0; k < n; k++) {
                 int x = player.getBlockX() + level.random.nextInt(DRIFT_RANGE * 2 + 1) - DRIFT_RANGE;
                 int z = player.getBlockZ() + level.random.nextInt(DRIFT_RANGE * 2 + 1) - DRIFT_RANGE;
-                DriftBuilder.grow(level, x, z, dirX, dirZ, maxLayers, false);
+                DriftBuilder.grow(level, x, z, wind.windDirX, wind.windDirZ, maxLayers, false);
             }
         }
     }

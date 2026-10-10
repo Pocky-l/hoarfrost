@@ -1,131 +1,67 @@
 {
-  "ambient.wind.light": {
+  "ambient.breeze": {
     "sounds": [
-      {
-        "name": "hoarfrost:wind/light_a"
-      },
-      {
-        "name": "hoarfrost:wind/light_b"
-      }
+      {"name": "hoarfrost:wind/breeze_a"},
+      {"name": "hoarfrost:wind/breeze_b"}
+    ],
+    "subtitle": "subtitles.hoarfrost.breeze"
+  },
+  "ambient.wind": {
+    "sounds": [
+      {"name": "hoarfrost:wind/wind_a"},
+      {"name": "hoarfrost:wind/wind_b"}
     ],
     "subtitle": "subtitles.hoarfrost.wind"
   },
-  "ambient.wind.strong": {
+  "ambient.storm": {
     "sounds": [
-      {
-        "name": "hoarfrost:wind/strong_a"
-      },
-      {
-        "name": "hoarfrost:wind/strong_b"
-      }
+      {"name": "hoarfrost:wind/storm_a"},
+      {"name": "hoarfrost:wind/storm_b"}
     ],
     "subtitle": "subtitles.hoarfrost.storm"
   },
-  "ambient.wind.gust": {
+  "ambient.howl": {
     "sounds": [
-      {
-        "name": "hoarfrost:wind/gust1"
-      },
-      {
-        "name": "hoarfrost:wind/gust2"
-      },
-      {
-        "name": "hoarfrost:wind/gust3"
-      },
-      {
-        "name": "hoarfrost:wind/gust4"
-      },
-      {
-        "name": "hoarfrost:wind/gust5"
-      }
+      {"name": "hoarfrost:wind/howl_a"},
+      {"name": "hoarfrost:wind/howl_b"}
+    ],
+    "subtitle": "subtitles.hoarfrost.howl"
+  },
+  "ambient.gust": {
+    "sounds": [
+      {"name": "hoarfrost:wind/gust1", "attenuation_distance": 48},
+      {"name": "hoarfrost:wind/gust2", "attenuation_distance": 48},
+      {"name": "hoarfrost:wind/gust3", "attenuation_distance": 48},
+      {"name": "hoarfrost:wind/gust4", "attenuation_distance": 48},
+      {"name": "hoarfrost:wind/gust5", "attenuation_distance": 48},
+      {"name": "hoarfrost:wind/gust6", "attenuation_distance": 48}
     ],
     "subtitle": "subtitles.hoarfrost.gust"
   },
   "step.snow.powder": {
     "sounds": [
-      {
-        "name": "hoarfrost:step/powder1",
-        "volume": 0.9
-      },
-      {
-        "name": "hoarfrost:step/powder2",
-        "volume": 0.9
-      },
-      {
-        "name": "hoarfrost:step/powder3",
-        "volume": 0.9
-      },
-      {
-        "name": "hoarfrost:step/powder4",
-        "volume": 0.9
-      },
-      {
-        "name": "hoarfrost:step/powder5",
-        "volume": 0.9
-      },
-      {
-        "name": "hoarfrost:step/powder6",
-        "volume": 0.9
-      },
-      {
-        "name": "hoarfrost:step/powder7",
-        "volume": 0.9
-      },
-      {
-        "name": "hoarfrost:step/powder8",
-        "volume": 0.9
-      }
+      {"name": "hoarfrost:step/powder1", "volume": 0.9},
+      {"name": "hoarfrost:step/powder2", "volume": 0.9},
+      {"name": "hoarfrost:step/powder3", "volume": 0.9},
+      {"name": "hoarfrost:step/powder4", "volume": 0.9},
+      {"name": "hoarfrost:step/powder5", "volume": 0.9},
+      {"name": "hoarfrost:step/powder6", "volume": 0.9},
+      {"name": "hoarfrost:step/powder7", "volume": 0.9},
+      {"name": "hoarfrost:step/powder8", "volume": 0.9}
     ],
     "subtitle": "subtitles.hoarfrost.step"
   },
   "step.snow.packed": {
     "sounds": [
-      {
-        "name": "hoarfrost:step/packed1",
-        "volume": 0.8
-      },
-      {
-        "name": "hoarfrost:step/packed2",
-        "volume": 0.8
-      },
-      {
-        "name": "hoarfrost:step/packed3",
-        "volume": 0.8
-      },
-      {
-        "name": "hoarfrost:step/packed4",
-        "volume": 0.8
-      },
-      {
-        "name": "hoarfrost:step/packed5",
-        "volume": 0.8
-      },
-      {
-        "name": "hoarfrost:step/packed6",
-        "volume": 0.8
-      },
-      {
-        "name": "hoarfrost:step/packed7",
-        "volume": 0.8
-      },
-      {
-        "name": "hoarfrost:step/packed8",
-        "volume": 0.8
-      }
+      {"name": "hoarfrost:step/packed1", "volume": 0.8},
+      {"name": "hoarfrost:step/packed2", "volume": 0.8},
+      {"name": "hoarfrost:step/packed3", "volume": 0.8},
+      {"name": "hoarfrost:step/packed4", "volume": 0.8},
+      {"name": "hoarfrost:step/packed5", "volume": 0.8},
+      {"name": "hoarfrost:step/packed6", "volume": 0.8},
+      {"name": "hoarfrost:step/packed7", "volume": 0.8},
+      {"name": "hoarfrost:step/packed8", "volume": 0.8}
     ],
     "subtitle": "subtitles.hoarfrost.step"
-  },
-  "ambient.wind.squall": {
-    "sounds": [
-      {
-        "name": "hoarfrost:wind/strong_a",
-        "attenuation_distance": 40
-      },
-      {
-        "name": "hoarfrost:wind/strong_b",
-        "attenuation_distance": 40
-      }
-    ],
-    "subtitle": "subtitles.hoarfrost.squall"
   }
 }
