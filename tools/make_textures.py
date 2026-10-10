@@ -225,32 +225,9 @@ def snow_cover():
     Image.fromarray(out, "RGBA").save(path, optimize=True)
 
 
-def snow_leaves():
-    """White, snowy leaves (as in Bedrock Edition): drawn over the sides of leaves under snow.
-
-    A leafy pattern in white and pale grey, with a few holes like fancy leaves; alpha 0.55..1 elsewhere, so a thin
-    snow shows only the whitest leaves and a full one all of them.
-    """
-    size = 16
-    rng = np.random.default_rng(31)
-    leaf = np.kron(rng.uniform(0, 1, (size // 2, size // 2)), np.ones((2, 2))) * 0.6 + rng.uniform(0, 1, (size, size)) * 0.4
-    image = np.zeros((size, size, 4), dtype=np.uint8)
-    tone = 0.84 + 0.16 * leaf
-    image[..., 0] = np.round(tone * 250).astype(np.uint8)
-    image[..., 1] = np.round(tone * 252).astype(np.uint8)
-    image[..., 2] = np.round(np.minimum(1.0, tone * 1.02) * 255).astype(np.uint8)
-    holes = rng.uniform(0, 1, (size, size)) < 0.1
-    alpha = 0.55 + 0.45 * leaf
-    alpha[holes] = 0.0
-    image[..., 3] = np.round(alpha * 255).astype(np.uint8)
-    path = os.path.join(OUT, "block", "snow_leaves.png")
-    Image.fromarray(image, "RGBA").save(path, optimize=True)
-
-
 def main():
     flakes()
     snow_cover()
-    snow_leaves()
 
 
 if __name__ == "__main__":

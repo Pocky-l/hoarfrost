@@ -41,7 +41,7 @@ snowfall changes character:
 - **Soft snow on the ground.** Snow settles on the land, roofs, crowns and posts as one smooth surface - no grid, no
   steps: rounded drifts in the lee of walls, trees and hills, fuller hollows, thinner wind-swept ridges and roofs, an even
   layer under crowns, little rounded caps on fence posts, a soft rim at the edge of a roof. Where little snow falls it is
-  a dusting with the ground showing through. Crowns of trees hold snow on top and their leaves turn white (as in Bedrock Edition), and distant land and
+  a dusting with the ground showing through. Crowns of trees hold snow on top, and distant land and
   trees stay white out to the render distance. The colour follows the vanilla snow texture (and resource packs). Snow blown into a cave mouth or under an overhang settles a few blocks deep
   and fades - it never runs down a tunnel. It sits on top of vanilla snow layers, melts near lamps and in warm land, and
   stays where it lay when you come back.
@@ -51,15 +51,18 @@ snowfall changes character:
 - **Footprints** as plain soft dents; trodden paths get packed. Fresh snow fills them again.
 - **Real drifts** (server): in windy snowfall, snow layers pile up in the lee of walls and trees.
 - **No thunderstorms in snow**: no lightning, flashes or thunder over snowy land.
-- **Sky and haze**: a snowy sky is soft and bright instead of the dark grey of rain (thunder does not turn it dirty grey);
-  falling snow closes in the view with a cool blue-grey haze of the sky's brightness, thicker in gusts. None of it
-  reaches indoors or underground.
+- **Snowy leaves**: leaves in snowy biomes are white, as in Bedrock Edition, fading out over the biome border.
+- **Sky and haze**: light snow falls from a sky of its own colour; heavy snow and blizzards turn it a soft, bright
+  overcast instead of the dark grey of rain (thunder does not turn it dirty grey). Falling snow closes in the view with a
+  cool blue-grey haze of the sky's brightness, thicker in gusts. None of it reaches indoors or underground.
 - **Sound**: light snow is silent; snow brings a soft breeze; storms grow from a fresh wind to a roar with a howl around
   every edge, and single gusts rush past from upwind. Indoors the storm is muffled; underground there is nothing. Falling
   snow hushes the world outdoors, and footsteps crunch in powder and squeak on trodden snow.
 - **[Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons)** (optional): snow falls and lies where
   the season makes it cold - temperate land in winter, melting in spring, none in a warm summer - and deep winter brings
   heavier snow and blizzards.
+- **[Distant Horizons](https://www.curseforge.com/minecraft/mc-mods/distant-horizons)** (optional): the snowy haze stays
+  when Distant Horizons turns the vanilla fog off and also covers its distant land.
 - Works with Petrichor, Sodium, Iris and shader packs, and Sound Physics Remastered. Everything visual works on any
   server; with the mod on the server too, all players share the same kind of snow and the server builds drifts.
 

@@ -19,12 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   warm land; saved per world.
 - Powder blown up by wind charges, explosions, gusts, running and landings, settling slowly.
 - Clouds of snow and driving snow dust in heavy snow and blizzards; whiteouts in heavy blizzards.
-- Snow on distant land out to the render distance; snow on crowns and white leaves under snow.
+- Snow on distant land out to the render distance; snow on crowns.
+- White leaves in snowy biomes, as in Bedrock Edition.
 - No lightning or thunder over snowy land.
 - Footprints as soft dents, packed paths.
 - Real snow layer drifts built by the server in windy snowfall.
-- Bright snowy sky and a cool blue-grey haze, gated to the outdoors.
+- Light snow keeps the sky its colour; heavy snow and blizzards bring a bright overcast and a cool blue-grey haze, gated
+  to the outdoors.
 - Soundscape: silent light snow, breeze, wind, storm roar, howl, passing gusts, muffled indoors; hush of falling snow;
   snow footsteps.
 - Optional Serene Seasons integration.
+- The snowy haze works with Distant Horizons and covers its distant land too.
 - `/hoarfrost weather <kind> [seconds]`, `/hoarfrost weather clear`, `/hoarfrost status`.

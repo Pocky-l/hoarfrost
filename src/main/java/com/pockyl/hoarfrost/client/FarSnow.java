@@ -15,7 +15,6 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 import com.pockyl.hoarfrost.compat.Climate;
-import com.pockyl.hoarfrost.sim.CoverChunk;
 import com.pockyl.hoarfrost.sim.SnowCover;
 
 import java.util.ArrayList;
@@ -26,15 +25,12 @@ import java.util.List;
 /**
  * The snow lying on the land out to the render distance, beyond the simulated snow around the camera: only the top
  * surface of each column, with the depth snow settles to there in still air. Cheap to look at and to draw (see
- * {@code FarSnowRenderer}); it also fills the near land until the simulated snow there is ready, and tells
- * {@link LeafFrost} how much snow lies on distant crowns.
+ * {@code FarSnowRenderer}); it also fills the near land until the simulated snow there is ready.
  */
 public final class FarSnow {
     /** Natural depth on open cold land and on crowns. */
     private static final float OPEN = SnowCover.capacity(1.0F) * 0.6F;
     private static final float CROWN = SnowCover.capacity(0.7F) * 0.6F;
-    /** Chunks whose frost is handed to {@link LeafFrost} per tick. */
-    private static final int FROST_PER_TICK = 48;
 
     /** One chunk column of distant snow. */
     public static final class Chunk {
@@ -44,7 +40,6 @@ public final class FarSnow {
         public final float[] base = new float[256];
         public final float[] depth = new float[256];
         public final int[] light = new int[256];
-        final boolean[] leaves = new boolean[256];
         boolean sampled;
         public int revision;
 
@@ -61,10 +56,7 @@ public final class FarSnow {
 
     private final Long2ObjectOpenHashMap<Chunk> chunks = new Long2ObjectOpenHashMap<>();
     private final BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-    private final byte[] steps = new byte[256];
-    private final short[] tops = new short[256];
-    private long[] frostOrder = new long[0];
-    private int frostCursor;
+    private long[] order = new long[0];
     private int resampleCursor;
     private int ticks;
 
@@ -92,7 +84,7 @@ public final class FarSnow {
      * Keeps the chunks within {@code radius} chunks of the camera, looks at new ones nearest first within a time budget,
      * and looks at one again now and then (seasons change where snow lies).
      */
-    public void tick(ClientLevel level, Vec3 camera, int radius, long budgetNanos, SnowCover cover) {
+    public void tick(ClientLevel level, Vec3 camera, int radius, long budgetNanos) {
         ticks++;
         int cx = Mth.floor(camera.x) >> 4;
         int cz = Mth.floor(camera.z) >> 4;
@@ -112,8 +104,7 @@ public final class FarSnow {
                     }
                 }
             }
-            frostOrder = chunks.keySet().toLongArray();
-            LeafFrost.prune(key -> chunks.containsKey(key));
+            order = chunks.keySet().toLongArray();
         }
         List<Chunk> pending = new ArrayList<>();
         for (Chunk chunk : chunks.values()) {
@@ -131,13 +122,12 @@ public final class FarSnow {
                     break;
                 }
             }
-        } else if (frostOrder.length > 0 && ticks % 4 == 0) {
-            Chunk chunk = chunks.get(frostOrder[resampleCursor++ % frostOrder.length]);
+        } else if (order.length > 0 && ticks % 4 == 0) {
+            Chunk chunk = chunks.get(order[resampleCursor++ % order.length]);
             if (chunk != null) {
                 sample(level, chunk);
             }
         }
-        feedFrost(cover);
     }
 
     private void sample(ClientLevel level, Chunk chunk) {
@@ -150,7 +140,6 @@ public final class FarSnow {
                 int z = chunk.z * 16 + lz;
                 chunk.base[column] = Float.NaN;
                 chunk.depth[column] = 0.0F;
-                chunk.leaves[column] = false;
                 int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) - 1;
                 if (y < level.getMinBuildHeight()) {
                     continue;
@@ -174,44 +163,10 @@ public final class FarSnow {
                 // The top of the land is under the open sky (the client may not have lit a new chunk yet).
                 chunk.base[column] = base;
                 chunk.light[column] = block << 4 | 15 << 20;
-                chunk.leaves[column] = state.is(BlockTags.LEAVES);
                 if (block < 11 && Climate.snowsAt(level, pos)) {
-                    chunk.depth[column] = chunk.leaves[column] ? CROWN : OPEN;
+                    chunk.depth[column] = state.is(BlockTags.LEAVES) ? CROWN : OPEN;
                 }
             }
-        }
-    }
-
-    /** Hands the snow on crowns to {@link LeafFrost}: from the simulated snow where there is any, else from this. */
-    private void feedFrost(SnowCover cover) {
-        if (frostOrder.length == 0) {
-            return;
-        }
-        for (int n = 0; n < Math.min(FROST_PER_TICK, frostOrder.length); n++) {
-            long key = frostOrder[frostCursor++ % frostOrder.length];
-            Chunk chunk = chunks.get(key);
-            if (chunk == null || !chunk.sampled) {
-                continue;
-            }
-            CoverChunk near = cover == null ? null : cover.chunk(chunk.x, chunk.z);
-            boolean simulated = near != null && near.surveyed();
-            for (int column = 0; column < 256; column++) {
-                float depth;
-                float top;
-                boolean leaves;
-                if (simulated) {
-                    leaves = near.has(CoverChunk.TOP, column) && (near.flags(CoverChunk.TOP, column) & CoverChunk.LEAVES) != 0;
-                    depth = leaves ? near.depth(CoverChunk.TOP, column) : 0.0F;
-                    top = leaves ? near.base(CoverChunk.TOP, column) : 0.0F;
-                } else {
-                    leaves = chunk.leaves[column];
-                    depth = leaves ? chunk.depth[column] : 0.0F;
-                    top = leaves ? chunk.base[column] : 0.0F;
-                }
-                steps[column] = (byte) Math.round(Math.clamp(depth / 0.12F, 0.0F, 1.0F) * LeafFrost.STEPS);
-                tops[column] = (short) Math.round(top);
-            }
-            LeafFrost.set(chunk.x, chunk.z, steps, tops);
         }
     }
 }

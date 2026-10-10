@@ -8,6 +8,7 @@
     "ChannelAccessor",
     "ClientLevelMixin",
     "ClientPacketListenerMixin",
+    "FogRendererMixin",
     "LevelRendererMixin",
     "SoundEngineAccessor",
     "SoundManagerAccessor"

@@ -29,6 +29,16 @@ repositories {
             includeGroup 'com.github.glitchfiend'
         }
     }
+    exclusiveContent {
+        // Distant Horizons (optional integration).
+        forRepository {
+            maven {
+                name = 'Modrinth'
+                url = 'https://api.modrinth.com/maven'
+            }
+        }
+        filter { includeGroup('maven.modrinth') }
+    }
 }
 
 neoForge {
@@ -86,6 +96,10 @@ configurations {
 dependencies {
     // Optional: snow follows the seasons when Serene Seasons is installed. Not needed to run the mod.
     compileOnly "com.github.glitchfiend:SereneSeasons-neoforge:${serene_seasons_version}"
+    // Optional: the snowy haze also covers Distant Horizons' distant land. Its API ships inside the mod jar.
+    compileOnly("maven.modrinth:distanthorizons:${distanthorizons_version}") {
+        transitive = false
+    }
 }
 
 var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {

@@ -38,27 +38,67 @@ public final class SnowSky {
         return 1.0F / Mth.lerp(presence, 1.0F, Math.max(0.2F, kept));
     }
 
-    /** The sky colour: an overcast, slightly blue grey of the brightness the time of day gives. */
-    public static Vec3 skyColor(Vec3 color, float partialTick) {
-        ClientLevel level = Minecraft.getInstance().level;
-        float k = ClientWeather.snow() * 0.6F;
-        if (!enabled() || level == null || k <= 0.0F) {
-            return color;
-        }
-        // Vanilla greys the sky by 0.3 x rain and 0.6 x thunder of its brightness.
-        float l = Math.min(1.0F, luma(color.x, color.y, color.z) * restore(level, partialTick, 0.3F, 0.6F) * 0.95F);
-        return color.lerp(new Vec3(l * 0.86F, l * 0.93F, l * 1.04F), k);
+    /**
+     * How overcast the snowy weather is, 0..1: light snow and a steady snowfall fall from a high, thin cloud and leave
+     * the sky its colour; heavy snow and blizzards hide it.
+     */
+    private static float overcast() {
+        float k = Mth.clamp((140.0F - ClientWeather.conditions().visibility) / 120.0F, 0.0F, 1.0F);
+        return k * k;
     }
 
-    /** Snow clouds are pale grey, not the dark grey of rain clouds. */
-    public static Vec3 cloudColor(Vec3 color, float partialTick) {
+    /**
+     * Undoes vanilla's greying of a colour by rain or thunder: {@code c' = c m + luma(c) f (1 - m)} with
+     * {@code m = 1 - level x keep}.
+     */
+    private static Vec3 ungrey(Vec3 c, float level, float keep, float f) {
+        float m = 1.0F - level * keep;
+        if (level <= 0.0F || m <= 0.0F) {
+            return c;
+        }
+        float scale = m + f * (1.0F - m);
+        float l = luma(c.x, c.y, c.z) / scale * f * (1.0F - m);
+        return new Vec3(Math.clamp((c.x - l) / m, 0.0, 1.0), Math.clamp((c.y - l) / m, 0.0, 1.0), Math.clamp((c.z - l) / m, 0.0, 1.0));
+    }
+
+    /**
+     * The sky colour: in snowy land vanilla's rainy grey is taken back, so light snow falls from a sky of its own colour;
+     * the heavier the snow, the more it turns an overcast, slightly blue grey of the brightness the time of day gives.
+     */
+    public static Vec3 skyColor(Vec3 color, float partialTick) {
         ClientLevel level = Minecraft.getInstance().level;
-        float k = ClientWeather.snow() * 0.7F;
-        if (!enabled() || level == null || k <= 0.0F) {
+        float presence = ClientWeather.presence();
+        if (!enabled() || level == null || presence <= 0.0F) {
             return color;
         }
-        float l = Math.min(1.0F, luma(color.x, color.y, color.z) * restore(level, partialTick, 0.38F, 0.76F) * 1.05F);
-        return color.lerp(new Vec3(l * 0.95F, l * 0.97F, l), k);
+        // Vanilla mixes the sky towards 0.6 x its luma by 0.75 x rain, then towards 0.2 x its luma by 0.75 x thunder.
+        Vec3 clear = ungrey(ungrey(color, level.getThunderLevel(partialTick), 0.75F, 0.2F), level.getRainLevel(partialTick), 0.75F, 0.6F);
+        Vec3 base = color.lerp(clear, presence);
+        float k = ClientWeather.snow() * overcast() * 0.6F;
+        if (k <= 0.0F) {
+            return base;
+        }
+        float l = Math.min(1.0F, luma(clear.x, clear.y, clear.z) * 0.95F);
+        return base.lerp(new Vec3(l * 0.86F, l * 0.93F, l * 1.04F), k);
+    }
+
+    /** Snow clouds: white in light snow, pale grey in heavy snow - not the dark grey of rain clouds. */
+    public static Vec3 cloudColor(Vec3 color, float partialTick) {
+        ClientLevel level = Minecraft.getInstance().level;
+        float presence = ClientWeather.presence();
+        if (!enabled() || level == null || presence <= 0.0F) {
+            return color;
+        }
+        // Vanilla's clouds without rain: white in the light of the time of day.
+        float day = Mth.clamp(Mth.cos(level.getTimeOfDay(partialTick) * Mth.TWO_PI) * 2.0F + 0.5F, 0.0F, 1.0F);
+        Vec3 clear = new Vec3(day * 0.9F + 0.1F, day * 0.9F + 0.1F, day * 0.85F + 0.15F);
+        Vec3 base = color.lerp(clear, presence);
+        float k = ClientWeather.snow() * overcast() * 0.7F;
+        if (k <= 0.0F) {
+            return base;
+        }
+        float l = Math.min(1.0F, luma(clear.x, clear.y, clear.z) * 0.85F);
+        return base.lerp(new Vec3(l * 0.95F, l * 0.97F, l), k);
     }
 
     /**
@@ -76,8 +116,8 @@ public final class SnowSky {
         float result = darken;
         if (dimming > 0.01F && dimming < 0.999F) {
             float clear = (darken - 0.2F) / 0.8F / dimming;
-            float snowy = Mth.clamp(clear * (1.0F - rain * 0.1F), 0.0F, 1.0F) * 0.8F + 0.2F;
-            result = Mth.lerp(presence * 0.75F, darken, Math.max(darken, snowy));
+            float snowy = Mth.clamp(clear * (1.0F - rain * 0.1F * overcast()), 0.0F, 1.0F) * 0.8F + 0.2F;
+            result = Mth.lerp(presence * (1.0F - 0.25F * overcast()), darken, Math.max(darken, snowy));
         }
         return Math.max(result, 0.2F + 0.06F * presence);
     }
@@ -101,7 +141,8 @@ public final class SnowSky {
             return new float[] {r, g, b};
         }
         float l = Math.min(1.0F, luma(r, g, b) * 0.95F);
-        float mix = k * 0.45F;
+        // Light snow leaves the colour of the distance nearly as it is, like the sky.
+        float mix = k * 0.45F * (0.25F + 0.75F * overcast());
         return new float[] {
                 Mth.lerp(mix, r, l * 0.84F),
                 Mth.lerp(mix, g, l * 0.92F),

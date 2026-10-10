@@ -89,7 +89,7 @@ public final class ClientConfig {
             .translation(key("distantCover"))
             .define("distant", true);
     public static final ModConfigSpec.BooleanValue SNOWY_LEAVES = BUILDER
-            .comment("Leaves under snow look frosted.")
+            .comment("Leaves in snowy biomes are white, as in Bedrock Edition.")
             .translation(key("snowyLeaves"))
             .define("snowyLeaves", true);
     public static final ModConfigSpec.BooleanValue FOOTPRINTS = BUILDER

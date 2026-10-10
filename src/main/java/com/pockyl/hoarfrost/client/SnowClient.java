@@ -43,6 +43,7 @@ import com.pockyl.hoarfrost.ClientConfig;
 import com.pockyl.hoarfrost.Hoarfrost;
 import com.pockyl.hoarfrost.client.render.CoverRenderer;
 import com.pockyl.hoarfrost.client.render.FlakeRenderer;
+import com.pockyl.hoarfrost.client.render.SnowFog;
 import com.pockyl.hoarfrost.client.render.SnowSky;
 import com.pockyl.hoarfrost.client.sound.Hush;
 import com.pockyl.hoarfrost.client.sound.Soundscape;
@@ -105,6 +106,9 @@ public final class SnowClient {
         return simulation != null && ClientConfig.SNOWFALL.get() && hasWeather(Minecraft.getInstance().level);
     }
 
+    /** The leaves setting the chunk meshes were built with. */
+    private static Boolean snowyLeaves;
+
     private static void applyConfig() {
         ClientConfig.Quality quality = ClientConfig.quality();
         int capacity = SETTINGS.nearFlakes + SETTINGS.farFlakes + SETTINGS.streamFlakes + SETTINGS.powderGrains + SETTINGS.clouds;
@@ -123,6 +127,10 @@ public final class SnowClient {
         SETTINGS.cover = ClientConfig.COVER.get();
         SETTINGS.footprints = ClientConfig.FOOTPRINTS.get();
         SETTINGS.powder = ClientConfig.POWDER.get();
+        if (snowyLeaves != null && snowyLeaves != ClientConfig.SNOWY_LEAVES.get()) {
+            LeafFrost.rebuild();
+        }
+        snowyLeaves = ClientConfig.SNOWY_LEAVES.get();
         if (capacity != SETTINGS.nearFlakes + SETTINGS.farFlakes + SETTINGS.streamFlakes + SETTINGS.powderGrains + SETTINGS.clouds
                 || hadCover != SETTINGS.cover) {
             reset();
@@ -164,7 +172,7 @@ public final class SnowClient {
         if (SETTINGS.cover) {
             updateCoverChunks(camera);
             if (ClientConfig.DISTANT_COVER.get()) {
-                FAR.tick(level, camera, minecraft.options.getEffectiveRenderDistance(), FAR_BUDGET_NANOS, simulation.cover());
+                FAR.tick(level, camera, minecraft.options.getEffectiveRenderDistance(), FAR_BUDGET_NANOS);
             }
         }
         feedEntities(camera);
@@ -206,7 +214,6 @@ public final class SnowClient {
         }
         simulation = null;
         FAR.clear();
-        LeafFrost.clear();
         STRIDE.clear();
         LAST_FALL.clear();
     }
@@ -442,6 +449,9 @@ public final class SnowClient {
 
     @SubscribeEvent
     public static void onRenderFog(ViewportEvent.RenderFog event) {
+        if (event.getMode() == FogRenderer.FogMode.FOG_TERRAIN) {
+            SnowFog.clear();
+        }
         if (!hasWeather(Minecraft.getInstance().level) || event.getType() != FogType.NONE) {
             return;
         }
@@ -480,6 +490,9 @@ public final class SnowClient {
         event.setFarPlaneDistance(newFar);
         event.setNearPlaneDistance(Math.max(0.0F, newNear));
         event.setCanceled(true);
+        if (event.getMode() == FogRenderer.FogMode.FOG_TERRAIN) {
+            SnowFog.setTerrain(Math.max(0.0F, newNear), newFar, k);
+        }
     }
 
     @SubscribeEvent
@@ -492,6 +505,7 @@ public final class SnowClient {
             event.setRed(color[0]);
             event.setGreen(color[1]);
             event.setBlue(color[2]);
+            SnowFog.setColor(color[0], color[1], color[2]);
         }
     }
 
