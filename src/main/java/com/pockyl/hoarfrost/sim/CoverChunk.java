@@ -170,6 +170,18 @@ public final class CoverChunk {
         return flags[entry] != before;
     }
 
+    /** Sets the block light at a surface (lamps melt the snow); returns whether anything changed. */
+    boolean setLight(int entry, int block) {
+        int before = light[entry];
+        byte flagsBefore = flags[entry];
+        light[entry] = before & ~0xF0 | block << 4;
+        flags[entry] = (byte) (block >= 11 ? flagsBefore | LIT : flagsBefore & ~LIT);
+        if ((flags[entry] & LIT) != 0) {
+            depth[entry] = 0.0F;
+        }
+        return light[entry] != before || flags[entry] != flagsBefore;
+    }
+
     void addChange(float amount) {
         change += amount;
         dirty = true;

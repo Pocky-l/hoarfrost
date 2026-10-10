@@ -11,6 +11,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import com.pockyl.hoarfrost.compat.Climate;
 import com.pockyl.hoarfrost.weather.SnowConditions;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiPredicate;
 
@@ -33,6 +34,9 @@ public final class SnowSimulation {
     private static final float NEAR_ABOVE = 18.0F;
     private static final float FAR_BELOW = 24.0F;
     private static final float FAR_ABOVE = 36.0F;
+    /** Clouds of snow drift between these distances from the camera. */
+    private static final float CLOUD_NEAR = 6.0F;
+    private static final float CLOUD_FAR = 56.0F;
     /** Ticks between two chunks having their climate checked again. */
     private static final int CLIMATE_INTERVAL = 5;
 
@@ -52,6 +56,10 @@ public final class SnowSimulation {
     private int ticks;
     private boolean filled;
     private int climateCursor;
+    private final List<long[]> pendingLight = new ArrayList<>();
+    private float streamX;
+    private float streamY;
+    private float streamZ;
 
     public SnowSimulation(SnowSettings settings) {
         this(settings, new SnowConditions());
@@ -61,7 +69,7 @@ public final class SnowSimulation {
     public SnowSimulation(SnowSettings settings, SnowConditions weather) {
         this.settings = settings;
         this.weather = weather;
-        this.flakes = new Flakes(settings.nearFlakes + settings.farFlakes + settings.streamFlakes + settings.powderGrains);
+        this.flakes = new Flakes(settings.nearFlakes + settings.farFlakes + settings.streamFlakes + settings.powderGrains + settings.clouds);
         this.cold = (level, at) -> settings.everywhereCold || Climate.snowsAt(level, at);
     }
 
@@ -100,6 +108,32 @@ public final class SnowSimulation {
         }
     }
 
+    /**
+     * Checks the climate and the lamps of the chunks around a block again soon (a lamp was placed or removed: its light
+     * spreads over the next ticks).
+     */
+    public void lightChanged(int x, int z) {
+        pendingLight.add(new long[] {x, z, ticks + 6L});
+    }
+
+    private void refreshPendingLight(Level level) {
+        for (int n = pendingLight.size() - 1; n >= 0; n--) {
+            long[] entry = pendingLight.get(n);
+            if (entry[2] > ticks) {
+                continue;
+            }
+            pendingLight.remove(n);
+            for (int cx = ((int) entry[0] - 15) >> 4; cx <= ((int) entry[0] + 15) >> 4; cx++) {
+                for (int cz = ((int) entry[1] - 15) >> 4; cz <= ((int) entry[1] + 15) >> 4; cz++) {
+                    CoverChunk chunk = cover.chunk(cx, cz);
+                    if (chunk != null && chunk.surveyed()) {
+                        cover.refreshClimate(level, chunk, cold);
+                    }
+                }
+            }
+        }
+    }
+
     /** The next chunk in turn has its climate checked again. */
     private void refreshClimate(Level level) {
         int size = cover.chunks().size();
@@ -129,7 +163,9 @@ public final class SnowSimulation {
             if (ticks % CLIMATE_INTERVAL == 0) {
                 refreshClimate(level);
             }
+            refreshPendingLight(level);
         }
+        moveClouds();
         moveNear(level);
         moveFar();
         moveStream();
@@ -137,6 +173,7 @@ public final class SnowSimulation {
         spawnNear(level);
         spawnFar();
         spawnStream();
+        spawnClouds(level);
         if (settings.powder && settings.cover) {
             spindrift();
         }
@@ -247,9 +284,9 @@ public final class SnowSimulation {
                 continue;
             }
             float response = switch (flakes.shape[i]) {
-                case Flakes.CLUMP, Flakes.CLUMP_ALT -> 0.2F;
-                case Flakes.GRAIN -> 0.45F;
-                default -> 0.32F;
+                case Flakes.CLUMP, Flakes.CLUMP_ALT -> 0.12F;
+                case Flakes.GRAIN -> 0.3F;
+                default -> 0.2F;
             };
             if (!fly(level, i, response, 1.0F)) {
                 flakes.remove(i);
@@ -429,10 +466,14 @@ public final class SnowSimulation {
     }
 
     private void moveStream() {
+        // The stream follows the air around the camera with some inertia, as a mass of snow in the air does.
         air.sample(camX, camY, camZ, scratch);
-        float ax = scratch[0];
-        float ay = scratch[1];
-        float az = scratch[2];
+        streamX += (scratch[0] - streamX) * 0.06F;
+        streamY += (scratch[1] - streamY) * 0.06F;
+        streamZ += (scratch[2] - streamZ) * 0.06F;
+        float ax = streamX;
+        float ay = streamY;
+        float az = streamZ;
         int high = flakes.highWater();
         for (int i = 0; i < high; i++) {
             if (flakes.kind[i] != Flakes.STREAM) {
@@ -498,6 +539,85 @@ public final class SnowSimulation {
     }
 
     // ------------------------------------------------------------------------------------------------------------
+    // Clouds of snow
+    // ------------------------------------------------------------------------------------------------------------
+
+    private void spawnClouds(Level level) {
+        int target = Math.min(settings.clouds, Math.round(settings.clouds * weather.clouds * weather.snow * settings.density));
+        int missing = target - flakes.count(Flakes.CLOUD);
+        for (int attempt = 0; attempt < Math.min(missing, 6) * 3 && missing > 0; attempt++) {
+            float angle = random.next() * Mth.TWO_PI;
+            float r = (float) Math.sqrt(Mth.lerp(random.next(), CLOUD_NEAR * CLOUD_NEAR, CLOUD_FAR * CLOUD_FAR));
+            double x = camX + Mth.cos(angle) * r;
+            double z = camZ + Mth.sin(angle) * r;
+            int top = air.top(x, z);
+            if (top == Integer.MIN_VALUE || !air.snowy(x, z)) {
+                continue;
+            }
+            // Mostly low, rolling over the ground; some higher up.
+            float height = 0.6F + 9.0F * random.next() * random.next();
+            int i = flakes.add(Flakes.CLOUD, x, top + height, z);
+            if (i < 0) {
+                return;
+            }
+            flakes.size[i] = random.range(3.0F, 8.5F) * (0.7F + 0.3F * Math.min(1.0F, height / 3.0F));
+            flakes.shape[i] = Flakes.VEIL;
+            flakes.life[i] = random.range(160.0F, 380.0F);
+            flakes.span[i] = flakes.life[i];
+            flakes.spin[i] = flakes.prevSpin[i] = random.signed() * 0.3F;
+            flakes.spinRate[i] = random.signed() * 0.002F;
+            // How thick this cloud is.
+            flakes.sway[i] = random.range(0.6F, 1.0F);
+            air.sample(x, top + height, z, scratch);
+            flakes.vx[i] = scratch[0];
+            flakes.vy[i] = 0.0F;
+            flakes.vz[i] = scratch[2];
+            light(level, i);
+            missing--;
+        }
+    }
+
+    private void moveClouds() {
+        int high = flakes.highWater();
+        for (int i = 0; i < high; i++) {
+            if (flakes.kind[i] != Flakes.CLOUD) {
+                continue;
+            }
+            flakes.prevX[i] = flakes.x[i];
+            flakes.prevY[i] = flakes.y[i];
+            flakes.prevZ[i] = flakes.z[i];
+            flakes.prevSpin[i] = flakes.spin[i];
+            // A cloud is a large mass of air: it drifts with the wind around it and changes course slowly.
+            air.sample(flakes.x[i], flakes.y[i], flakes.z[i], scratch);
+            flakes.vx[i] += (scratch[0] - flakes.vx[i]) * 0.04F;
+            flakes.vy[i] += (scratch[1] * 0.3F - flakes.vy[i]) * 0.04F;
+            flakes.vz[i] += (scratch[2] - flakes.vz[i]) * 0.04F;
+            double x = flakes.x[i] + flakes.vx[i];
+            double y = flakes.y[i] + flakes.vy[i];
+            double z = flakes.z[i] + flakes.vz[i];
+            flakes.x[i] = x;
+            flakes.y[i] = y;
+            flakes.z[i] = z;
+            flakes.spin[i] += flakes.spinRate[i];
+            float life = flakes.life[i] -= 1.0F;
+            double dx = x - camX;
+            double dz = z - camZ;
+            int top = air.top(x, z);
+            // Where the ground is under it: a cloud is drawn no deeper than that, so it never cuts into the snow.
+            flakes.phase[i] = top;
+            if (life <= 0.0F || dx * dx + dz * dz > (CLOUD_FAR + 8.0) * (CLOUD_FAR + 8.0) || top == Integer.MIN_VALUE || y < top - 0.5) {
+                flakes.remove(i);
+                continue;
+            }
+            // Fades in and out over its life; denser where a gust carries it, so squalls roll past as clouds.
+            float age = 1.0F - life / flakes.span[i];
+            float envelope = Mth.sin((float) Math.PI * age);
+            float gust = Math.clamp((weather.gustAt(x, z) - 0.6F) / 1.0F, 0.15F, 1.3F);
+            flakes.alpha[i] = envelope * gust * flakes.sway[i] * Math.min(1.0F, weather.clouds * 1.5F);
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------------------------
     // Powder
     // ------------------------------------------------------------------------------------------------------------
 
@@ -508,16 +628,21 @@ public final class SnowSimulation {
      * @param life   ticks the grains last at most
      */
     public void lift(double x, double y, double z, float vx, float vy, float vz, float spread, int count, float life) {
+        lift(x, y, z, vx, vy, vz, spread, count, life, 0.3F);
+    }
+
+    /** As {@link #lift}, with the share of soft puffs among the grains. */
+    public void lift(double x, double y, double z, float vx, float vy, float vz, float spread, int count, float life, float puffShare) {
         int room = settings.powderGrains - flakes.count(Flakes.POWDER);
         for (int n = 0; n < Math.min(count, room); n++) {
             int i = flakes.add(Flakes.POWDER, x + random.signed() * 0.3, y + random.next() * 0.15, z + random.signed() * 0.3);
             if (i < 0) {
                 return;
             }
-            flakes.size[i] = random.range(0.6F, 1.6F);
-            flakes.shape[i] = random.next() < 0.25F ? Flakes.PUFF : Flakes.GRAIN;
+            flakes.size[i] = random.range(1.0F, 2.4F);
+            flakes.shape[i] = random.next() < puffShare ? Flakes.PUFF : Flakes.GRAIN;
             if (flakes.shape[i] == Flakes.PUFF) {
-                flakes.size[i] *= 3.0F;
+                flakes.size[i] *= random.range(3.0F, 6.0F);
             }
             flakes.fall[i] = random.range(0.012F, 0.032F);
             flakes.sway[i] = random.range(0.002F, 0.008F);
@@ -610,14 +735,21 @@ public final class SnowSimulation {
         if (!settings.powder) {
             return;
         }
+        float total = 0.0F;
         for (SnowCover.Blown column : blown) {
             double dx = column.x() - x;
             double dz = column.z() - z;
             double distance = Math.max(0.3, Math.sqrt(dx * dx + dz * dz));
-            float out = strength * 0.5F * (float) (1.0 - Math.min(1.0, distance / (radius * 1.5)));
-            int count = Math.min(220, 4 + Math.round(column.amount() * 1100.0F));
-            lift(column.x(), column.y(), column.z(), (float) (dx / distance) * out, 0.12F + strength * 0.45F, (float) (dz / distance) * out,
-                    0.06F + strength * 0.12F, count, 220.0F);
+            float out = strength * 0.55F * (float) (1.0 - Math.min(1.0, distance / (radius * 1.5)));
+            int count = Math.min(500, 24 + Math.round(column.amount() * 3500.0F));
+            lift(column.x(), column.y(), column.z(), (float) (dx / distance) * out, 0.14F + strength * 0.5F, (float) (dz / distance) * out,
+                    0.07F + strength * 0.14F, count, 260.0F, 0.4F);
+            total += column.amount();
+        }
+        if (total > 0.01F) {
+            // The heart of the burst: a billowing cloud of snow dust over the blast that hangs a while and drifts off.
+            lift(x, y, z, 0.0F, 0.1F + strength * 0.25F, 0.0F, 0.16F + strength * 0.2F, Math.min(400, 60 + Math.round(total * 600.0F)),
+                    320.0F, 0.85F);
         }
     }
 

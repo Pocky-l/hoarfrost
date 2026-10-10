@@ -29,35 +29,34 @@ public final class Wind {
     /** Direction in radians: the course plus a wander of up to ~40 degrees in a storm, ~15 in calm snow. */
     public static float angle(double time, float gustiness) {
         float slow = (Noise.value(time / 1100.0, WANDER_SEED) - 0.5F) * 2.0F;
-        float quick = (Noise.value(time / 230.0, WANDER_SEED + 1) - 0.5F) * 2.0F;
-        return course(time) + slow * (0.25F + 0.35F * gustiness) + quick * 0.12F * gustiness;
+        float quick = (Noise.value(time / 420.0, WANDER_SEED + 1) - 0.5F) * 2.0F;
+        return course(time) + slow * (0.25F + 0.35F * gustiness) + quick * 0.05F * gustiness;
     }
 
     /** Mean speed in blocks per tick for a snowfall whose base wind is {@code base}: swells and slackens over minutes. */
     public static float speed(double time, float base, float gustiness) {
         float swell = Noise.value(time / 1600.0, SWELL_SEED);
-        float breath = Noise.value(time / 300.0, SWELL_SEED + 1);
+        float breath = Noise.value(time / 500.0, SWELL_SEED + 1);
         return base * (0.6F + 0.65F * swell + gustiness * 0.35F * (breath - 0.5F));
     }
 
     /**
      * The gust factor around 1 at a point: above 1 in a gust, below in a lull. The pattern is fixed to the moving air
-     * (shifted by the drift), stretched across the wind, so fronts of gusts roll past from upwind.
+     * (shifted by the drift), so gusts roll past from upwind.
      *
      * @param driftX how far the wind has carried the air
-     * @param dirX   unit direction of the wind
      */
-    public static float gust(double x, double z, double driftX, double driftZ, float dirX, float dirZ, float gustiness) {
+    public static float gust(double x, double z, double driftX, double driftZ, float gustiness) {
         if (gustiness <= 0.0F) {
             return 1.0F;
         }
+        // The pattern only moves with the air: tied to the drift, not to the direction (turning it around a far origin
+        // would sweep the gusts across the land).
         double rx = x - driftX;
         double rz = z - driftZ;
-        double along = rx * dirX + rz * dirZ;
-        double across = rz * dirX - rx * dirZ;
-        float big = Noise.value(along / 52.0, across / 44.0, GUST_SEED) - 0.5F;
-        float small = Noise.value(along / 16.0, across / 15.0, GUST_SEED + 1) - 0.5F;
-        float g = 1.0F + gustiness * 0.85F * (big * 2.2F + small * 0.9F);
+        float big = Noise.value(rx / 48.0, rz / 48.0, GUST_SEED) - 0.5F;
+        float small = Noise.value(rx / 22.0, rz / 22.0, GUST_SEED + 1) - 0.5F;
+        float g = 1.0F + gustiness * 0.85F * (big * 2.2F + small * 0.55F);
         return Math.clamp(g, 0.12F, 2.4F);
     }
 }

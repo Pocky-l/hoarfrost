@@ -5,6 +5,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LightLayer;
 
 import com.pockyl.hoarfrost.weather.Noise;
 import com.pockyl.hoarfrost.weather.SnowConditions;
@@ -29,7 +30,6 @@ public final class SnowCover {
     public static final float RATE = 3.0E-5F;
     /** Melting per tick in warm land and near lamps. */
     private static final float MELT = 6.0E-5F;
-    private static final float LAMP_MELT = 4.0E-4F;
     /** Ticks between two updates of a chunk. */
     public static final int INTERVAL = 20;
     /** Share of the natural depth already lying on cold ground seen for the first time. */
@@ -106,7 +106,8 @@ public final class SnowCover {
             float before = chunk.depth[e];
             float after = before;
             if ((f & CoverChunk.LIT) != 0) {
-                after = Math.max(0.0F, before - LAMP_MELT * ticks);
+                // Gone at once around a lamp: melting slowly through the thin, patchy stage would flicker.
+                after = 0.0F;
             } else if ((f & CoverChunk.COLD) == 0) {
                 after = Math.max(0.0F, before - MELT * ticks * (1.0F + weather.snow));
             } else if (fall > 0.0F) {
@@ -267,10 +268,11 @@ public final class SnowCover {
 
     /**
      * Checks again where snow falls and stays on one chunk (with seasons, temperate land turns cold in winter and warm in
-     * spring). Call for a few chunks now and then.
+     * spring) and where lamps melt it (light spreads a moment after a lamp is placed). Call for a few chunks now and then.
      */
     public void refreshClimate(Level level, CoverChunk chunk, BiPredicate<Level, BlockPos> cold) {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        boolean changed = false;
         for (int e = 0; e < CoverChunk.ENTRIES; e++) {
             float b = chunk.base[e];
             if (Float.isNaN(b)) {
@@ -279,7 +281,45 @@ public final class SnowCover {
             int column = e % CoverChunk.COLUMNS;
             pos.set(chunk.x * 16 + (column & 15), Mth.floor(b + 0.02F), chunk.z * 16 + (column >> 4));
             chunk.setCold(e, cold.test(level, pos));
+            int block = level.getBrightness(LightLayer.BLOCK, pos);
+            changed |= chunk.setLight(e, block);
         }
+        if (changed) {
+            chunk.touched();
+        }
+    }
+
+    /**
+     * A vanilla snow layer grew or shrank (vanilla snowfall adds them all the time): only that column's surface moves,
+     * the snow on it keeping the height it reached, instead of surveying the land again.
+     *
+     * @param newBase the height of the top of what now lies there
+     * @return whether a surface was moved
+     */
+    public boolean snowLayerChanged(int x, int z, float newBase) {
+        CoverChunk chunk = chunkAt(x, z);
+        if (chunk == null || !chunk.surveyed) {
+            return false;
+        }
+        int column = CoverChunk.index(x, z);
+        int best = -1;
+        float bestDistance = 1.01F;
+        for (int s = 0; s < CoverChunk.SURFACES; s++) {
+            int e = s * CoverChunk.COLUMNS + column;
+            float b = chunk.base[e];
+            if (!Float.isNaN(b) && Math.abs(b - newBase) < bestDistance) {
+                bestDistance = Math.abs(b - newBase);
+                best = e;
+            }
+        }
+        if (best < 0) {
+            return false;
+        }
+        float top = chunk.base[best] + chunk.depth[best];
+        chunk.base[best] = newBase;
+        chunk.depth[best] = Math.max(0.0F, top - newBase);
+        chunk.touched();
+        return true;
     }
 
     /** Blocks changed around a column: the land is surveyed again wherever the change can matter (the lee reaches far). */

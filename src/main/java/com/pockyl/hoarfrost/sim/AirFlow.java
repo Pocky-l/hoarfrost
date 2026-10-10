@@ -35,6 +35,8 @@ public final class AirFlow {
     private static final int SHADOW_REACH = 12;
     /** Ticks between refreshes of the land grid. */
     private static final int REFRESH = 20;
+    /** Ticks over which the air glides into the fields of a turned wind. */
+    private static final float BLEND_TICKS = 40.0F;
     // The eddy grid: cells of EDDY_CELL blocks around the centre.
     private static final int EDDY_CELL = 4;
     private static final int EDDY_HALF_XZ = 9;
@@ -53,6 +55,11 @@ public final class AirFlow {
     /** Rise of the land across the wind (to the left of it): the air is pushed the other way. */
     private final float[] side = new float[SIZE * SIZE];
     private final float[] smooth = new float[SIZE * SIZE];
+    // The fields before the wind last turned: the air glides from them to the new ones instead of jumping.
+    private final float[] previousShadow = new float[SIZE * SIZE];
+    private final float[] previousSlope = new float[SIZE * SIZE];
+    private final float[] previousSide = new float[SIZE * SIZE];
+    private float blend = 1.0F;
     /** Whether snow falls on a column (sampled per 4x4 blocks). */
     private final boolean[] snowy = new boolean[(SIZE / 4) * (SIZE / 4)];
     private final float[] eddies = new float[EDDY_X * EDDY_Y * EDDY_X * 3];
@@ -104,11 +111,28 @@ public final class AirFlow {
         int cz = Mth.floor(centerZ);
         sinceRefresh++;
         boolean moved = originX == Integer.MIN_VALUE || Math.abs(cx - HALF - originX) > 8 || Math.abs(cz - HALF - originZ) > 8;
-        boolean turned = Float.isNaN(gridDirX) || gridDirX * weather.windDirX + gridDirZ * weather.windDirZ < 0.996F;
+        // Small steps of the wind's direction, each faded in over two seconds: the air turns, it does not jump.
+        boolean turned = Float.isNaN(gridDirX) || gridDirX * weather.windDirX + gridDirZ * weather.windDirZ < 0.9995F;
+        blend = Math.min(1.0F, blend + 1.0F / BLEND_TICKS);
         if (moved || turned || sinceRefresh >= REFRESH) {
             boolean heights = moved || sinceRefresh >= REFRESH;
             sinceRefresh = 0;
+            if (moved) {
+                blend = 1.0F;
+            } else {
+                for (int i = 0; i < SIZE * SIZE; i++) {
+                    previousShadow[i] += (shadow[i] - previousShadow[i]) * blend;
+                    previousSlope[i] += (slope[i] - previousSlope[i]) * blend;
+                    previousSide[i] += (side[i] - previousSide[i]) * blend;
+                }
+                blend = 0.0F;
+            }
             refresh(level, moved ? cx - HALF : originX, moved ? cz - HALF : originZ, heights, cold);
+            if (moved) {
+                System.arraycopy(shadow, 0, previousShadow, 0, SIZE * SIZE);
+                System.arraycopy(slope, 0, previousSlope, 0, SIZE * SIZE);
+                System.arraycopy(side, 0, previousSide, 0, SIZE * SIZE);
+            }
         }
         updateEddies(centerX, centerY, centerZ);
         for (int i = blasts.size() - 1; i >= 0; i--) {
@@ -275,37 +299,41 @@ public final class AirFlow {
         float vx;
         float vy = 0.0F;
         float vz;
-        int i = index(x, z);
-        if (i < 0) {
+        if (!covers(x, z)) {
             vx = dirX * speed;
             vz = dirZ * speed;
         } else {
-            float above = (float) (y - heightBlocking[i]);
+            // Every field is interpolated between column centres, so the air changes smoothly from block to block.
+            prepare(x, z);
+            float top = lerp(heightBlocking);
+            float above = (float) (y - top);
             float factor;
             if (above < 0.0F) {
                 // Under a crown, a roof or in a cave: only a little of the wind gets in.
-                boolean canopy = y >= heightGround[i];
-                factor = canopy ? 0.3F : 0.18F;
+                boolean canopy = y >= lerp(heightGround);
+                factor = canopy ? 0.26F : 0.18F;
             } else {
                 factor = Math.clamp((float) Math.log1p(above / 0.35F) / LOG_TOP, 0.18F, 1.0F);
             }
             float back = 0.0F;
-            float sheltered = (float) (shadow[i] - y);
+            float sheltered = (float) (blended(shadow, previousShadow) - y);
             if (sheltered > 0.0F) {
-                float s = Math.min(1.0F, sheltered / 1.5F);
-                s = s * s * (3.0F - 2.0F * s);
+                float s = smoothstep(0.0F, 1.5F, sheltered);
                 factor *= 1.0F - 0.78F * s;
                 // The eddy behind the obstacle rolls back towards it near the ground.
-                back = 0.22F * s * (above < 2.0F ? 1.0F : 0.5F);
+                back = 0.22F * s * (1.0F - 0.5F * smoothstep(1.0F, 3.0F, above));
             }
             float horizontal = speed * (factor - back);
             vx = dirX * horizontal;
             vz = dirZ * horizontal;
-            if (above > -0.5F) {
+            float near = smoothstep(-1.0F, 0.0F, above);
+            if (near > 0.0F) {
+                float lift = (float) Math.exp(-Math.max(above, 0.0F) / 2.5F);
                 // Up the windward side, down the lee.
-                vy += speed * Math.clamp(slope[i], -1.5F, 2.0F) * 0.55F * (float) Math.exp(-Math.max(above, 0.0F) / 2.5F);
+                vy += speed * Math.clamp(blended(slope, previousSlope), -1.5F, 2.0F) * 0.55F * lift * near;
                 // Aside around obstacles.
-                float push = -Math.clamp(side[i], -2.0F, 2.0F) * speed * 0.3F * (float) Math.exp(-Math.max(above, 0.0F) / 3.0F);
+                float push = -Math.clamp(blended(side, previousSide), -2.0F, 2.0F) * speed * 0.3F
+                        * (float) Math.exp(-Math.max(above, 0.0F) / 3.0F) * near;
                 vx += -dirZ * push;
                 vz += dirX * push;
             }
@@ -354,6 +382,45 @@ public final class AirFlow {
         out[0] = vx;
         out[1] = vy;
         out[2] = vz;
+    }
+
+    // Bilinear interpolation between the centres of the four nearest columns, set up by prepare().
+    private int lerpIndex;
+    private float lerpX;
+    private float lerpZ;
+
+    private void prepare(double x, double z) {
+        float fx = Math.clamp((float) (x - originX - 0.5), 0.0F, SIZE - 1.001F);
+        float fz = Math.clamp((float) (z - originZ - 0.5), 0.0F, SIZE - 1.001F);
+        int gx = (int) fx;
+        int gz = (int) fz;
+        lerpIndex = gz * SIZE + gx;
+        lerpX = fx - gx;
+        lerpZ = fz - gz;
+    }
+
+    private float lerp(int[] field) {
+        int i = lerpIndex;
+        float a = field[i] + (field[i + 1] - field[i]) * lerpX;
+        float b = field[i + SIZE] + (field[i + SIZE + 1] - field[i + SIZE]) * lerpX;
+        return a + (b - a) * lerpZ;
+    }
+
+    private float lerp(float[] field) {
+        int i = lerpIndex;
+        float a = field[i] + (field[i + 1] - field[i]) * lerpX;
+        float b = field[i + SIZE] + (field[i + SIZE + 1] - field[i + SIZE]) * lerpX;
+        return a + (b - a) * lerpZ;
+    }
+
+    private float blended(float[] field, float[] previous) {
+        float now = lerp(field);
+        return blend >= 1.0F ? now : lerp(previous) + (now - lerp(previous)) * blend;
+    }
+
+    private static float smoothstep(float from, float to, float value) {
+        float t = Math.clamp((value - from) / (to - from), 0.0F, 1.0F);
+        return t * t * (3.0F - 2.0F * t);
     }
 
     /** Eddy vector at a point (each component about -1..1), interpolated in the eddy grid. */

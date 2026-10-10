@@ -1,6 +1,7 @@
 package com.pockyl.hoarfrost.client;
 
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -20,5 +21,7 @@ public final class HoarfrostClient {
         modBus.addListener((ModConfigEvent.Reloading event) -> SnowClient.onConfigChanged());
         // A restarted sound engine has a new OpenAL context: the filter must be made again.
         modBus.addListener((SoundEngineLoadEvent event) -> Hush.reset());
+        // Last, so the leaves' colours of other mods are wrapped too.
+        modBus.addListener(EventPriority.LOWEST, LeafFrost::onRegisterColors);
     }
 }

@@ -2,9 +2,9 @@
 
 Usage: python tools/make_textures.py   (from the mod folder; needs numpy and pillow)
 
-* textures/fx/flakes.png: a strip of 16 sprites of 64x64 (10 used), white with the shape in the alpha channel:
+* textures/fx/flakes.png: a strip of 16 sprites of 64x64 (11 used), white with the shape in the alpha channel:
   speck, round flake, two six-armed crystals, two fluffy clumps of crystals, grain, puff of powder, motion streak and an
-  out-of-focus disc.
+  out-of-focus disc; and a cloud of snow, shaded lighter on top.
 * textures/block/snow_cover.png: fresh snow, 64x64 for 4x4 blocks (16 pixels per block like vanilla), tiling seamlessly.
   Its alpha holds soft noise between 0.52 and 1: the renderer scales it by how deep the snow is, and the cutout shader
   drops what falls below one half, so thin snow becomes a dusting with gaps of an organic shape.
@@ -155,6 +155,21 @@ def bokeh():
     return np.clip(disc * 0.5 + rim * 0.2, 0, 1)
 
 
+def veil(rng):
+    """A cloud of snow: soft billowing lobes, lit from above (brighter top, a cooler grey below) for a sense of volume."""
+    x, y = grid()
+    a = np.zeros_like(x)
+    for _ in range(14):
+        cx, cy = rng.uniform(-14, 14), rng.uniform(-9, 9)
+        a += gaussian(rng.uniform(6, 11), x, y, cx, cy) * rng.uniform(0.5, 1.0)
+    edge = 1.0 - smoothstep(16.0, 31.0, np.hypot(x, y * 1.15))
+    billows = periodic_noise(rng, 4) * 0.5 + periodic_noise(rng, 8) * 0.35 + periodic_noise(rng, 16) * 0.15
+    a = np.clip(a / a.max(), 0, 1) * edge * (0.25 + 0.95 * billows)
+    a = np.clip(a * 1.3, 0, 1)
+    shade = 0.86 + 0.14 * np.clip(0.5 - y / 40.0, 0, 1)
+    return a * 0.85, shade
+
+
 def flakes():
     rng = np.random.default_rng(1203)
     sprites = [speck(), round_flake(rng), crystal(rng), plate_star(rng), clump(rng), clump(rng), grain(rng), puff(rng), streak(), bokeh()]
@@ -162,6 +177,10 @@ def flakes():
     sheet[..., 0:3] = 255
     for i, alpha in enumerate(sprites):
         sheet[:, i * S:(i + 1) * S, 3] = np.round(np.clip(alpha, 0, 1) * 255).astype(np.uint8)
+    cloud, shade = veil(rng)
+    sheet[:, 10 * S:11 * S, 3] = np.round(np.clip(cloud, 0, 1) * 255).astype(np.uint8)
+    for c, tone in enumerate((1.0, 1.0, 1.03)):
+        sheet[:, 10 * S:11 * S, c] = np.round(np.clip(shade * tone, 0, 1) * 255).astype(np.uint8)
     path = os.path.join(OUT, "fx", "flakes.png")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     Image.fromarray(sheet, "RGBA").save(path, optimize=True)
@@ -191,9 +210,10 @@ def snow_cover():
     shade = periodic_noise(rng, 4) * 0.6 + periodic_noise(rng, 16) * 0.4
     grain_noise = rng.uniform(-1, 1, (S, S))
     image = np.zeros((S, S, 4), dtype=np.float64)
-    base = np.array([243.0, 246.0, 251.0])
+    # Neutral and bright: the game tints it to the colour of the vanilla snow texture in use.
+    base = np.array([250.0, 250.0, 250.0])
     for c in range(3):
-        image[..., c] = base[c] - 5.0 * (shade - 0.5) * (1.3 if c < 2 else 0.7) + 1.6 * grain_noise
+        image[..., c] = base[c] - 5.0 * (shade - 0.5) + 1.6 * grain_noise
     # A few sparkling crystals.
     sparkle = rng.uniform(0, 1, (S, S)) > 0.985
     image[sparkle, 0:3] = 255.0
@@ -205,9 +225,34 @@ def snow_cover():
     Image.fromarray(out, "RGBA").save(path, optimize=True)
 
 
+def snow_leaves():
+    """Snow caught in foliage, for the sides of leaves: clumps and specks, thicker towards the top.
+
+    Alpha 0 where there is no snow; elsewhere 0.52..1, the higher the earlier the clump shows as snow builds up.
+    """
+    size = 16
+    rng = np.random.default_rng(31)
+    # Clumps of two by two pixels, with single specks between them.
+    lattice = np.kron(rng.uniform(0, 1, (size // 2, size // 2)), np.ones((2, 2)))
+    y = np.arange(size)[:, None] / (size - 1)
+    top_bias = 1.0 - 0.75 * y
+    blob = lattice * 0.6 + rng.uniform(0, 1, (size, size)) * 0.4
+    score = blob * top_bias
+    image = np.zeros((size, size, 4), dtype=np.uint8)
+    image[..., 0:3] = 250
+    alpha = np.where(score > 0.22, 0.52 + 0.48 * np.clip((score - 0.22) / 0.6, 0, 1), 0.0)
+    # The upper edge is a rim of snow lying on the leaves.
+    alpha[0, :] = np.maximum(alpha[0, :], 0.95)
+    alpha[1, :] = np.maximum(alpha[1, :], np.where(rng.uniform(0, 1, size) > 0.3, 0.8, 0.0))
+    image[..., 3] = np.round(alpha * 255).astype(np.uint8)
+    path = os.path.join(OUT, "block", "snow_leaves.png")
+    Image.fromarray(image, "RGBA").save(path, optimize=True)
+
+
 def main():
     flakes()
     snow_cover()
+    snow_leaves()
 
 
 if __name__ == "__main__":

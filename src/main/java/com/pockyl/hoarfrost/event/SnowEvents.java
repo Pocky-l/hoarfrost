@@ -3,15 +3,18 @@ package com.pockyl.hoarfrost.event;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.pockyl.hoarfrost.Config;
 import com.pockyl.hoarfrost.Hoarfrost;
+import com.pockyl.hoarfrost.compat.Climate;
 import com.pockyl.hoarfrost.network.SnowSyncPayload;
 import com.pockyl.hoarfrost.weather.SnowConditions;
 import com.pockyl.hoarfrost.weather.SnowData;
@@ -29,6 +32,7 @@ public final class SnowEvents {
     private static final float DRIFT_WIND = 0.15F;
     private static final int DRIFT_RANGE = 40;
     private static final float DRIFT_ATTEMPTS = 8.0F;
+    private static final double SNOWY_THUNDER_RANGE = 192.0;
     private static final Map<ServerLevel, SnowKind> LAST_SENT = new WeakHashMap<>();
     private static final Map<ServerLevel, SnowConditions> WIND = new WeakHashMap<>();
 
@@ -50,6 +54,25 @@ public final class SnowEvents {
         }
         if (kind != null && Config.value(Config.DRIFTS)) {
             buildDrifts(level, wind(level, kind));
+        }
+    }
+
+    /**
+     * No thunderstorm where it snows: natural lightning near a player in snowy land does not strike (a thunderstorm in
+     * snowy land is a blizzard). Bolts with a cause (tridents) and bolts far from snow are left alone.
+     */
+    @SubscribeEvent
+    public static void onEntityJoin(EntityJoinLevelEvent event) {
+        if (!(event.getEntity() instanceof LightningBolt bolt) || bolt.getCause() != null
+                || !(event.getLevel() instanceof ServerLevel level) || !level.isRaining()) {
+            return;
+        }
+        for (ServerPlayer player : level.players()) {
+            if (player.distanceToSqr(bolt) < SNOWY_THUNDER_RANGE * SNOWY_THUNDER_RANGE
+                    && Climate.snowsAt(level, player.blockPosition().above())) {
+                event.setCanceled(true);
+                return;
+            }
         }
     }
 

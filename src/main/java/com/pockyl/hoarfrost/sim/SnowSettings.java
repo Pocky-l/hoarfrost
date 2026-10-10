@@ -15,6 +15,8 @@ public final class SnowSettings {
     public float farRadius = 72.0F;
     /** Light flakes in the stream rushing past the face in storms. */
     public int streamFlakes = 7000;
+    /** Most clouds of snow drifting over the land in a storm. */
+    public int clouds = 260;
     /** Most grains of powder lifted from the snow at once. */
     public int powderGrains = 6000;
     /** Multiplier for the number of flakes. */

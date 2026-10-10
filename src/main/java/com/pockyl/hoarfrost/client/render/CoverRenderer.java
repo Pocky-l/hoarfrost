@@ -1,5 +1,6 @@
 package com.pockyl.hoarfrost.client.render;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.shaders.Uniform;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -20,13 +21,18 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 
+import com.pockyl.hoarfrost.ClientConfig;
 import com.pockyl.hoarfrost.Hoarfrost;
+import com.pockyl.hoarfrost.client.FarSnow;
 import com.pockyl.hoarfrost.client.compat.ShaderPacks;
 import com.pockyl.hoarfrost.sim.CoverChunk;
 import com.pockyl.hoarfrost.sim.CoverSurvey;
@@ -80,15 +86,25 @@ public final class CoverRenderer implements AutoCloseable {
     /** Snow this much above the top of a step buries it, and the snow surface runs smoothly over it. */
     private static final float BURIED = 0.08F;
     private static final long REBUILD_BUDGET_NANOS = 2_500_000L;
-    private static final double NEAR = 28.0;
-    private static final double MIDDLE = 64.0;
+    private static final double NEAR = 40.0;
+    private static final double MIDDLE = 80.0;
     private static final double HYSTERESIS = 6.0;
     /** Direction of the soft light that shapes the snow surface (from above, a little from the side). */
     private static final float LIGHT_X = -0.32F;
     private static final float LIGHT_Y = 0.9F;
     private static final float LIGHT_Z = -0.28F;
+    /** How much of the light a flat surface faces. */
+    private static final float FLAT_LIGHT = LIGHT_Y / (float) Math.sqrt(LIGHT_X * LIGHT_X + LIGHT_Y * LIGHT_Y + LIGHT_Z * LIGHT_Z);
+    /** Brightness of the sides of the snow, like the sides of vanilla blocks. */
+    private static final float SIDE_SHADE = 0.82F;
+    private static final ResourceLocation VANILLA_SNOW = ResourceLocation.withDefaultNamespace("block/snow");
+    private static final ResourceLocation LEAF_SNOW = Hoarfrost.id("block/snow_leaves");
+    /** Leaves this far below the top of a crown can hold snow. */
+    private static final int LEAF_DEPTH = 8;
+    private static final float LEAF_SHADE = 0.94F;
 
     private final SnowCover cover;
+    private final FarSnowRenderer far;
     private final Long2ObjectOpenHashMap<Mesh> meshes = new Long2ObjectOpenHashMap<>();
     private final List<Mesh> dirty = new ArrayList<>();
     private final ByteBufferBuilder bytes = new ByteBufferBuilder(1 << 18);
@@ -97,6 +113,15 @@ public final class CoverRenderer implements AutoCloseable {
     private float u1;
     private float v1;
     private boolean shaderPack;
+    // Multiplier that makes our snow texture the colour of the vanilla snow texture in use (resource packs included).
+    private float tintR = 1.0F;
+    private float tintG = 1.0F;
+    private float tintB = 1.0F;
+    private TextureAtlasSprite tintedFrom;
+    private float leafU0;
+    private float leafU1;
+    private float leafV0;
+    private float leafV1;
     private int lastQuads;
 
     // Scratch for building: the 3x3 neighbourhood of a column and the vertex grid of a block.
@@ -127,8 +152,9 @@ public final class CoverRenderer implements AutoCloseable {
     private float minY;
     private float maxY;
 
-    public CoverRenderer(SnowCover cover) {
+    public CoverRenderer(SnowCover cover, FarSnow far) {
         this.cover = cover;
+        this.far = new FarSnowRenderer(far);
     }
 
     /** A static GPU mesh of one chunk. */
@@ -185,6 +211,7 @@ public final class CoverRenderer implements AutoCloseable {
         }
         collect(cam, radius);
         rebuild();
+        far.update(this, cam, this::owns);
 
         COVER.setupRenderState();
         ShaderInstance shader = RenderSystem.getShader();
@@ -208,6 +235,7 @@ public final class CoverRenderer implements AutoCloseable {
             mesh.buffer.draw();
             drawn += mesh.quads;
         }
+        drawn += far.draw(cam, frustum, offset);
         lastQuads = drawn;
         if (offset != null) {
             offset.set(0.0F, 0.0F, 0.0F);
@@ -224,6 +252,49 @@ public final class CoverRenderer implements AutoCloseable {
         v0 = sprite.getV0();
         u1 = sprite.getU1();
         v1 = sprite.getV1();
+        TextureAtlasSprite leaf = atlas.getSprite(LEAF_SNOW);
+        leafU0 = leaf.getU0();
+        leafU1 = leaf.getU1();
+        leafV0 = leaf.getV0();
+        leafV1 = leaf.getV1();
+        TextureAtlasSprite vanilla = atlas.getSprite(VANILLA_SNOW);
+        if (vanilla != tintedFrom) {
+            // Resources were (re)loaded: match the colour again and rebuild.
+            tintedFrom = vanilla;
+            float[] ours = average(sprite);
+            float[] theirs = average(vanilla);
+            tintR = Math.min(1.0F, theirs[0] / ours[0]);
+            tintG = Math.min(1.0F, theirs[1] / ours[1]);
+            tintB = Math.min(1.0F, theirs[2] / ours[2]);
+            closeAll();
+        }
+    }
+
+    /** Mean colour of a sprite's opaque pixels, 0..1 per channel. */
+    private static float[] average(TextureAtlasSprite sprite) {
+        NativeImage image = sprite.contents().getOriginalImage();
+        double r = 0.0;
+        double g = 0.0;
+        double b = 0.0;
+        int n = 0;
+        int width = sprite.contents().width();
+        int height = sprite.contents().height();
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int abgr = image.getPixelRGBA(x, y);
+                if ((abgr >>> 24) < 128) {
+                    continue;
+                }
+                r += abgr & 0xFF;
+                g += abgr >> 8 & 0xFF;
+                b += abgr >> 16 & 0xFF;
+                n++;
+            }
+        }
+        if (n == 0) {
+            return new float[] {1.0F, 1.0F, 1.0F};
+        }
+        return new float[] {(float) (r / n / 255.0), (float) (g / n / 255.0), (float) (b / n / 255.0)};
     }
 
     private void collect(Vec3 cam, double radius) {
@@ -306,6 +377,22 @@ public final class CoverRenderer implements AutoCloseable {
             mesh.close();
         }
         meshes.clear();
+        far.invalidate();
+    }
+
+    /** Whether the detailed snow draws a chunk (the distant snow leaves it out). */
+    private boolean owns(int chunkX, int chunkZ) {
+        Mesh mesh = meshes.get(ChunkPos.asLong(chunkX, chunkZ));
+        return mesh != null && mesh.builtRevision != Integer.MIN_VALUE;
+    }
+
+    /** Texture coordinates of the snow texture at a block and a fraction across it. */
+    float u(int blockX, float fraction) {
+        return u0 + (u1 - u0) / TEXTURE_BLOCKS * (Math.floorMod(blockX, TEXTURE_BLOCKS) + fraction);
+    }
+
+    float v(int blockZ, float fraction) {
+        return v0 + (v1 - v0) / TEXTURE_BLOCKS * (Math.floorMod(blockZ, TEXTURE_BLOCKS) + fraction);
     }
 
     // ------------------------------------------------------------------------------------------------------------
@@ -352,6 +439,9 @@ public final class CoverRenderer implements AutoCloseable {
                 }
             }
         }
+        if (mesh.detail > 1 && ClientConfig.SNOWY_LEAVES.get()) {
+            leafSnow(builder, chunk, mesh.originY);
+        }
         MeshData data = builder.build();
         if (data == null) {
             mesh.empty = true;
@@ -367,6 +457,109 @@ public final class CoverRenderer implements AutoCloseable {
         mesh.quads = quads;
         mesh.bounds = new AABB(mesh.originX, mesh.originY + minY - 0.1, mesh.originZ, mesh.originX + 16.0, mesh.originY + maxY + 0.1,
                 mesh.originZ + 16.0);
+    }
+
+    /**
+     * Snow caught in the foliage of crowns under snow: a layer of clumps over the open sides of the leaves, thickest at the
+     * top of the crown and thinning out lower down, as much as lies on the crown.
+     */
+    private void leafSnow(BufferBuilder builder, CoverChunk chunk, double originY) {
+        ClientLevel world = Minecraft.getInstance().level;
+        if (world == null) {
+            return;
+        }
+        float lu0 = leafU0;
+        float lu1 = leafU1;
+        float lv0 = leafV0;
+        float lv1 = leafV1;
+        int color = tint(LEAF_SHADE);
+        for (int column = 0; column < CoverChunk.COLUMNS; column++) {
+            if (!chunk.has(CoverChunk.TOP, column) || (chunk.flags(CoverChunk.TOP, column) & CoverChunk.LEAVES) == 0) {
+                continue;
+            }
+            float amount = Math.clamp(chunk.depth(CoverChunk.TOP, column) / 0.12F, 0.0F, 1.0F);
+            if (amount < 0.05F) {
+                continue;
+            }
+            int light = chunk.light(CoverChunk.TOP, column);
+            int packed = (light >> 4 & 0xF) * 16 | (light >> 20 & 0xF) * 16 << 16;
+            int lx = column & 15;
+            int lz = column >> 4;
+            int x = chunk.x * 16 + lx;
+            int z = chunk.z * 16 + lz;
+            int top = (int) Math.floor(chunk.base(CoverChunk.TOP, column)) - 1;
+            for (int k = 0; k < LEAF_DEPTH; k++) {
+                int y = top - k;
+                probe.set(x, y, z);
+                BlockState state = world.getBlockState(probe);
+                if (!state.is(BlockTags.LEAVES)) {
+                    if (state.isSolidRender(world, probe)) {
+                        break;
+                    }
+                    continue;
+                }
+                float share = amount * (1.0F - k * 0.12F);
+                if (share < 0.06F) {
+                    break;
+                }
+                int alpha = (int) ((0.5F + 0.42F * share) * 255.0F) << 24;
+                float y0 = (float) (y - originY);
+                float y1 = y0 + 1.0F;
+                for (Direction side : Direction.Plane.HORIZONTAL) {
+                    probe.set(x + side.getStepX(), y, z + side.getStepZ());
+                    BlockState next = world.getBlockState(probe);
+                    if (next.is(BlockTags.LEAVES) || next.isSolidRender(world, probe)) {
+                        continue;
+                    }
+                    leafFace(builder, side, lx, lz, y0, y1, alpha | color, packed, lu0, lu1, lv0, lv1);
+                }
+            }
+        }
+    }
+
+    /** One side of a leaves block, a hair outside it, counter-clockwise seen from outside. */
+    private void leafFace(BufferBuilder builder, Direction side, float lx, float lz, float y0, float y1, int color, int light, float u0,
+            float u1, float v0, float v1) {
+        float e = 0.004F;
+        float nx = side.getStepX();
+        float nz = side.getStepZ();
+        float xa;
+        float za;
+        float xb;
+        float zb;
+        switch (side) {
+            case WEST -> {
+                xa = lx - e;
+                xb = lx - e;
+                za = lz;
+                zb = lz + 1.0F;
+            }
+            case EAST -> {
+                xa = lx + 1.0F + e;
+                xb = lx + 1.0F + e;
+                za = lz + 1.0F;
+                zb = lz;
+            }
+            case NORTH -> {
+                xa = lx + 1.0F;
+                xb = lx;
+                za = lz - e;
+                zb = lz - e;
+            }
+            default -> {
+                xa = lx;
+                xb = lx + 1.0F;
+                za = lz + 1.0F + e;
+                zb = lz + 1.0F + e;
+            }
+        }
+        builder.addVertex(xa, y0, za, color, u0, v1, OverlayTexture.NO_OVERLAY, light, nx, 0.0F, nz);
+        builder.addVertex(xb, y0, zb, color, u1, v1, OverlayTexture.NO_OVERLAY, light, nx, 0.0F, nz);
+        builder.addVertex(xb, y1, zb, color, u1, v0, OverlayTexture.NO_OVERLAY, light, nx, 0.0F, nz);
+        builder.addVertex(xa, y1, za, color, u0, v0, OverlayTexture.NO_OVERLAY, light, nx, 0.0F, nz);
+        minY = Math.min(minY, y0);
+        maxY = Math.max(maxY, y1);
+        quads++;
     }
 
     private void gatherDents(CoverChunk chunk, boolean near) {
@@ -616,17 +809,21 @@ public final class CoverRenderer implements AutoCloseable {
         float nx = gridNx[g];
         float ny = gridNy[g];
         float nz = gridNz[g];
-        float lit = Math.max(0.0F, (nx * LIGHT_X + ny * LIGHT_Y + nz * LIGHT_Z) / 0.987F);
-        // Soft shading: snow facing away from the light is a little darker and bluer, like snow in its own shadow.
-        float shade = 0.8F + 0.2F * lit;
-        float trodden = 1.0F - 0.08F * packed;
-        int r = (int) (247.0F * shade * trodden);
-        int gr = (int) (250.0F * shade * trodden);
-        int b = (int) (255.0F * Math.min(1.0F, shade * 1.04F) * (1.0F - 0.04F * packed));
+        float lit = Math.max(0.0F, (nx * LIGHT_X + ny * LIGHT_Y + nz * LIGHT_Z) / FLAT_LIGHT);
+        // Flat snow is as bright as the top of a vanilla snow block; slopes facing away from the light a little darker.
+        float shade = Math.min(1.0F, 0.8F + 0.2F * lit) * (1.0F - 0.08F * packed);
         int alpha = (int) (gridAlpha[g] * 255.0F);
-        builder.addVertex(x, y, z, alpha << 24 | r << 16 | gr << 8 | b, u, v, OverlayTexture.NO_OVERLAY, gridLight[g], nx, ny, nz);
+        builder.addVertex(x, y, z, alpha << 24 | tint(shade), u, v, OverlayTexture.NO_OVERLAY, gridLight[g], nx, ny, nz);
         minY = Math.min(minY, y);
         maxY = Math.max(maxY, y);
+    }
+
+    /** The snow colour at a brightness, as RGB. */
+    int tint(float shade) {
+        int r = Math.min(255, (int) (tintR * shade * 255.0F));
+        int g = Math.min(255, (int) (tintG * shade * 255.0F));
+        int b = Math.min(255, (int) (tintB * shade * 255.0F));
+        return r << 16 | g << 8 | b;
     }
 
     /**
@@ -655,8 +852,8 @@ public final class CoverRenderer implements AutoCloseable {
             float vTopB = va + texV * Math.min(1.0F, yb - bottom);
             int alphaA = (int) (gridAlpha[ga] * 255.0F);
             int alphaB = (int) (gridAlpha[gb] * 255.0F);
-            int colorA = alphaA << 24 | 0xDCE2EC;
-            int colorB = alphaB << 24 | 0xDCE2EC;
+            int colorA = alphaA << 24 | tint(SIDE_SHADE);
+            int colorB = alphaB << 24 | tint(SIDE_SHADE);
             int lightA = gridLight[ga];
             int lightB = gridLight[gb];
             // Counter-clockwise seen from outside: which end comes first depends on the side.
@@ -754,7 +951,7 @@ public final class CoverRenderer implements AutoCloseable {
             float za = alongX ? ez : ez + k * step;
             float xb = alongX ? xa + step : ex;
             float zb = alongX ? ez : za + step;
-            int color = 0xFFDCE2EC;
+            int color = 0xFF000000 | tint(SIDE_SHADE);
             int light = gridLight[ga];
             float ua = u0 + texU * k * step;
             float ub = ua + texU * step;
@@ -779,6 +976,7 @@ public final class CoverRenderer implements AutoCloseable {
     @Override
     public void close() {
         closeAll();
+        far.close();
         bytes.close();
     }
 }

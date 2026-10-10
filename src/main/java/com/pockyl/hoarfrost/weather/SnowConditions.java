@@ -33,6 +33,7 @@ public final class SnowConditions {
     public float turbulence;
     public float visibility;
     public float stream;
+    public float clouds;
     public float accumulation;
     public float hush;
     public float breeze;
@@ -65,6 +66,7 @@ public final class SnowConditions {
         turbulence = mix(turbulence, kind.turbulence, step);
         visibility = mix(visibility, kind.visibility, step);
         stream = mix(stream, kind.stream, step);
+        clouds = mix(clouds, kind.clouds, step);
         accumulation = mix(accumulation, kind.accumulation, step);
         hush = mix(hush, kind.hush, step);
         breeze = mix(breeze, kind.breeze, step);
@@ -104,7 +106,7 @@ public final class SnowConditions {
 
     /** The gust factor at a point: see {@link Wind#gust}. */
     public float gustAt(double x, double z) {
-        return Wind.gust(x, z, driftX, driftZ, windDirX, windDirZ, gustiness);
+        return Wind.gust(x, z, driftX, driftZ, gustiness);
     }
 
     private static float mix(float from, float to, float step) {

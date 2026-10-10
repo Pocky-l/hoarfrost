@@ -59,5 +59,8 @@
   "hoarfrost.configuration.sound": "Звук",
   "hoarfrost.configuration.windVolume": "Громкость ветра",
   "hoarfrost.configuration.hush": "Тишина снегопада",
-  "hoarfrost.configuration.snowSteps": "Хруст шагов по снегу"
+  "hoarfrost.configuration.snowSteps": "Хруст шагов по снегу",
+  "hoarfrost.configuration.clouds": "Снежные облака в метель",
+  "hoarfrost.configuration.distantCover": "Снег на дальней земле",
+  "hoarfrost.configuration.snowyLeaves": "Заснеженная листва"
 }

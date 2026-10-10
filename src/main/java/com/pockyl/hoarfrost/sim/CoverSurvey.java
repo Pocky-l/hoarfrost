@@ -5,6 +5,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
@@ -180,6 +181,11 @@ public final class CoverSurvey {
         if (topY < level.getMinBuildHeight()) {
             return;
         }
+        // A thin vanilla snow layer does not count in the heightmap: the snow lies on top of it, not through it.
+        pos.set(x, topY + 1, z);
+        if (level.getBlockState(pos).getBlock() instanceof SnowLayerBlock) {
+            topY++;
+        }
         pos.set(x, topY, z);
         BlockState state = level.getBlockState(pos);
         if (surface(level, state, topY, top)) {
@@ -219,7 +225,8 @@ public final class CoverSurvey {
 
     /** Air, plants, torches: nothing snow lies on or that stops it. */
     private boolean open(Level level, BlockState state) {
-        return state.getCollisionShape(level, pos).isEmpty() && state.getFluidState().isEmpty() && !state.is(BlockTags.LEAVES);
+        return state.getCollisionShape(level, pos).isEmpty() && state.getFluidState().isEmpty() && !state.is(BlockTags.LEAVES)
+                && !(state.getBlock() instanceof SnowLayerBlock);
     }
 
     /** Sets up the surface of the block at {@code y} in window slot {@code w}; false when snow cannot lie on it. */
@@ -269,7 +276,8 @@ public final class CoverSurvey {
     private void finishSurface(Level level, int x, int z, int w, BiPredicate<Level, BlockPos> cold) {
         probe.set(x, (int) Math.floor(base[w] + 0.02F), z);
         int block = level.getBrightness(LightLayer.BLOCK, probe);
-        int sky = level.getBrightness(LightLayer.SKY, probe);
+        // The top surface is under the open sky; the client may not have lit new chunks yet, which would draw it black.
+        int sky = w < WINDOW * WINDOW ? 15 : level.getBrightness(LightLayer.SKY, probe);
         light[w] = block << 4 | sky << 20;
         if (block >= 11) {
             flags[w] |= CoverChunk.LIT;

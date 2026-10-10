@@ -29,6 +29,8 @@ snowfall changes character:
 | Blizzard | A howling storm, snow streaming past the face, squalls swallowing the world for a moment. |
 | Heavy blizzard | A whiteout: roaring, howling wind and gusts of snow tearing past. |
 
+- **Volume in storms**: in heavy snow and blizzards, clouds of snow roll low over the land with the wind; squalls sweep
+  past as clouds that swallow the view for a moment.
 - **A living wind.** It turns slowly and wanders, swells in gusts and drops in lulls; gusts are fronts that roll over the
   land from upwind. Near the ground it slows down, it rises over hills and walls, is calm behind them with an eddy rolling
   back, flows around obstacles and only reaches a little way under crowns, roofs and into caves. Rain and snow blow the
@@ -39,7 +41,8 @@ snowfall changes character:
 - **Soft snow on the ground.** Snow settles on the land, roofs, crowns and posts as one smooth surface - no grid, no
   steps: rounded drifts in the lee of walls, trees and hills, fuller hollows, thinner wind-swept ridges and roofs, an even
   layer under crowns, little rounded caps on fence posts, a soft rim at the edge of a roof. Where little snow falls it is
-  a dusting with the ground showing through. Snow blown into a cave mouth or under an overhang settles a few blocks deep
+  a dusting with the ground showing through. Crowns of trees hold snow on top and in their foliage, and distant land and
+  trees stay white out to the render distance. The colour follows the vanilla snow texture (and resource packs). Snow blown into a cave mouth or under an overhang settles a few blocks deep
   and fades - it never runs down a tunnel. It sits on top of vanilla snow layers, melts near lamps and in warm land, and
   stays where it lay when you come back.
 - **Snow has physics.** A wind charge or an explosion bursts the air outwards, flinging falling flakes aside, and blows the
@@ -47,6 +50,7 @@ snowfall changes character:
   off exposed snow and send it skimming along the ground; running feet kick it up; a landing throws up a puff.
 - **Footprints** as plain soft dents; trodden paths get packed. Fresh snow fills them again.
 - **Real drifts** (server): in windy snowfall, snow layers pile up in the lee of walls and trees.
+- **No thunderstorms in snow**: no lightning, flashes or thunder over snowy land.
 - **Sky and haze**: a snowy sky is soft and bright instead of the dark grey of rain (thunder does not turn it dirty grey);
   falling snow closes in the view with a cool blue-grey haze of the sky's brightness, thicker in gusts. None of it
   reaches indoors or underground.
@@ -80,8 +84,8 @@ Nothing to craft: the mod has no items.
 In the mod list (Mods > Hoarfrost > Config) or in the config files:
 
 - `hoarfrost-client.toml`: quality preset (flake counts, how far snow is simulated and drawn), snowfall on/off,
-  flake density, snow in the distance, the stream of flakes in storms, snow on the ground, footprints, powder, haze,
-  bright snowy sky, wind volume, hush, snow footsteps.
+  flake density, snow in the distance, clouds of snow in storms, the stream of flakes in storms, snow on the ground, snow
+  on distant land, snowy leaves, footprints, powder, haze, bright snowy sky, wind volume, hush, snow footsteps.
 - `hoarfrost-server.toml` (per world): chances of each kind of snow, thunderstorms as blizzards, following Serene Seasons,
   drifts (on/off, highest drift, growth speed).
 

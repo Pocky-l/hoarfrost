@@ -8,7 +8,8 @@ import java.util.Arrays;
  *   <li>{@link #NEAR} flakes around the camera, moved by the air and stopped by the land;</li>
  *   <li>{@link #FAR} flakes in the middle distance, which only fall and drift with the wind;</li>
  *   <li>{@link #STREAM} light flakes rushing past the face in heavy snow and blizzards;</li>
- *   <li>{@link #POWDER} grains of snow lifted off the ground by the wind, blasts and feet, which fall back slowly.</li>
+ *   <li>{@link #POWDER} grains of snow lifted off the ground by the wind, blasts and feet, which fall back slowly;</li>
+ *   <li>{@link #CLOUD} clouds of snow rolling over the land in heavy snow and storms.</li>
  * </ul>
  */
 public final class Flakes {
@@ -17,7 +18,9 @@ public final class Flakes {
     public static final byte FAR = 2;
     public static final byte STREAM = 3;
     public static final byte POWDER = 4;
-    private static final int KINDS = 5;
+    /** A cloud of snow drifting low over the land in a storm; its size is in blocks. */
+    public static final byte CLOUD = 5;
+    private static final int KINDS = 6;
 
     // Shapes, one per sprite of the flake texture.
     public static final byte SPECK = 0;
@@ -28,6 +31,7 @@ public final class Flakes {
     public static final byte CLUMP_ALT = 5;
     public static final byte GRAIN = 6;
     public static final byte PUFF = 7;
+    public static final byte VEIL = 10;
 
     public final int capacity;
     public final double[] x;
@@ -45,6 +49,8 @@ public final class Flakes {
     public final float[] alpha;
     /** Ticks left; negative = no limit. */
     public final float[] life;
+    /** The whole life of something that fades in and out over it. */
+    public final float[] span;
     /** Terminal fall speed. */
     public final float[] fall;
     /** Sway: phase, its speed and the amplitude. */
@@ -77,6 +83,7 @@ public final class Flakes {
         size = new float[capacity];
         alpha = new float[capacity];
         life = new float[capacity];
+        span = new float[capacity];
         fall = new float[capacity];
         phase = new float[capacity];
         sway = new float[capacity];

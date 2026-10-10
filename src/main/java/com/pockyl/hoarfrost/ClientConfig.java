@@ -8,10 +8,10 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 public final class ClientConfig {
     /** Budgets that scale with the hardware. Individual options below multiply on top of these. */
     public enum Quality {
-        LOW(3000, 18.0F, 4000, 48.0F, 2500, 2000, 48.0F, 2),
-        MEDIUM(6000, 22.0F, 7000, 60.0F, 6000, 4000, 64.0F, 2),
-        HIGH(9000, 24.0F, 10000, 72.0F, 9000, 6000, 80.0F, 3),
-        ULTRA(13000, 28.0F, 16000, 72.0F, 13000, 9000, 112.0F, 4);
+        LOW(3000, 18.0F, 4000, 48.0F, 2500, 4000, 48.0F, 2),
+        MEDIUM(6000, 22.0F, 7000, 60.0F, 6000, 8000, 64.0F, 2),
+        HIGH(9000, 24.0F, 10000, 72.0F, 9000, 12000, 80.0F, 3),
+        ULTRA(13000, 28.0F, 16000, 72.0F, 13000, 18000, 112.0F, 4);
 
         /** Simulated flakes around the camera and how far out they go. */
         public final int nearFlakes;
@@ -65,6 +65,10 @@ public final class ClientConfig {
             .comment("Snow falling in the middle distance, beyond the simulated flakes.")
             .translation(key("distant"))
             .define("distant", true);
+    public static final ModConfigSpec.BooleanValue CLOUDS = BUILDER
+            .comment("In heavy snow and blizzards, clouds of snow roll low over the land with the wind and the squalls.")
+            .translation(key("clouds"))
+            .define("clouds", true);
     public static final ModConfigSpec.BooleanValue STREAM = BUILDER
             .comment("In heavy snow and blizzards, a dense stream of light flakes rushes past the face.")
             .translation(key("stream"))
@@ -80,6 +84,14 @@ public final class ClientConfig {
                     + "ridges, a little under crowns and in cave mouths. Melts near lamps and in warm land.")
             .translation(key("cover"))
             .define("cover", true);
+    public static final ModConfigSpec.BooleanValue DISTANT_COVER = BUILDER
+            .comment("Snow lies on distant land out to the render distance, and on the crowns of trees there (simplified).")
+            .translation(key("distantCover"))
+            .define("distant", true);
+    public static final ModConfigSpec.BooleanValue SNOWY_LEAVES = BUILDER
+            .comment("Leaves under snow look frosted.")
+            .translation(key("snowyLeaves"))
+            .define("snowyLeaves", true);
     public static final ModConfigSpec.BooleanValue FOOTPRINTS = BUILDER
             .comment("Feet press dents into the snow and pack paths.")
             .translation(key("footprints"))

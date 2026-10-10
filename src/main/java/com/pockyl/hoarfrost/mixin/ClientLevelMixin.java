@@ -16,13 +16,20 @@ import com.pockyl.hoarfrost.client.render.SnowSky;
 /**
  * Block changes the client sees (the snow on the ground follows what is built and dug; NeoForge has no client-side block
  * change event), and the sky under snow clouds: vanilla darkens it for any precipitation like for rain, a snowy sky is
- * bright and milky. The return values are adjusted (chainable), not replaced.
+ * bright and milky, and no lightning flashes over snowy land. The return values are adjusted (chainable), not replaced.
  */
 @Mixin(ClientLevel.class)
 abstract class ClientLevelMixin {
     @Inject(method = "sendBlockUpdated", at = @At("HEAD"))
     private void hoarfrost$blockChanged(BlockPos pos, BlockState oldState, BlockState newState, int flags, CallbackInfo ci) {
         SnowClient.onBlockChanged((ClientLevel) (Object) this, pos, oldState, newState);
+    }
+
+    @Inject(method = "setSkyFlashTime", at = @At("HEAD"), cancellable = true)
+    private void hoarfrost$noFlashInSnow(int time, CallbackInfo ci) {
+        if (SnowClient.snowyAround()) {
+            ci.cancel();
+        }
     }
 
     @ModifyReturnValue(method = "getSkyColor", at = @At("RETURN"))

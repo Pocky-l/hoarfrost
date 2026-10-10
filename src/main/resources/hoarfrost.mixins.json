@@ -4,6 +4,7 @@
   "package": "com.pockyl.hoarfrost.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "BlockColorsAccessor",
     "ChannelAccessor",
     "ClientLevelMixin",
     "ClientPacketListenerMixin",

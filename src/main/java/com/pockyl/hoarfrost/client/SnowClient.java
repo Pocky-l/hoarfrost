@@ -18,7 +18,9 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.FogType;
@@ -35,6 +37,7 @@ import net.neoforged.neoforge.client.event.ViewportEvent;
 import net.neoforged.neoforge.client.event.sound.PlaySoundEvent;
 import net.neoforged.neoforge.client.event.sound.PlaySoundSourceEvent;
 import net.neoforged.neoforge.client.event.sound.PlayStreamingSourceEvent;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 
 import com.pockyl.hoarfrost.ClientConfig;
 import com.pockyl.hoarfrost.Hoarfrost;
@@ -79,6 +82,9 @@ public final class SnowClient {
     private static FlakeRenderer flakeRenderer;
     private static CoverRenderer coverRenderer;
     private static CoverStorage storage;
+    private static final FarSnow FAR = new FarSnow();
+    /** Time per tick for looking at distant land. */
+    private static final long FAR_BUDGET_NANOS = 1_500_000L;
     private static ClientLevel level;
     private static int ticks;
 
@@ -101,7 +107,7 @@ public final class SnowClient {
 
     private static void applyConfig() {
         ClientConfig.Quality quality = ClientConfig.quality();
-        int capacity = SETTINGS.nearFlakes + SETTINGS.farFlakes + SETTINGS.streamFlakes + SETTINGS.powderGrains;
+        int capacity = SETTINGS.nearFlakes + SETTINGS.farFlakes + SETTINGS.streamFlakes + SETTINGS.powderGrains + SETTINGS.clouds;
         boolean hadCover = SETTINGS.cover;
         SETTINGS.nearFlakes = quality.nearFlakes;
         SETTINGS.radius = quality.radius;
@@ -109,6 +115,7 @@ public final class SnowClient {
         SETTINGS.farRadius = quality.farRadius;
         SETTINGS.streamFlakes = ClientConfig.STREAM.get() ? quality.streamFlakes : 0;
         SETTINGS.powderGrains = quality.powderGrains;
+        SETTINGS.clouds = ClientConfig.CLOUDS.get() ? quality.nearFlakes / 35 : 0;
         SETTINGS.coverRadius = quality.coverRadius;
         SETTINGS.surveyBudget = quality.surveyMillis * 1_000_000L;
         SETTINGS.density = ClientConfig.SNOWFALL.get() ? (float) (double) ClientConfig.DENSITY.get() : 0.0F;
@@ -116,7 +123,7 @@ public final class SnowClient {
         SETTINGS.cover = ClientConfig.COVER.get();
         SETTINGS.footprints = ClientConfig.FOOTPRINTS.get();
         SETTINGS.powder = ClientConfig.POWDER.get();
-        if (capacity != SETTINGS.nearFlakes + SETTINGS.farFlakes + SETTINGS.streamFlakes + SETTINGS.powderGrains
+        if (capacity != SETTINGS.nearFlakes + SETTINGS.farFlakes + SETTINGS.streamFlakes + SETTINGS.powderGrains + SETTINGS.clouds
                 || hadCover != SETTINGS.cover) {
             reset();
         }
@@ -151,11 +158,14 @@ public final class SnowClient {
         if (simulation == null) {
             simulation = new SnowSimulation(SETTINGS, ClientWeather.conditions());
             flakeRenderer = new FlakeRenderer();
-            coverRenderer = new CoverRenderer(simulation.cover());
+            coverRenderer = new CoverRenderer(simulation.cover(), FAR);
             storage = new CoverStorage(storageDirectory(minecraft, level));
         }
         if (SETTINGS.cover) {
             updateCoverChunks(camera);
+            if (ClientConfig.DISTANT_COVER.get()) {
+                FAR.tick(level, camera, minecraft.options.getEffectiveRenderDistance(), FAR_BUDGET_NANOS, simulation.cover());
+            }
         }
         feedEntities(camera);
         simulation.tick(level, camera.x, camera.y, camera.z);
@@ -195,6 +205,8 @@ public final class SnowClient {
             flakeRenderer = null;
         }
         simulation = null;
+        FAR.clear();
+        LeafFrost.clear();
         STRIDE.clear();
         LAST_FALL.clear();
     }
@@ -371,6 +383,18 @@ public final class SnowClient {
         if (pos.getY() < top - 48) {
             return;
         }
+        FAR.blockChanged(pos.getX(), pos.getZ());
+        if (oldState.getLightEmission(level, pos) > 0 || newState.getLightEmission(level, pos) > 0) {
+            simulation.lightChanged(pos.getX(), pos.getZ());
+        }
+        boolean oldLayer = oldState.getBlock() instanceof SnowLayerBlock;
+        boolean newLayer = newState.getBlock() instanceof SnowLayerBlock;
+        if ((oldLayer || newLayer) && (oldLayer || oldState.isAir()) && (newLayer || newState.isAir())) {
+            float base = pos.getY() + (newLayer ? newState.getValue(SnowLayerBlock.LAYERS) / 8.0F : 0.0F);
+            if (simulation.cover().snowLayerChanged(pos.getX(), pos.getZ(), base)) {
+                return;
+            }
+        }
         simulation.cover().blockChanged(pos.getX(), pos.getZ());
     }
 
@@ -485,10 +509,27 @@ public final class SnowClient {
         Hush.onSourceReady(event.getSound(), event.getChannel());
     }
 
-    /** Footsteps in snow crunch: a step sound where snow lies is swapped for one of the mod's. */
+    /** Whether snowy land is around the listener: no thunderstorm there. */
+    public static boolean snowyAround() {
+        return hasWeather(level) && ClientWeather.presence() > 0.2F;
+    }
+
+    /** No lightning in snowy land, also on servers without the mod. */
+    @SubscribeEvent
+    public static void onEntityJoin(EntityJoinLevelEvent event) {
+        if (event.getLevel().isClientSide() && event.getEntity() instanceof LightningBolt && snowyAround()) {
+            event.setCanceled(true);
+        }
+    }
+
+    /** Footsteps in snow crunch: a step sound where snow lies is swapped for one of the mod's. No thunder in snowy land. */
     @SubscribeEvent
     public static void onPlaySound(PlaySoundEvent event) {
         SoundInstance sound = event.getSound();
+        if (sound != null && event.getName().startsWith("entity.lightning_bolt.") && snowyAround()) {
+            event.setSound(null);
+            return;
+        }
         if (simulation == null || sound == null || !event.getName().endsWith(".step")) {
             return;
         }

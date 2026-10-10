@@ -59,5 +59,8 @@
   "hoarfrost.configuration.sound": "Sound",
   "hoarfrost.configuration.windVolume": "Wind volume",
   "hoarfrost.configuration.hush": "Hush of falling snow",
-  "hoarfrost.configuration.snowSteps": "Steps crunch in snow"
+  "hoarfrost.configuration.snowSteps": "Steps crunch in snow",
+  "hoarfrost.configuration.clouds": "Clouds of snow in storms",
+  "hoarfrost.configuration.distantCover": "Snow on distant land",
+  "hoarfrost.configuration.snowyLeaves": "Snowy leaves"
 }

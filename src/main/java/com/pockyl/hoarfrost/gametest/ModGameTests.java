@@ -80,7 +80,7 @@ public final class ModGameTests {
         int n = 0;
         for (int x = 0; x < 2000; x += 7) {
             for (int z = 0; z < 2000; z += 11) {
-                sum += Wind.gust(x, z, 0.0, 0.0, 1.0F, 0.0F, 0.8F);
+                sum += Wind.gust(x, z, 0.0, 0.0, 0.8F);
                 n++;
             }
         }
@@ -279,6 +279,36 @@ public final class ModGameTests {
         helper.assertTrue(depth(helper, sim, 18, 6, 18) > 0.02, "snow on the roof");
         helper.assertTrue(depth(helper, sim, 6, 1, 6) > 0.05, "snow outside");
         helper.succeed();
+    }
+
+    @GameTest(template = "arena", skyAccess = true)
+    public static void snowLiesOnVanillaSnowLayersAndMeltsAtLamps(GameTestHelper helper) {
+        floor(helper);
+        for (int x = 10; x < 20; x++) {
+            for (int z = 10; z < 20; z++) {
+                helper.setBlock(new BlockPos(x, 1, z), Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 1 + (x + z) % 2));
+            }
+        }
+        helper.setBlock(new BlockPos(28, 1, 28), Blocks.CAMPFIRE);
+        // The light of the campfire spreads over the next ticks.
+        helper.runAfterDelay(20, () -> {
+            SnowSimulation sim = simulation(helper);
+            calm(sim, SnowKind.SNOW);
+            weather(sim, 40);
+            for (int x = 11; x < 19; x++) {
+                for (int z = 11; z < 19; z++) {
+                    Vec3 at = helper.absoluteVec(new Vec3(x + 0.5, 1.4, z + 0.5));
+                    CoverChunk chunk = sim.cover().chunkAt((int) Math.floor(at.x), (int) Math.floor(at.z));
+                    int column = CoverChunk.index((int) Math.floor(at.x), (int) Math.floor(at.z));
+                    float layer = (1 + (x + z) % 2) / 8.0F;
+                    helper.assertTrue(Math.abs(chunk.base(CoverChunk.TOP, column) - (at.y - 1.4 + 1.0 + layer)) < 1.0E-4,
+                            "the snow lies on the vanilla snow layer at " + x + ", " + z);
+                }
+            }
+            helper.assertTrue(depth(helper, sim, 28, 1, 29) == 0.0, "no snow next to the campfire");
+            helper.assertTrue(depth(helper, sim, 8, 1, 8) > 0.05, "snow away from it");
+            helper.succeed();
+        });
     }
 
     @GameTest(template = "arena", skyAccess = true)
