@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <img alt="Minecraft 1.21.1" src="https://img.shields.io/badge/Minecraft-1.21.1-62B47A">
-  <img alt="NeoForge" src="https://img.shields.io/badge/Loader-NeoForge-F16436">
-  <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-blue">
+  <a href="https://www.minecraft.net"><img alt="Minecraft 1.21.1" src="https://img.shields.io/badge/Minecraft-1.21.1-62B47A"></a>
+  <a href="https://neoforged.net"><img alt="NeoForge" src="https://img.shields.io/badge/Loader-NeoForge-F16436"></a>
+  <a href="LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/License-MIT-blue"></a>
 </p>
 
 ## Features
@@ -58,13 +58,23 @@ snowfall changes character:
 - **Sound**: light snow is silent; snow brings a soft breeze; storms grow from a fresh wind to a roar with a howl around
   every edge, and single gusts rush past from upwind. Indoors the storm is muffled; underground there is nothing. Falling
   snow hushes the world outdoors, and footsteps crunch in powder and squeak on trodden snow.
-- **[Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons)** (optional): snow falls and lies where
-  the season makes it cold - temperate land in winter, melting in spring, none in a warm summer - and deep winter brings
-  heavier snow and blizzards.
-- **[Distant Horizons](https://www.curseforge.com/minecraft/mc-mods/distant-horizons)** (optional): the snowy haze stays
-  when Distant Horizons turns the vanilla fog off and also covers its distant land.
-- Works with Petrichor, Sodium, Iris and shader packs, and Sound Physics Remastered. Everything visual works on any
-  server; with the mod on the server too, all players share the same kind of snow and the server builds drifts.
+
+Everything visual works on any server; with the mod on the server too, all players share the same kind of snow and the
+server builds drifts.
+
+## Compatibility
+
+[![Petrichor: Rain & Storms](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/petrichor.png)](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms) ✅ **[Petrichor: Rain & Storms](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms)** (optional) - Petrichor draws the rain, Hoarfrost the snow, column by column where rainy and snowy land meet; both blow with the same wind.
+
+[![Distant Horizons](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/distant-horizons.png)](https://www.curseforge.com/minecraft/mc-mods/distant-horizons) ✅ **[Distant Horizons](https://www.curseforge.com/minecraft/mc-mods/distant-horizons)** (optional) - the snowy haze stays when Distant Horizons turns the vanilla fog off, and it also covers the distant land, so far mountains fade into a snowstorm instead of standing out sharp.
+
+[![Serene Seasons](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/serene-seasons.png)](https://www.curseforge.com/minecraft/mc-mods/serene-seasons) ✅ **[Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons)** (optional) - snow falls and lies where the season makes it cold: temperate land in winter, melting in spring, none in a warm summer; deep winter brings heavier snow and blizzards.
+
+[![Iris](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/iris.png)](https://modrinth.com/mod/iris) ✅ **[Iris](https://modrinth.com/mod/iris)** (shader packs) - flakes are drawn through the pack's weather program and the snow on the ground with the pack's terrain, so they take on its look and lighting.
+
+[![Sodium](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sodium.png)](https://modrinth.com/mod/sodium) ✅ **[Sodium](https://modrinth.com/mod/sodium)** - works, white leaves in snowy biomes included.
+
+[![Sound Physics Remastered](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sound-physics-remastered.png)](https://www.curseforge.com/minecraft/mc-mods/sound-physics-remastered) ✅ **[Sound Physics Remastered](https://www.curseforge.com/minecraft/mc-mods/sound-physics-remastered)** (optional) - the hush of falling snow steps aside and lets Sound Physics do the muffling.
 
 ## Controls
 
@@ -96,7 +106,9 @@ In the mod list (Mods > Hoarfrost > Config) or in the config files:
 
 1. Install [NeoForge](https://neoforged.net) for Minecraft 1.21.1.
 2. Put this mod into the `mods` folder (client; on a server too for shared weather and drifts).
-3. Optional: [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons) for seasonal snow.
+3. Optional: [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons) for seasonal snow,
+   [Petrichor](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms) for the rain,
+   [Distant Horizons](https://www.curseforge.com/minecraft/mc-mods/distant-horizons) for distant land.
 
 ## Building
 
