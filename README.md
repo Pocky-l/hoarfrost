@@ -9,6 +9,7 @@
 </p>
 
 <p align="center">
+  <a href="https://www.curseforge.com/minecraft/mc-mods/hoarfrost-snow-blizzards"><img alt="CurseForge downloads" src="https://img.shields.io/curseforge/dt/1736975?logo=curseforge&label=CurseForge&color=F16436"></a>
   <a href="https://www.minecraft.net"><img alt="Minecraft 1.21.1" src="https://img.shields.io/badge/Minecraft-1.21.1-62B47A"></a>
   <a href="https://neoforged.net"><img alt="NeoForge" src="https://img.shields.io/badge/Loader-NeoForge-F16436"></a>
   <a href="LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/License-MIT-blue"></a>
