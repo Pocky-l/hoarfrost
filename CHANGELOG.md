@@ -18,8 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   posts, soft rims, a dusting where little falls, snow blown a few blocks into cave mouths; melts near lamps and in
   warm land; saved per world.
 - Powder blown up by wind charges, explosions, gusts, running and landings, settling slowly.
-- Clouds of snow rolling over the land in heavy snow and blizzards.
-- Snow on distant land out to the render distance; snow on and in the crowns of trees.
+- Clouds of snow and driving snow dust in heavy snow and blizzards; whiteouts in heavy blizzards.
+- Snow on distant land out to the render distance; snow on crowns and white leaves under snow.
 - No lightning or thunder over snowy land.
 - Footprints as soft dents, packed paths.
 - Real snow layer drifts built by the server in windy snowfall.

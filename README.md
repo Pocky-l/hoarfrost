@@ -29,8 +29,8 @@ snowfall changes character:
 | Blizzard | A howling storm, snow streaming past the face, squalls swallowing the world for a moment. |
 | Heavy blizzard | A whiteout: roaring, howling wind and gusts of snow tearing past. |
 
-- **Volume in storms**: in heavy snow and blizzards, clouds of snow roll low over the land with the wind; squalls sweep
-  past as clouds that swallow the view for a moment.
+- **Volume in storms**: in heavy snow and blizzards, clouds of snow roll low over the land with the wind, the air is
+  full of driving snow dust, and squalls swallow the view; in a heavy blizzard one sees only a few blocks.
 - **A living wind.** It turns slowly and wanders, swells in gusts and drops in lulls; gusts are fronts that roll over the
   land from upwind. Near the ground it slows down, it rises over hills and walls, is calm behind them with an eddy rolling
   back, flows around obstacles and only reaches a little way under crowns, roofs and into caves. Rain and snow blow the
@@ -41,7 +41,7 @@ snowfall changes character:
 - **Soft snow on the ground.** Snow settles on the land, roofs, crowns and posts as one smooth surface - no grid, no
   steps: rounded drifts in the lee of walls, trees and hills, fuller hollows, thinner wind-swept ridges and roofs, an even
   layer under crowns, little rounded caps on fence posts, a soft rim at the edge of a roof. Where little snow falls it is
-  a dusting with the ground showing through. Crowns of trees hold snow on top and in their foliage, and distant land and
+  a dusting with the ground showing through. Crowns of trees hold snow on top and their leaves turn white (as in Bedrock Edition), and distant land and
   trees stay white out to the render distance. The colour follows the vanilla snow texture (and resource packs). Snow blown into a cave mouth or under an overhang settles a few blocks deep
   and fades - it never runs down a tunnel. It sits on top of vanilla snow layers, melts near lamps and in warm land, and
   stays where it lay when you come back.

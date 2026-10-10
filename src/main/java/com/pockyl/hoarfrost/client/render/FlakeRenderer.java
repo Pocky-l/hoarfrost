@@ -121,7 +121,7 @@ public final class FlakeRenderer implements AutoCloseable {
                     case Flakes.STREAM -> 0.7F;
                     case Flakes.POWDER -> flakes.shape[i] == Flakes.PUFF ? 0.42F : 0.9F;
                     // A cloud is thin where you stand in it: it only shows as a cloud from a little way off.
-                    case Flakes.CLOUD -> 0.3F * smoothstep(flakes.size[i] * 0.3F, flakes.size[i] * 1.1F, distance);
+                    case Flakes.CLOUD -> 0.55F * smoothstep(flakes.size[i] * 0.25F, flakes.size[i] * 1.0F, distance);
                     default -> 0.92F;
                 };
                 int sprite = flakes.shape[i];

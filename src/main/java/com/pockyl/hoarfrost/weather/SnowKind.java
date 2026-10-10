@@ -21,7 +21,7 @@ public enum SnowKind {
             .sound(0.14F, 0.0F, 0.0F, 0.0F, 0.0F)),
     // Heavy snow: the air full of flakes, the land fading into white, a breeze with soft gusts.
     HEAVY_SNOW(new Builder().density(0.78F).size(1.7F, 3.4F).shapes(0.1F, 0.25F, 0.0F).fall(0.052F).flutter(0.018F)
-            .wind(0.095F, 0.4F, 0.5F).visibility(64.0F).clouds(0.35F).stream(0.25F).accumulation(1.9F).hush(0.85F)
+            .wind(0.095F, 0.4F, 0.5F).visibility(48.0F).clouds(0.4F).stream(0.25F).accumulation(1.9F).hush(0.85F)
             .sound(0.22F, 0.1F, 0.0F, 0.0F, 0.15F)),
     // Heavy snow with large flakes: big fluffy clumps tumbling down slowly through calm air, the deepest hush.
     HEAVY_LARGE_FLAKES(new Builder().density(0.6F).size(3.2F, 7.0F).shapes(0.1F, 0.75F, 0.0F).fall(0.034F).flutter(0.03F)
@@ -29,15 +29,15 @@ public enum SnowKind {
             .sound(0.07F, 0.0F, 0.0F, 0.0F, 0.0F)),
     // Light blizzard: fine snow driven by a fresh wind, gusts rolling over the land.
     LIGHT_BLIZZARD(new Builder().density(0.62F).size(1.1F, 2.2F).shapes(0.0F, 0.05F, 0.35F).fall(0.065F).flutter(0.012F)
-            .wind(0.32F, 0.65F, 0.7F).visibility(72.0F).clouds(0.55F).stream(0.55F).accumulation(1.2F).hush(0.3F)
+            .wind(0.32F, 0.65F, 0.7F).visibility(42.0F).clouds(0.75F).stream(0.55F).accumulation(1.2F).hush(0.3F)
             .sound(0.15F, 0.45F, 0.1F, 0.0F, 0.5F)),
     // Blizzard: a howling storm, snow streaming past, squalls swallowing the world for a moment.
     BLIZZARD(new Builder().density(0.85F).size(1.0F, 2.0F).shapes(0.0F, 0.0F, 0.5F).fall(0.075F).flutter(0.01F)
-            .wind(0.55F, 0.8F, 0.85F).visibility(38.0F).clouds(0.85F).stream(0.85F).accumulation(1.5F).hush(0.15F)
+            .wind(0.55F, 0.8F, 0.85F).visibility(20.0F).clouds(1.0F).stream(0.85F).accumulation(1.5F).hush(0.15F)
             .sound(0.05F, 0.3F, 0.7F, 0.25F, 0.8F)),
     // Heavy blizzard: a whiteout, the wind roaring and howling, gusts of snow tearing past.
     HEAVY_BLIZZARD(new Builder().density(1.0F).size(0.9F, 1.9F).shapes(0.0F, 0.0F, 0.6F).fall(0.085F).flutter(0.008F)
-            .wind(0.85F, 1.0F, 1.0F).visibility(18.0F).clouds(1.0F).stream(1.0F).accumulation(1.7F).hush(0.05F)
+            .wind(0.85F, 1.0F, 1.0F).visibility(9.0F).clouds(1.0F).stream(1.0F).accumulation(1.7F).hush(0.05F)
             .sound(0.0F, 0.2F, 0.95F, 0.5F, 1.0F));
 
     private static final SnowKind[] VALUES = values();

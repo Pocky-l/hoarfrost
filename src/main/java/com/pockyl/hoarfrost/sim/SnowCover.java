@@ -290,8 +290,8 @@ public final class SnowCover {
     }
 
     /**
-     * A vanilla snow layer grew or shrank (vanilla snowfall adds them all the time): only that column's surface moves,
-     * the snow on it keeping the height it reached, instead of surveying the land again.
+     * A vanilla snow layer grew or shrank (vanilla snowfall adds them all the time): only that column's surface moves
+     * instead of surveying the land again.
      *
      * @param newBase the height of the top of what now lies there
      * @return whether a surface was moved
@@ -304,6 +304,7 @@ public final class SnowCover {
         int column = CoverChunk.index(x, z);
         int best = -1;
         float bestDistance = 1.01F;
+        // A layer added or melted moves the surface by an eighth of a block; anything else is not this column's snow.
         for (int s = 0; s < CoverChunk.SURFACES; s++) {
             int e = s * CoverChunk.COLUMNS + column;
             float b = chunk.base[e];
@@ -316,8 +317,10 @@ public final class SnowCover {
             return false;
         }
         float top = chunk.base[best] + chunk.depth[best];
+        boolean dug = newBase < chunk.base[best] - 0.01F;
         chunk.base[best] = newBase;
-        chunk.depth[best] = Math.max(0.0F, top - newBase);
+        // A layer added by a snowfall goes under the snow, which keeps its height; snow dug away is gone with the layer.
+        chunk.depth[best] = dug ? 0.0F : Math.max(0.0F, top - newBase);
         chunk.touched();
         return true;
     }

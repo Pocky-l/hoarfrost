@@ -34,9 +34,13 @@ public final class SnowSimulation {
     private static final float NEAR_ABOVE = 18.0F;
     private static final float FAR_BELOW = 24.0F;
     private static final float FAR_ABOVE = 36.0F;
+    /** Most a flake's speed changes in a tick, in blocks per tick (blasts throw powder much faster, then the air slows it). */
+    private static final float MAX_ACCELERATION = 0.025F;
+    /** Snow dust of a storm comes in within this distance of the camera. */
+    private static final float GALE_RADIUS = 18.0F;
     /** Clouds of snow drift between these distances from the camera. */
-    private static final float CLOUD_NEAR = 6.0F;
-    private static final float CLOUD_FAR = 56.0F;
+    private static final float CLOUD_NEAR = 3.0F;
+    private static final float CLOUD_FAR = 48.0F;
     /** Ticks between two chunks having their climate checked again. */
     private static final int CLIMATE_INTERVAL = 5;
 
@@ -174,6 +178,7 @@ public final class SnowSimulation {
         spawnFar();
         spawnStream();
         spawnClouds(level);
+        gale();
         if (settings.powder && settings.cover) {
             spindrift();
         }
@@ -288,7 +293,7 @@ public final class SnowSimulation {
                 case Flakes.GRAIN -> 0.3F;
                 default -> 0.2F;
             };
-            if (!fly(level, i, response, 1.0F)) {
+            if (!fly(level, i, response, 1.0F, true)) {
                 flakes.remove(i);
                 continue;
             }
@@ -312,7 +317,7 @@ public final class SnowSimulation {
      * Moves a flake or grain one tick through the air: it follows the air with a delay ({@code response} per tick), falls
      * at its own speed, sways. Returns false when it hit the land.
      */
-    private boolean fly(Level level, int i, float response, float swayScale) {
+    private boolean fly(Level level, int i, float response, float swayScale, boolean inertia) {
         flakes.prevX[i] = flakes.x[i];
         flakes.prevY[i] = flakes.y[i];
         flakes.prevZ[i] = flakes.z[i];
@@ -321,9 +326,20 @@ public final class SnowSimulation {
         double y = flakes.y[i];
         double z = flakes.z[i];
         air.sample(x, y, z, scratch);
-        flakes.vx[i] += (scratch[0] - flakes.vx[i]) * response;
-        flakes.vy[i] += (scratch[1] - flakes.fall[i] - flakes.vy[i]) * response;
-        flakes.vz[i] += (scratch[2] - flakes.vz[i]) * response;
+        // A flake has inertia: however the air changes around it, its own speed changes only so fast, so it never jerks.
+        float ax = (scratch[0] - flakes.vx[i]) * response;
+        float ay = (scratch[1] - flakes.fall[i] - flakes.vy[i]) * response;
+        float az = (scratch[2] - flakes.vz[i]) * response;
+        float change = (float) Math.sqrt(ax * ax + ay * ay + az * az);
+        if (inertia && change > MAX_ACCELERATION) {
+            float k = MAX_ACCELERATION / change;
+            ax *= k;
+            ay *= k;
+            az *= k;
+        }
+        flakes.vx[i] += ax;
+        flakes.vy[i] += ay;
+        flakes.vz[i] += az;
         float phase = flakes.phase[i] + flakes.swing[i];
         flakes.phase[i] = phase;
         float sway = flakes.sway[i] * swayScale;
@@ -545,7 +561,7 @@ public final class SnowSimulation {
     private void spawnClouds(Level level) {
         int target = Math.min(settings.clouds, Math.round(settings.clouds * weather.clouds * weather.snow * settings.density));
         int missing = target - flakes.count(Flakes.CLOUD);
-        for (int attempt = 0; attempt < Math.min(missing, 6) * 3 && missing > 0; attempt++) {
+        for (int attempt = 0; attempt < Math.min(missing, 12) * 3 && missing > 0; attempt++) {
             float angle = random.next() * Mth.TWO_PI;
             float r = (float) Math.sqrt(Mth.lerp(random.next(), CLOUD_NEAR * CLOUD_NEAR, CLOUD_FAR * CLOUD_FAR));
             double x = camX + Mth.cos(angle) * r;
@@ -560,7 +576,7 @@ public final class SnowSimulation {
             if (i < 0) {
                 return;
             }
-            flakes.size[i] = random.range(3.0F, 8.5F) * (0.7F + 0.3F * Math.min(1.0F, height / 3.0F));
+            flakes.size[i] = random.range(4.0F, 11.0F) * (0.7F + 0.3F * Math.min(1.0F, height / 3.0F));
             flakes.shape[i] = Flakes.VEIL;
             flakes.life[i] = random.range(160.0F, 380.0F);
             flakes.span[i] = flakes.life[i];
@@ -622,6 +638,40 @@ public final class SnowSimulation {
     // ------------------------------------------------------------------------------------------------------------
 
     /**
+     * In a storm the air is full of snow dust driven by the wind: grains and soft puffs come in from upwind all around the
+     * camera, close to the ground and higher up, and stream past with the gusts.
+     */
+    private void gale() {
+        float strength = weather.stream * weather.snow * settings.density;
+        if (strength <= 0.01F || !air.snowy(camX, camZ)) {
+            return;
+        }
+        int target = Math.round(settings.powderGrains * 0.6F * Math.min(1.0F, strength));
+        int missing = target - flakes.count(Flakes.POWDER);
+        int budget = Math.min(missing, Math.max(10, target / 40));
+        for (int n = 0; n < budget / 6; n++) {
+            // Mostly upwind of the camera, so the dust blows through the view.
+            double x = camX - weather.windDirX * random.range(0.0F, GALE_RADIUS) + random.signed() * GALE_RADIUS;
+            double z = camZ - weather.windDirZ * random.range(0.0F, GALE_RADIUS) + random.signed() * GALE_RADIUS;
+            int top = air.top(x, z);
+            if (top == Integer.MIN_VALUE || !air.snowy(x, z)) {
+                continue;
+            }
+            float height = 0.2F + 7.0F * random.next() * random.next();
+            double y = top + height;
+            if (y < camY - 10.0 || y > camY + 12.0) {
+                continue;
+            }
+            float gust = weather.gustAt(x, z);
+            if (random.next() > Math.clamp(gust * gust / 1.4F, 0.25F, 1.0F)) {
+                continue;
+            }
+            air.sample(x, y, z, scratch);
+            lift(x, y, z, scratch[0], scratch[1] + 0.01F, scratch[2], 0.04F, 6, random.range(50.0F, 130.0F), 0.3F);
+        }
+    }
+
+    /**
      * Throws up grains of powder.
      *
      * @param spread random part of the velocity
@@ -668,7 +718,7 @@ public final class SnowSimulation {
             flakes.vx[i] += random.signed() * 0.003F;
             flakes.vy[i] += random.signed() * 0.002F;
             flakes.vz[i] += random.signed() * 0.003F;
-            boolean airborne = fly(level, i, 0.14F, 1.0F);
+            boolean airborne = fly(level, i, 0.14F, 1.0F, false);
             float life = flakes.life[i] -= 1.0F;
             double dx = flakes.x[i] - camX;
             double dz = flakes.z[i] - camZ;

@@ -115,7 +115,7 @@ public final class SnowClient {
         SETTINGS.farRadius = quality.farRadius;
         SETTINGS.streamFlakes = ClientConfig.STREAM.get() ? quality.streamFlakes : 0;
         SETTINGS.powderGrains = quality.powderGrains;
-        SETTINGS.clouds = ClientConfig.CLOUDS.get() ? quality.nearFlakes / 35 : 0;
+        SETTINGS.clouds = ClientConfig.CLOUDS.get() ? quality.nearFlakes / 15 : 0;
         SETTINGS.coverRadius = quality.coverRadius;
         SETTINGS.surveyBudget = quality.surveyMillis * 1_000_000L;
         SETTINGS.density = ClientConfig.SNOWFALL.get() ? (float) (double) ClientConfig.DENSITY.get() : 0.0F;
@@ -476,7 +476,7 @@ public final class SnowClient {
             return;
         }
         // The haze thickens gradually from just in front of the camera instead of standing as a wall.
-        float newNear = Math.min(event.getNearPlaneDistance(), newFar * (0.18F - 0.14F * k));
+        float newNear = Math.min(event.getNearPlaneDistance(), newFar * (0.18F - 0.16F * k));
         event.setFarPlaneDistance(newFar);
         event.setNearPlaneDistance(Math.max(0.0F, newNear));
         event.setCanceled(true);

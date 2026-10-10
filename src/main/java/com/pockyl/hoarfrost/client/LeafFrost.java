@@ -18,8 +18,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongPredicate;
 
 /**
- * Frost on the crowns of trees: leaves under snow are tinted a cold, pale green - most at the top of the crown, less
- * further down (near the camera the snow caught in the foliage is drawn over them as well, see {@code CoverRenderer}). The leaves' own colour handlers are wrapped, so every tree, modded or not, keeps its colour
+ * White leaves under snow, as in Bedrock Edition: the leaves of snowy crowns lose their green tint (near the camera a
+ * white snowy face is drawn over them as well, see {@code CoverRenderer}, since a tint alone cannot make a dark texture
+ * white). The leaves' own colour handlers are wrapped, so every tree, modded or not, keeps its colour
  * underneath; the frost goes through vanilla block colours and so works with Sodium and shader packs.
  *
  * <p>How much snow lies on each column's crown is kept per chunk in steps; chunk meshes are rebuilt only when a step
@@ -28,9 +29,9 @@ import java.util.function.LongPredicate;
 public final class LeafFrost {
     /** Steps of frost; a change of step rebuilds the chunk's meshes. */
     public static final int STEPS = 4;
-    private static final int FROST = 0xE6EEF2;
+    private static final int FROST = 0xFFFFFF;
     /** Share of the leaf colour the frost takes at the top of a fully snowed crown. */
-    private static final float MOST = 0.45F;
+    private static final float MOST = 1.0F;
 
     /** Per chunk: the frost step and the height of the top of the crown of each column. */
     private static final Map<Long, Entry> CHUNKS = new ConcurrentHashMap<>();
@@ -78,7 +79,7 @@ public final class LeafFrost {
         }
         // Thickest on top of the crown, a sprinkle on the leaves lower down.
         float below = entry.tops[column] - (pos.getY() + 1.0F);
-        float k = MOST * step / STEPS * Math.clamp(1.0F - below * 0.16F, 0.3F, 1.0F);
+        float k = MOST * step / STEPS * Math.clamp(1.0F - below * 0.04F, 0.6F, 1.0F);
         int r = color >> 16 & 0xFF;
         int g = color >> 8 & 0xFF;
         int b = color & 0xFF;

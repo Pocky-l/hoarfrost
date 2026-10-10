@@ -30,6 +30,8 @@ public final class CoverChunk {
     /** Near a lamp: snow melts. */
     public static final byte LIT = 8;
 
+    /** Surfaces that moved by more than this between two surveys lose their snow. */
+    private static final float CARRY_STEP = 0.3F;
     /** Saved data of older layouts is ignored. */
     private static final int DATA_VERSION = 1;
 
@@ -257,9 +259,8 @@ public final class CoverChunk {
     }
 
     /**
-     * After a survey: carries the snow over from the surfaces before by the height its top reached, so a block placed
-     * beside the snow or a vanilla snow layer growing under it does not change how high the snow lies; snow under a
-     * block placed on it is gone.
+     * After a survey: carries the snow over from the surfaces before by the height its top reached, where a surface
+     * moved by a small step at most; snow under a block placed on it is gone, a hole dug out starts bare.
      */
     void carryOver() {
         if (carried == null) {
@@ -284,7 +285,9 @@ public final class CoverChunk {
                         continue;
                     }
                     float distance = Math.abs(oldBase[oe] - base[e]);
-                    if (distance < 1.01F && distance < best && oldTops[oe] > base[e]) {
+                    // Only over a small step (a slab, a carpet): a hole dug into the ground starts bare instead of filling
+                    // with the snow that lay above it.
+                    if (distance <= CARRY_STEP && distance < best && oldTops[oe] > base[e]) {
                         best = distance;
                         depth[e] = oldTops[oe] - base[e];
                         packed[e] = oldPacked[oe];

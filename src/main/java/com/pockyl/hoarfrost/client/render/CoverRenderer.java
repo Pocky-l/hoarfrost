@@ -99,9 +99,10 @@ public final class CoverRenderer implements AutoCloseable {
     private static final float SIDE_SHADE = 0.82F;
     private static final ResourceLocation VANILLA_SNOW = ResourceLocation.withDefaultNamespace("block/snow");
     private static final ResourceLocation LEAF_SNOW = Hoarfrost.id("block/snow_leaves");
-    /** Leaves this far below the top of a crown can hold snow. */
-    private static final int LEAF_DEPTH = 8;
-    private static final float LEAF_SHADE = 0.94F;
+    /** Leaves this far below the top of a crown turn white. */
+    private static final int LEAF_DEPTH = 14;
+    private static final float LEAF_SHADE = 0.9F;
+    private static final Direction[] LEAF_SIDES = {Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, Direction.DOWN};
 
     private final SnowCover cover;
     private final FarSnowRenderer far;
@@ -460,27 +461,24 @@ public final class CoverRenderer implements AutoCloseable {
     }
 
     /**
-     * Snow caught in the foliage of crowns under snow: a layer of clumps over the open sides of the leaves, thickest at the
-     * top of the crown and thinning out lower down, as much as lies on the crown.
+     * Leaves of crowns under snow turn white, as in Bedrock Edition: a white leafy face over every open side and underside
+     * of the leaves down the crown; with little snow only the whitest leaves show.
      */
     private void leafSnow(BufferBuilder builder, CoverChunk chunk, double originY) {
         ClientLevel world = Minecraft.getInstance().level;
         if (world == null) {
             return;
         }
-        float lu0 = leafU0;
-        float lu1 = leafU1;
-        float lv0 = leafV0;
-        float lv1 = leafV1;
         int color = tint(LEAF_SHADE);
         for (int column = 0; column < CoverChunk.COLUMNS; column++) {
             if (!chunk.has(CoverChunk.TOP, column) || (chunk.flags(CoverChunk.TOP, column) & CoverChunk.LEAVES) == 0) {
                 continue;
             }
-            float amount = Math.clamp(chunk.depth(CoverChunk.TOP, column) / 0.12F, 0.0F, 1.0F);
+            float amount = Math.clamp(chunk.depth(CoverChunk.TOP, column) / 0.08F, 0.0F, 1.0F);
             if (amount < 0.05F) {
                 continue;
             }
+            int alpha = (int) ((0.5F + 0.5F * amount) * 255.0F) << 24;
             int light = chunk.light(CoverChunk.TOP, column);
             int packed = (light >> 4 & 0xF) * 16 | (light >> 20 & 0xF) * 16 << 16;
             int lx = column & 15;
@@ -498,66 +496,73 @@ public final class CoverRenderer implements AutoCloseable {
                     }
                     continue;
                 }
-                float share = amount * (1.0F - k * 0.12F);
-                if (share < 0.06F) {
-                    break;
-                }
-                int alpha = (int) ((0.5F + 0.42F * share) * 255.0F) << 24;
                 float y0 = (float) (y - originY);
-                float y1 = y0 + 1.0F;
-                for (Direction side : Direction.Plane.HORIZONTAL) {
-                    probe.set(x + side.getStepX(), y, z + side.getStepZ());
+                for (Direction side : LEAF_SIDES) {
+                    probe.set(x + side.getStepX(), y + side.getStepY(), z + side.getStepZ());
                     BlockState next = world.getBlockState(probe);
                     if (next.is(BlockTags.LEAVES) || next.isSolidRender(world, probe)) {
                         continue;
                     }
-                    leafFace(builder, side, lx, lz, y0, y1, alpha | color, packed, lu0, lu1, lv0, lv1);
+                    leafFace(builder, side, lx, lz, y0, alpha | color, packed);
                 }
             }
         }
     }
 
-    /** One side of a leaves block, a hair outside it, counter-clockwise seen from outside. */
-    private void leafFace(BufferBuilder builder, Direction side, float lx, float lz, float y0, float y1, int color, int light, float u0,
-            float u1, float v0, float v1) {
+    /** One face of a leaves block, a hair outside it, counter-clockwise seen from outside. */
+    private void leafFace(BufferBuilder builder, Direction side, float lx, float lz, float y0, int color, int light) {
         float e = 0.004F;
+        float y1 = y0 + 1.0F;
         float nx = side.getStepX();
+        float ny = side.getStepY();
         float nz = side.getStepZ();
-        float xa;
-        float za;
-        float xb;
-        float zb;
-        switch (side) {
-            case WEST -> {
-                xa = lx - e;
-                xb = lx - e;
-                za = lz;
-                zb = lz + 1.0F;
+        float u0 = leafU0;
+        float u1 = leafU1;
+        float v0 = leafV0;
+        float v1 = leafV1;
+        if (side == Direction.DOWN) {
+            float y = y0 - e;
+            builder.addVertex(lx, y, lz, color, u0, v0, OverlayTexture.NO_OVERLAY, light, nx, ny, nz);
+            builder.addVertex(lx + 1.0F, y, lz, color, u1, v0, OverlayTexture.NO_OVERLAY, light, nx, ny, nz);
+            builder.addVertex(lx + 1.0F, y, lz + 1.0F, color, u1, v1, OverlayTexture.NO_OVERLAY, light, nx, ny, nz);
+            builder.addVertex(lx, y, lz + 1.0F, color, u0, v1, OverlayTexture.NO_OVERLAY, light, nx, ny, nz);
+        } else {
+            float xa;
+            float za;
+            float xb;
+            float zb;
+            switch (side) {
+                case WEST -> {
+                    xa = lx - e;
+                    xb = lx - e;
+                    za = lz;
+                    zb = lz + 1.0F;
+                }
+                case EAST -> {
+                    xa = lx + 1.0F + e;
+                    xb = lx + 1.0F + e;
+                    za = lz + 1.0F;
+                    zb = lz;
+                }
+                case NORTH -> {
+                    xa = lx + 1.0F;
+                    xb = lx;
+                    za = lz - e;
+                    zb = lz - e;
+                }
+                default -> {
+                    xa = lx;
+                    xb = lx + 1.0F;
+                    za = lz + 1.0F + e;
+                    zb = lz + 1.0F + e;
+                }
             }
-            case EAST -> {
-                xa = lx + 1.0F + e;
-                xb = lx + 1.0F + e;
-                za = lz + 1.0F;
-                zb = lz;
-            }
-            case NORTH -> {
-                xa = lx + 1.0F;
-                xb = lx;
-                za = lz - e;
-                zb = lz - e;
-            }
-            default -> {
-                xa = lx;
-                xb = lx + 1.0F;
-                za = lz + 1.0F + e;
-                zb = lz + 1.0F + e;
-            }
+            builder.addVertex(xa, y0, za, color, u0, v1, OverlayTexture.NO_OVERLAY, light, nx, ny, nz);
+            builder.addVertex(xb, y0, zb, color, u1, v1, OverlayTexture.NO_OVERLAY, light, nx, ny, nz);
+            builder.addVertex(xb, y1, zb, color, u1, v0, OverlayTexture.NO_OVERLAY, light, nx, ny, nz);
+            builder.addVertex(xa, y1, za, color, u0, v0, OverlayTexture.NO_OVERLAY, light, nx, ny, nz);
         }
-        builder.addVertex(xa, y0, za, color, u0, v1, OverlayTexture.NO_OVERLAY, light, nx, 0.0F, nz);
-        builder.addVertex(xb, y0, zb, color, u1, v1, OverlayTexture.NO_OVERLAY, light, nx, 0.0F, nz);
-        builder.addVertex(xb, y1, zb, color, u1, v0, OverlayTexture.NO_OVERLAY, light, nx, 0.0F, nz);
-        builder.addVertex(xa, y1, za, color, u0, v0, OverlayTexture.NO_OVERLAY, light, nx, 0.0F, nz);
-        minY = Math.min(minY, y0);
+        minY = Math.min(minY, y0 - e);
         maxY = Math.max(maxY, y1);
         quads++;
     }

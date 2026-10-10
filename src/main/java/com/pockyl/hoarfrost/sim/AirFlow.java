@@ -55,6 +55,7 @@ public final class AirFlow {
     /** Rise of the land across the wind (to the left of it): the air is pushed the other way. */
     private final float[] side = new float[SIZE * SIZE];
     private final float[] smooth = new float[SIZE * SIZE];
+    private final float[] blurLine = new float[SIZE];
     // The fields before the wind last turned: the air glides from them to the new ones instead of jumping.
     private final float[] previousShadow = new float[SIZE * SIZE];
     private final float[] previousSlope = new float[SIZE * SIZE];
@@ -166,30 +167,19 @@ public final class AirFlow {
         }
         gridDirX = weather.windDirX;
         gridDirZ = weather.windDirZ;
-        // Obstacles for the wind: leaves let it through in part. Smoothed 3x3 for slopes.
-        for (int gz = 0; gz < SIZE; gz++) {
-            for (int gx = 0; gx < SIZE; gx++) {
-                float sum = 0.0F;
-                int n = 0;
-                for (int dz = -1; dz <= 1; dz++) {
-                    for (int dx = -1; dx <= 1; dx++) {
-                        int x = gx + dx;
-                        int z = gz + dz;
-                        if (x >= 0 && z >= 0 && x < SIZE && z < SIZE) {
-                            sum += obstacle(x, z);
-                            n++;
-                        }
-                    }
-                }
-                smooth[gz * SIZE + gx] = sum / n;
-            }
+        // Obstacles for the wind (leaves let it through in part), smoothed over several blocks: air flows around a wall
+        // in a curve a few blocks wide, it does not turn on the spot - a field changing within a block jerks the flakes.
+        for (int i = 0; i < SIZE * SIZE; i++) {
+            smooth[i] = obstacle(i % SIZE, i / SIZE);
         }
+        blur(smooth);
         float dx = gridDirX;
         float dz = gridDirZ;
         for (int gz = 0; gz < SIZE; gz++) {
             for (int gx = 0; gx < SIZE; gx++) {
                 int i = gz * SIZE + gx;
-                float top = -Float.MAX_VALUE;
+                // Nothing upwind: the calm zone is far below (finite, so the blur stays a number).
+                float top = heightGround[i] - 64.0F;
                 for (int k = 1; k <= SHADOW_REACH; k++) {
                     int ux = Math.round(gx - dx * k);
                     int uz = Math.round(gz - dz * k);
@@ -200,8 +190,39 @@ public final class AirFlow {
                     top = Math.max(top, obstacle(ux, uz) - k * 0.2F);
                 }
                 shadow[i] = top;
-                slope[i] = (smoothAt(gx + dx, gz + dz) - smoothAt(gx - dx, gz - dz)) * 0.5F;
-                side[i] = (smoothAt(gx - dz, gz + dx) - smoothAt(gx + dz, gz - dx)) * 0.5F;
+                slope[i] = (smoothAt(gx + dx * 2.0F, gz + dz * 2.0F) - smoothAt(gx - dx * 2.0F, gz - dz * 2.0F)) * 0.25F;
+                side[i] = (smoothAt(gx - dz * 2.0F, gz + dx * 2.0F) - smoothAt(gx + dz * 2.0F, gz - dx * 2.0F)) * 0.25F;
+            }
+        }
+        blur(shadow);
+    }
+
+    /** Two passes of a 5-wide box blur, each along x and then z: close to a soft bell 9 blocks wide. */
+    private void blur(float[] field) {
+        for (int pass = 0; pass < 2; pass++) {
+            for (int axis = 0; axis < 2; axis++) {
+                for (int line = 0; line < SIZE; line++) {
+                    for (int k = 0; k < SIZE; k++) {
+                        float sum = 0.0F;
+                        int n = 0;
+                        for (int o = -2; o <= 2; o++) {
+                            int at = k + o;
+                            if (at < 0 || at >= SIZE) {
+                                continue;
+                            }
+                            sum += axis == 0 ? field[line * SIZE + at] : field[at * SIZE + line];
+                            n++;
+                        }
+                        blurLine[k] = sum / n;
+                    }
+                    for (int k = 0; k < SIZE; k++) {
+                        if (axis == 0) {
+                            field[line * SIZE + k] = blurLine[k];
+                        } else {
+                            field[k * SIZE + line] = blurLine[k];
+                        }
+                    }
+                }
             }
         }
     }
@@ -305,10 +326,9 @@ public final class AirFlow {
         } else {
             // Every field is interpolated between column centres, so the air changes smoothly from block to block.
             prepare(x, z);
-            float top = lerp(heightBlocking);
-            float above = (float) (y - top);
+            float above = (float) (y - Math.max(lerp(smooth), lerp(heightGround)));
             float factor;
-            if (above < 0.0F) {
+            if (y < lerp(heightBlocking) - 0.5F) {
                 // Under a crown, a roof or in a cave: only a little of the wind gets in.
                 boolean canopy = y >= lerp(heightGround);
                 factor = canopy ? 0.26F : 0.18F;
@@ -330,7 +350,7 @@ public final class AirFlow {
             if (near > 0.0F) {
                 float lift = (float) Math.exp(-Math.max(above, 0.0F) / 2.5F);
                 // Up the windward side, down the lee.
-                vy += speed * Math.clamp(blended(slope, previousSlope), -1.5F, 2.0F) * 0.55F * lift * near;
+                vy += speed * Math.clamp(blended(slope, previousSlope), -1.2F, 1.5F) * 0.45F * lift * near;
                 // Aside around obstacles.
                 float push = -Math.clamp(blended(side, previousSide), -2.0F, 2.0F) * speed * 0.3F
                         * (float) Math.exp(-Math.max(above, 0.0F) / 3.0F) * near;
