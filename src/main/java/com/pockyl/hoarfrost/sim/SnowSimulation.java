@@ -33,6 +33,8 @@ public final class SnowSimulation {
     private static final float NEAR_ABOVE = 18.0F;
     private static final float FAR_BELOW = 24.0F;
     private static final float FAR_ABOVE = 36.0F;
+    /** Ticks between two chunks having their climate checked again. */
+    private static final int CLIMATE_INTERVAL = 5;
 
     private final SnowSettings settings;
     private final SnowConditions weather;
@@ -49,6 +51,7 @@ public final class SnowSimulation {
     private double camZ;
     private int ticks;
     private boolean filled;
+    private int climateCursor;
 
     public SnowSimulation(SnowSettings settings) {
         this(settings, new SnowConditions());
@@ -97,6 +100,24 @@ public final class SnowSimulation {
         }
     }
 
+    /** The next chunk in turn has its climate checked again. */
+    private void refreshClimate(Level level) {
+        int size = cover.chunks().size();
+        if (size == 0) {
+            return;
+        }
+        int target = climateCursor++ % size;
+        int index = 0;
+        for (CoverChunk chunk : cover.chunks()) {
+            if (index++ == target) {
+                if (chunk.surveyed()) {
+                    cover.refreshClimate(level, chunk, cold);
+                }
+                return;
+            }
+        }
+    }
+
     public void tick(Level level, double cameraX, double cameraY, double cameraZ) {
         ticks++;
         camX = cameraX;
@@ -105,6 +126,9 @@ public final class SnowSimulation {
         air.update(level, weather, camX, camY, camZ, cold);
         if (settings.cover) {
             cover.tick(weather);
+            if (ticks % CLIMATE_INTERVAL == 0) {
+                refreshClimate(level);
+            }
         }
         moveNear(level);
         moveFar();
@@ -399,7 +423,7 @@ public final class SnowSimulation {
             if (i < 0) {
                 return;
             }
-            initFlake(i, 0.75F);
+            initFlake(i, 0.9F);
             flakes.light[i] = 0xF00000;
         }
     }

@@ -163,6 +163,13 @@ public final class CoverChunk {
         return c + (windyA + (windyB - windyA) * t - c) * w;
     }
 
+    /** Sets where snow falls and stays again (seasons change it); returns whether anything changed. */
+    boolean setCold(int entry, boolean cold) {
+        byte before = flags[entry];
+        flags[entry] = (byte) (cold ? before | COLD : before & ~COLD);
+        return flags[entry] != before;
+    }
+
     void addChange(float amount) {
         change += amount;
         dirty = true;

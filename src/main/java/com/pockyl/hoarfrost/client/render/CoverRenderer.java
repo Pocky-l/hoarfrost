@@ -75,6 +75,10 @@ public final class CoverRenderer implements AutoCloseable {
     private static final float MIN_DEPTH = 0.0015F;
     /** Depth from which the snow covers the ground completely; below it the ground shows through in gaps. */
     private static final float FULL_COVER = 0.05F;
+    /** Steps up to this height are smoothed over by the snow. */
+    private static final float SMALL_STEP = 0.3F;
+    /** Snow this much above the top of a step buries it, and the snow surface runs smoothly over it. */
+    private static final float BURIED = 0.08F;
     private static final long REBUILD_BUDGET_NANOS = 2_500_000L;
     private static final double NEAR = 28.0;
     private static final double MIDDLE = 64.0;
@@ -430,13 +434,18 @@ public final class CoverRenderer implements AutoCloseable {
                 }
                 int otherColumn = CoverChunk.index(x, z);
                 int best = -1;
-                float bestDistance = CoverSurvey.SAME_LEVEL;
+                float bestDistance = Float.MAX_VALUE;
                 for (int s = 0; s < CoverChunk.SURFACES; s++) {
-                    if (!other.has(s, otherColumn)) {
+                    if (!other.has(s, otherColumn) || (other.flags(s, otherColumn) & CoverChunk.CAP) != 0) {
                         continue;
                     }
-                    float distance = Math.abs(other.base(s, otherColumn) - b);
-                    if ((other.flags(s, otherColumn) & CoverChunk.CAP) == 0 && distance <= bestDistance) {
+                    float nb = other.base(s, otherColumn);
+                    float distance = Math.abs(nb - b);
+                    // One surface across a small step (vanilla snow layers, carpets), or across any step up to a block once
+                    // the snow on both sides buries it; otherwise the higher block keeps its own snow with a rim.
+                    boolean joined = distance <= SMALL_STEP
+                            || distance <= 1.05F && Math.min(b + d, nb + other.depth(s, otherColumn)) >= Math.max(b, nb) + BURIED;
+                    if (joined && distance < bestDistance) {
                         bestDistance = distance;
                         best = s;
                     }

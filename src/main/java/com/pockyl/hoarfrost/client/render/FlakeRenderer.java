@@ -36,15 +36,17 @@ public final class FlakeRenderer implements AutoCloseable {
     private static final int SPRITES = 16;
     private static final int STREAK = 8;
     private static final int BOKEH = 9;
-    /** Blocks per centimetre. */
-    private static final float CM = 0.01F;
-    /** Smallest size on screen, as a share of the distance: about two pixels at 1080p. */
-    private static final float MIN_ANGLE = 0.0022F;
+    /** Blocks per centimetre of a flake: drawn about twice life size, so flakes read on screen as they do to the eye. */
+    private static final float CM = 0.022F;
+    /** Smallest size on screen, as a share of the distance: about three pixels at 1080p. */
+    private static final float MIN_ANGLE = 0.003F;
     /** Shapes are only drawn above this size on screen (share of the distance); below it a soft speck reads the same. */
     private static final float DETAIL_ANGLE = 0.007F;
     /** The shapes fill this much of their sprite. */
     private static final float FILL = 0.72F;
     private static final float FOCUS = 0.5F;
+    /** Speed across the view (blocks per tick) from which a flake is seen as a streak: only in strong wind. */
+    private static final float STREAK_SPEED = 0.14F;
 
     private final ByteBufferBuilder bytes = new ByteBufferBuilder(1 << 21);
     private int lastCount;
@@ -112,7 +114,7 @@ public final class FlakeRenderer implements AutoCloseable {
             float size = flakes.size[i] * CM;
             float alpha = flakes.alpha[i] * switch (kind) {
                 case Flakes.FAR -> 0.8F;
-                case Flakes.STREAM -> 0.55F;
+                case Flakes.STREAM -> 0.7F;
                 case Flakes.POWDER -> flakes.shape[i] == Flakes.PUFF ? 0.22F : 0.6F;
                 default -> 0.92F;
             };
@@ -155,9 +157,9 @@ public final class FlakeRenderer implements AutoCloseable {
             float pz = vz - nz * along;
             float across = Mth.sqrt(px * px + py * py + pz * pz);
             float bright = 0.9F + 0.1F * ((i * 0x9E3779B9 >>> 24) / 255.0F);
-            // The eye smears a flake that crosses its own size several times per frame.
+            // The eye smears a flake driven fast across the view (a gale), crossing its own size many times a tick.
             float smear = across / Math.max(world, 1.0E-3F);
-            if (smear > 3.0F && !shaped && sprite != BOKEH && sprite != Flakes.PUFF) {
+            if (across > STREAK_SPEED && smear > 4.0F && !shaped && sprite != BOKEH && sprite != Flakes.PUFF) {
                 sprite = STREAK;
                 ax = px / across;
                 ay = py / across;
@@ -167,7 +169,7 @@ public final class FlakeRenderer implements AutoCloseable {
                 bz = nx * ay - ny * ax;
                 halfA = half + across * 0.75F;
                 half *= 0.7F;
-                alpha *= Math.max(0.45F, 1.0F - (smear - 3.0F) * 0.04F);
+                alpha *= Math.max(0.45F, 1.0F - (smear - 4.0F) * 0.04F);
             } else if (shaped || sprite == Flakes.GRAIN || sprite == Flakes.PUFF) {
                 float angle = Mth.lerp(partialTick, flakes.prevSpin[i], flakes.spin[i]);
                 float c = Mth.cos(angle);

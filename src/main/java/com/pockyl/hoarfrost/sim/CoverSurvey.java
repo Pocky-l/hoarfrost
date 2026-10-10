@@ -41,6 +41,8 @@ public final class CoverSurvey {
     private static final int HEIGHTS = 16 + 2 * HEIGHT_MARGIN;
     /** How far below the top the surface under a crown, roof or overhang is looked for. */
     private static final int UNDER_SCAN = 40;
+    /** Sheltered floors further below the top than this are only looked at when sky light reaches them. */
+    private static final int DEEP = 10;
     /** Surfaces whose heights differ by at most this are one snow surface. */
     public static final float SAME_LEVEL = 0.6F;
     /** Distance over which snow blown in through an opening fades, at full gale. */
@@ -198,7 +200,13 @@ public final class CoverSurvey {
             } else if (gap) {
                 if (surface(level, at, y, under)) {
                     finishSurface(level, x, z, under, cold);
-                    underFactors(level, x, z, under, leaves, solid);
+                    if (topY - y > DEEP && (light[under] >> 20 & 0xF) == 0) {
+                        // Deep below and no sky light reaches it: no opening is near, nothing can blow in.
+                        calm[under] = 0.0F;
+                        Arrays.fill(windy, under * CoverChunk.DIRECTIONS, (under + 1) * CoverChunk.DIRECTIONS, 0.0F);
+                    } else {
+                        underFactors(level, x, z, under, leaves, solid);
+                    }
                 }
                 return;
             } else if (at.is(BlockTags.LEAVES)) {

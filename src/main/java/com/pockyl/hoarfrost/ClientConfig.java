@@ -9,9 +9,9 @@ public final class ClientConfig {
     /** Budgets that scale with the hardware. Individual options below multiply on top of these. */
     public enum Quality {
         LOW(3000, 18.0F, 4000, 48.0F, 2500, 2000, 48.0F, 2),
-        MEDIUM(5000, 22.0F, 7000, 60.0F, 4500, 4000, 64.0F, 2),
-        HIGH(7000, 24.0F, 10000, 72.0F, 7000, 6000, 80.0F, 3),
-        ULTRA(10000, 28.0F, 16000, 72.0F, 10000, 9000, 112.0F, 4);
+        MEDIUM(6000, 22.0F, 7000, 60.0F, 6000, 4000, 64.0F, 2),
+        HIGH(9000, 24.0F, 10000, 72.0F, 9000, 6000, 80.0F, 3),
+        ULTRA(13000, 28.0F, 16000, 72.0F, 13000, 9000, 112.0F, 4);
 
         /** Simulated flakes around the camera and how far out they go. */
         public final int nearFlakes;

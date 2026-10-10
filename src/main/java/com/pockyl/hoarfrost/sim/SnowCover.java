@@ -1,14 +1,18 @@
 package com.pockyl.hoarfrost.sim;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 
+import com.pockyl.hoarfrost.weather.Noise;
 import com.pockyl.hoarfrost.weather.SnowConditions;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.BiPredicate;
 
 /**
  * The snow lying around the camera (or in a game test), chunk by chunk.
@@ -30,6 +34,7 @@ public final class SnowCover {
     public static final int INTERVAL = 20;
     /** Share of the natural depth already lying on cold ground seen for the first time. */
     private static final float SEED_SHARE = 0.6F;
+    private static final int BLAST_SEED = 0x6B1A;
 
     private final Long2ObjectOpenHashMap<CoverChunk> chunks = new Long2ObjectOpenHashMap<>();
     private int tick;
@@ -239,10 +244,12 @@ public final class SnowCover {
                     double dy = b - y;
                     double dz = bz + 0.5 - z;
                     double distance = Math.sqrt(dx * dx + dy * dy * 1.5 + dz * dz);
-                    if (distance >= radius) {
+                    // A ragged edge: the blast tears the snow away further in some directions than in others.
+                    float reach = radius * (0.75F + 0.5F * Noise.unit(bx, bz, BLAST_SEED));
+                    if (distance >= reach) {
                         continue;
                     }
-                    float t = (float) (1.0 - distance / radius);
+                    float t = (float) (1.0 - distance / reach);
                     float share = Math.min(1.0F, strength * t * t * (3.0F - 2.0F * t) * 1.4F);
                     float taken = chunk.depth[e] * share;
                     if (taken <= 0.0005F) {
@@ -256,6 +263,23 @@ public final class SnowCover {
             }
         }
         return blown;
+    }
+
+    /**
+     * Checks again where snow falls and stays on one chunk (with seasons, temperate land turns cold in winter and warm in
+     * spring). Call for a few chunks now and then.
+     */
+    public void refreshClimate(Level level, CoverChunk chunk, BiPredicate<Level, BlockPos> cold) {
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int e = 0; e < CoverChunk.ENTRIES; e++) {
+            float b = chunk.base[e];
+            if (Float.isNaN(b)) {
+                continue;
+            }
+            int column = e % CoverChunk.COLUMNS;
+            pos.set(chunk.x * 16 + (column & 15), Mth.floor(b + 0.02F), chunk.z * 16 + (column >> 4));
+            chunk.setCold(e, cold.test(level, pos));
+        }
     }
 
     /** Blocks changed around a column: the land is surveyed again wherever the change can matter (the lee reaches far). */
