@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="src/main/resources/logo.png" alt="Hoarfrost: Snow & Blizzards" width="160">
+  <img src="src/main/resources/logo.png" alt="Hoarfrost: Snow &amp; Blizzards" width="160">
 </p>
 
-<h1 align="center">Hoarfrost: Snow & Blizzards</h1>
+<h1 align="center">Hoarfrost: Snow &amp; Blizzards</h1>
 
 <p align="center">
-  Cosy, realistic snowy weather: seven kinds of snowfall and blizzard, flakes carried by a living wind, soft snow settling on the land and a quiet winter soundscape.
+  <b>Cosy, realistic snowy weather</b> - seven kinds of snowfall and blizzard, flakes carried by a living wind, soft snow settling on the land and a quiet winter soundscape.
 </p>
 
 <p align="center">
@@ -15,67 +15,40 @@
   <a href="LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/License-MIT-blue"></a>
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/blizzard.jpg" alt="A blizzard sweeping through a snowy spruce forest" width="720">
+</p>
+
 ## Features
 
-**Seven kinds of snowy weather**, each with its own flakes, fall, wind, haze and sound, gliding into each other as a
-snowfall changes character:
-
-| Kind | What it is like |
-|---|---|
-| Light snow | A few slow crystals tumbling through still air. Complete silence - only the hush of falling snow. |
-| Snow | A steady, quiet snowfall with a soft breeze. |
-| Heavy snow | The air full of flakes, the land fading into white, a breeze with soft gusts. |
-| Heavy snow with large flakes | Big fluffy clumps of crystals drifting down slowly in calm air, the deepest hush. |
-| Light blizzard | Fine snow driven by a fresh wind; gusts roll over the land. |
-| Blizzard | A howling storm, snow streaming past the face, squalls swallowing the world for a moment. |
-| Heavy blizzard | A whiteout: roaring, howling wind and gusts of snow tearing past. |
-
-- **Volume in storms**: in heavy snow and blizzards, clouds of snow roll low over the land with the wind, the air is
-  full of driving snow dust, and squalls swallow the view; in a heavy blizzard one sees only a few blocks.
-- **A living wind.** It turns slowly and wanders, swells in gusts and drops in lulls; gusts are fronts that roll over the
-  land from upwind. Near the ground it slows down, it rises over hills and walls, is calm behind them with an eddy rolling
-  back, flows around obstacles and only reaches a little way under crowns, roofs and into caves. Rain and snow blow the
-  same way (shared with Petrichor).
-- **Flakes moved by that air**: specks, soft round flakes, six-armed crystals that tumble and glint, fluffy clumps,
-  hard grains in storms, streaks in a gale. Snow falls in the middle distance too, and in heavy snow and blizzards a
-  dense stream of light flakes rushes past the face.
-- **Soft snow on the ground.** Snow settles on the land, roofs, crowns and posts as one smooth surface - no grid, no
-  steps: rounded drifts in the lee of walls, trees and hills, fuller hollows, thinner wind-swept ridges and roofs, an even
-  layer under crowns, little rounded caps on fence posts, a soft rim at the edge of a roof. Where little snow falls it is
-  a dusting with the ground showing through. Crowns of trees hold snow on top, and distant land and
-  trees stay white out to the render distance. The colour follows the vanilla snow texture (and resource packs). Snow blown into a cave mouth or under an overhang settles a few blocks deep
-  and fades - it never runs down a tunnel. It sits on top of vanilla snow layers, melts near lamps and in warm land, and
-  stays where it lay when you come back.
-- **Snow has physics.** A wind charge or an explosion bursts the air outwards, flinging falling flakes aside, and blows the
-  snow off the ground into a cloud of powder that rises, drifts with the wind and settles slowly. Strong gusts lift powder
-  off exposed snow and send it skimming along the ground; running feet kick it up; a landing throws up a puff.
-- **Footprints** as plain soft dents; trodden paths get packed. Fresh snow fills them again.
-- **Real drifts** (server): in windy snowfall, snow layers pile up in the lee of walls and trees.
-- **No thunderstorms in snow**: no lightning, flashes or thunder over snowy land.
-- **Snowy leaves**: leaves in snowy biomes are white, as in Bedrock Edition, fading out over the biome border.
-- **Sky and haze**: light snow falls from a sky of its own colour; heavy snow and blizzards turn it a soft, bright
-  overcast instead of the dark grey of rain (thunder does not turn it dirty grey). Falling snow closes in the view with a
-  cool blue-grey haze of the sky's brightness, thicker in gusts. None of it reaches indoors or underground.
-- **Sound**: light snow is silent; snow brings a soft breeze; storms grow from a fresh wind to a roar with a howl around
-  every edge, and single gusts rush past from upwind. Indoors the storm is muffled; underground there is nothing. Falling
-  snow hushes the world outdoors, and footsteps crunch in powder and squeak on trodden snow.
-
-Everything visual works on any server; with the mod on the server too, all players share the same kind of snow and the
-server builds drifts.
+- ❄️ **Seven kinds of snow** - light snow, snow, heavy snow, large flakes, light blizzard, blizzard and a whiteout heavy
+  blizzard, each with its own flakes, wind, haze and sound, gliding into each other.
+- 🌬️ **A living wind** - turns, gusts and lulls, rises over hills and walls, is calm behind them and barely reaches
+  under roofs; flakes, crystals, clumps and grains drift with it.
+- 🏔️ **Soft snow on the ground** - one smooth cover on land, roofs and crowns, with drifts in the lee, wind-swept ridges
+  and caps on fence posts; out to the render distance, melting near lamps.
+- 💨 **Snow with physics** - wind charges, explosions, gusts and running feet blow up powder; footprints and trodden
+  paths that fresh snow fills again.
+- 🌫️ **Storms with volume** - clouds of snow rolling over the land, a bright overcast sky and a blue-grey haze, never
+  indoors or underground.
+- 🌲 **White leaves in snowy biomes**, as in Bedrock Edition, and real snow drifts piling up when the mod is on the
+  server.
+- 🔇 **A quiet winter soundscape** - the hush of falling snow, wind growing to a howl, muffled indoors, footsteps
+  crunching and squeaking.
 
 ## Compatibility
 
-[![Petrichor: Rain & Storms](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/petrichor.png)](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms) ✅ **[Petrichor: Rain & Storms](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms)** (optional) - Petrichor draws the rain, Hoarfrost the snow, column by column where rainy and snowy land meet; both blow with the same wind.
+[![Petrichor: Rain & Storms](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/petrichor.png)](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms) ✅ **[Petrichor: Rain & Storms](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms)** (optional) - Petrichor draws the rain, Hoarfrost the snow, both blown by the same wind.
 
-[![Distant Horizons](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/distant-horizons.png)](https://www.curseforge.com/minecraft/mc-mods/distant-horizons) ✅ **[Distant Horizons](https://www.curseforge.com/minecraft/mc-mods/distant-horizons)** (optional) - the snowy haze stays when Distant Horizons turns the vanilla fog off, and it also covers the distant land, so far mountains fade into a snowstorm instead of standing out sharp.
+[![Distant Horizons](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/distant-horizons.png)](https://www.curseforge.com/minecraft/mc-mods/distant-horizons) ✅ **[Distant Horizons](https://www.curseforge.com/minecraft/mc-mods/distant-horizons)** (optional) - the snowy haze covers the distant land too, and far snowy trees stay white.
 
-[![Serene Seasons](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/serene-seasons.png)](https://www.curseforge.com/minecraft/mc-mods/serene-seasons) ✅ **[Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons)** (optional) - snow falls and lies where the season makes it cold: temperate land in winter, melting in spring, none in a warm summer; deep winter brings heavier snow and blizzards.
+[![Serene Seasons](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/serene-seasons.png)](https://www.curseforge.com/minecraft/mc-mods/serene-seasons) ✅ **[Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons)** (optional) - snow falls and lies where the season makes it cold; deep winter brings blizzards.
 
-[![Iris](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/iris.png)](https://modrinth.com/mod/iris) ✅ **[Iris](https://modrinth.com/mod/iris)** (shader packs) - flakes are drawn through the pack's weather program and the snow on the ground with the pack's terrain, so they take on its look and lighting.
+[![Iris](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/iris.png)](https://modrinth.com/mod/iris) ✅ **[Iris](https://modrinth.com/mod/iris)** (shader packs) - flakes and the snow cover take on the pack's look and lighting.
 
-[![Sodium](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sodium.png)](https://modrinth.com/mod/sodium) ✅ **[Sodium](https://modrinth.com/mod/sodium)** - works, white leaves in snowy biomes included.
+[![Sodium](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sodium.png)](https://modrinth.com/mod/sodium) ✅ **[Sodium](https://modrinth.com/mod/sodium)** - works, white leaves included.
 
-[![Sound Physics Remastered](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sound-physics-remastered.png)](https://www.curseforge.com/minecraft/mc-mods/sound-physics-remastered) ✅ **[Sound Physics Remastered](https://www.curseforge.com/minecraft/mc-mods/sound-physics-remastered)** (optional) - the hush of falling snow steps aside and lets Sound Physics do the muffling.
+[![Sound Physics Remastered](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sound-physics-remastered.png)](https://www.curseforge.com/minecraft/mc-mods/sound-physics-remastered) ✅ **[Sound Physics Remastered](https://www.curseforge.com/minecraft/mc-mods/sound-physics-remastered)** (optional) - the hush of falling snow lets Sound Physics do the muffling.
 
 ## Controls
 
@@ -139,80 +112,63 @@ The jar is written to `build/libs/`. `./gradlew runGameTestServer` runs the game
 <!-- more-mods:start -->
 ## More mods by Pocky
 
+**🌦️ Weather & nature**
+
 <table>
   <tr>
-    <td align="center" width="112"><a href="https://www.curseforge.com/minecraft/mc-mods/turbo-for-distant-horizons"><img src="https://raw.githubusercontent.com/Pocky-l/dhturbo/main/docs/icon.png" width="96" alt="Turbo for Distant Horizons"></a></td>
-    <td>
-      <a href="https://www.curseforge.com/minecraft/mc-mods/turbo-for-distant-horizons"><b>Turbo for Distant Horizons</b></a><br>
-      Distant Horizons addon: generates distant terrain from the world noise many times faster, with real trees nearby.<br>
-      <a href="https://www.curseforge.com/minecraft/mc-mods/turbo-for-distant-horizons"><img alt="CurseForge" src="https://img.shields.io/curseforge/dt/1734835?logo=curseforge&label=CurseForge&color=F16436"></a>
-      <a href="https://github.com/Pocky-l/dhturbo"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-source-181717?logo=github"></a>
-    </td>
+    <td width="56"><a href="https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms"><img src="docs/more-mods/petrichor.png" width="48" alt="Petrichor: Rain & Storms"></a></td>
+    <td><a href="https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms"><b>Petrichor: Rain & Storms</b></a> - realistic rain, puddles, drips and branching lightning (<a href="https://github.com/Pocky-l/petrichor">source</a>)</td>
   </tr>
   <tr>
-    <td align="center" width="112"><a href="https://www.curseforge.com/minecraft/mc-mods/holy-staff"><img src="https://raw.githubusercontent.com/Pocky-l/holy-staff/main/docs/icon.png" width="96" alt="Holy Staff"></a></td>
-    <td>
-      <a href="https://www.curseforge.com/minecraft/mc-mods/holy-staff"><b>Holy Staff</b></a><br>
-      A holy staff with three healing skills, aim previews and flying heal numbers.<br>
-      <a href="https://www.curseforge.com/minecraft/mc-mods/holy-staff"><img alt="CurseForge" src="https://img.shields.io/curseforge/dt/1725465?logo=curseforge&label=CurseForge&color=F16436"></a>
-      <a href="https://github.com/Pocky-l/holy-staff"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-source-181717?logo=github"></a>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="112"><a href="https://www.curseforge.com/minecraft/mc-mods/inventory-backups"><img src="https://raw.githubusercontent.com/Pocky-l/inventory-backups/main/docs/icon.png" width="96" alt="Inventory Backups"></a></td>
-    <td>
-      <a href="https://www.curseforge.com/minecraft/mc-mods/inventory-backups"><b>Inventory Backups</b></a><br>
-      Automatic player inventory and ender chest backups with a clickable chat browser, previews and one-click restore for admins.<br>
-      <a href="https://www.curseforge.com/minecraft/mc-mods/inventory-backups"><img alt="CurseForge" src="https://img.shields.io/curseforge/dt/836385?logo=curseforge&label=CurseForge&color=F16436"></a>
-      <a href="https://github.com/Pocky-l/inventory-backups"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-source-181717?logo=github"></a>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="112"><a href="https://www.curseforge.com/minecraft/mc-mods/lumen-rigs"><img src="https://raw.githubusercontent.com/Pocky-l/lumen-rigs/main/docs/icon.png" width="96" alt="Lumen Rigs"></a></td>
-    <td>
-      <a href="https://www.curseforge.com/minecraft/mc-mods/lumen-rigs"><b>Lumen Rigs</b></a><br>
-      Aimable spotlights, floodlights, searchlights and soft panels with colored light and visible beams.<br>
-      <a href="https://www.curseforge.com/minecraft/mc-mods/lumen-rigs"><img alt="CurseForge" src="https://img.shields.io/curseforge/dt/1727739?logo=curseforge&label=CurseForge&color=F16436"></a>
-      <a href="https://github.com/Pocky-l/lumen-rigs"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-source-181717?logo=github"></a>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="112"><a href="https://www.curseforge.com/minecraft/mc-mods/neon-glowsticks"><img src="https://raw.githubusercontent.com/Pocky-l/neon-glowsticks/main/docs/icon.png" width="96" alt="Neon Glowsticks"></a></td>
-    <td>
-      <a href="https://www.curseforge.com/minecraft/mc-mods/neon-glowsticks"><b>Neon Glowsticks</b></a><br>
-      Throwable glowsticks that bounce, roll and light up the dark with colored light.<br>
-      <a href="https://www.curseforge.com/minecraft/mc-mods/neon-glowsticks"><img alt="CurseForge" src="https://img.shields.io/curseforge/dt/1727688?logo=curseforge&label=CurseForge&color=F16436"></a>
-      <a href="https://github.com/Pocky-l/neon-glowsticks"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-source-181717?logo=github"></a>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="112"><a href="https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms"><img src="https://raw.githubusercontent.com/Pocky-l/petrichor/main/docs/icon.png" width="96" alt="Petrichor: Rain & Storms"></a></td>
-    <td>
-      <a href="https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms"><b>Petrichor: Rain & Storms</b></a><br>
-      Realistic rain and storms: rain types, puddles, runoff and drips, branching lightning with delayed thunder.<br>
-      <a href="https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms"><img alt="CurseForge" src="https://img.shields.io/curseforge/dt/1729574?logo=curseforge&label=CurseForge&color=F16436"></a>
-      <a href="https://github.com/Pocky-l/petrichor"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-source-181717?logo=github"></a>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="112"><a href="https://www.curseforge.com/minecraft/mc-mods/rustling-leaves"><img src="https://raw.githubusercontent.com/Pocky-l/rustling-leaves/main/docs/icon.png" width="96" alt="Rustling Leaves"></a></td>
-    <td>
-      <a href="https://www.curseforge.com/minecraft/mc-mods/rustling-leaves"><b>Rustling Leaves</b></a><br>
-      Physically simulated leaves: falling leaves, leaf piles you can wade through, rake and blow away, gusts, whirlwinds and leaf tools.<br>
-      <a href="https://www.curseforge.com/minecraft/mc-mods/rustling-leaves"><img alt="CurseForge" src="https://img.shields.io/curseforge/dt/1729578?logo=curseforge&label=CurseForge&color=F16436"></a>
-      <a href="https://github.com/Pocky-l/rustling-leaves"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-source-181717?logo=github"></a>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="112"><a href="https://www.curseforge.com/minecraft/mc-mods/ranchers-vacpack"><img src="https://raw.githubusercontent.com/Pocky-l/ranchers-vacpack/main/docs/icon.png" width="96" alt="Rancher's Vacpack"></a></td>
-    <td>
-      <a href="https://www.curseforge.com/minecraft/mc-mods/ranchers-vacpack"><b>Rancher's Vacpack</b></a><br>
-      A Slime Rancher inspired vacuum gun: suck up items and small mobs, store them in a tank and shoot them back out.<br>
-      <a href="https://www.curseforge.com/minecraft/mc-mods/ranchers-vacpack"><img alt="CurseForge" src="https://img.shields.io/curseforge/dt/1725381?logo=curseforge&label=CurseForge&color=F16436"></a>
-      <a href="https://github.com/Pocky-l/ranchers-vacpack"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-source-181717?logo=github"></a>
-    </td>
+    <td width="56"><a href="https://www.curseforge.com/minecraft/mc-mods/rustling-leaves"><img src="docs/more-mods/rustling_leaves.png" width="48" alt="Rustling Leaves"></a></td>
+    <td><a href="https://www.curseforge.com/minecraft/mc-mods/rustling-leaves"><b>Rustling Leaves</b></a> - falling leaves and leaf piles you can wade through, rake and blow away (<a href="https://github.com/Pocky-l/rustling-leaves">source</a>)</td>
   </tr>
 </table>
+
+**💡 Light**
+
+<table>
+  <tr>
+    <td width="56"><a href="https://www.curseforge.com/minecraft/mc-mods/lumen-rigs"><img src="docs/more-mods/lumen_rigs.png" width="48" alt="Lumen Rigs"></a></td>
+    <td><a href="https://www.curseforge.com/minecraft/mc-mods/lumen-rigs"><b>Lumen Rigs</b></a> - aimable spotlights and floodlights with colored light and visible beams (<a href="https://github.com/Pocky-l/lumen-rigs">source</a>)</td>
+  </tr>
+  <tr>
+    <td width="56"><a href="https://www.curseforge.com/minecraft/mc-mods/neon-glowsticks"><img src="docs/more-mods/neon_glowsticks.png" width="48" alt="Neon Glowsticks"></a></td>
+    <td><a href="https://www.curseforge.com/minecraft/mc-mods/neon-glowsticks"><b>Neon Glowsticks</b></a> - throwable glowsticks that bounce, roll and light up the dark (<a href="https://github.com/Pocky-l/neon-glowsticks">source</a>)</td>
+  </tr>
+</table>
+
+**🎨 Graphics & performance**
+
+<table>
+  <tr>
+    <td width="56"><a href="https://www.curseforge.com/minecraft/mc-mods/turbo-for-distant-horizons"><img src="docs/more-mods/dhturbo.png" width="48" alt="Turbo for Distant Horizons"></a></td>
+    <td><a href="https://www.curseforge.com/minecraft/mc-mods/turbo-for-distant-horizons"><b>Turbo for Distant Horizons</b></a> - Distant Horizons terrain generated many times faster (<a href="https://github.com/Pocky-l/dhturbo">source</a>)</td>
+  </tr>
+</table>
+
+**⚔️ Gear & gameplay**
+
+<table>
+  <tr>
+    <td width="56"><a href="https://www.curseforge.com/minecraft/mc-mods/holy-staff"><img src="docs/more-mods/holy_staff.png" width="48" alt="Holy Staff"></a></td>
+    <td><a href="https://www.curseforge.com/minecraft/mc-mods/holy-staff"><b>Holy Staff</b></a> - a healing staff with three skills and flying heal numbers (<a href="https://github.com/Pocky-l/holy-staff">source</a>)</td>
+  </tr>
+  <tr>
+    <td width="56"><a href="https://www.curseforge.com/minecraft/mc-mods/ranchers-vacpack"><img src="docs/more-mods/vacpack.png" width="48" alt="Rancher's Vacpack"></a></td>
+    <td><a href="https://www.curseforge.com/minecraft/mc-mods/ranchers-vacpack"><b>Rancher's Vacpack</b></a> - a Slime Rancher vacuum gun for items and small mobs (<a href="https://github.com/Pocky-l/ranchers-vacpack">source</a>)</td>
+  </tr>
+</table>
+
+**🛠️ Server tools**
+
+<table>
+  <tr>
+    <td width="56"><a href="https://www.curseforge.com/minecraft/mc-mods/inventory-backups"><img src="docs/more-mods/inventorybackups.png" width="48" alt="Inventory Backups"></a></td>
+    <td><a href="https://www.curseforge.com/minecraft/mc-mods/inventory-backups"><b>Inventory Backups</b></a> - inventory and ender chest backups with one-click restore for admins (<a href="https://github.com/Pocky-l/inventory-backups">source</a>)</td>
+  </tr>
+</table>
+
 <!-- more-mods:end -->
 
 ## License
