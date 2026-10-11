@@ -4,6 +4,11 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - Unreleased
+### Fixed
+- Breaking a trapdoor, a carpet, a slab or another low block no longer leaves snow behind where it stood. Snow that lay
+  on the block keeps its depth and drops to the ground below instead of filling the space the block took.
+
 ## [1.0.0] - 2026-10-10
 ### Added
 - Seven kinds of snowy weather - light snow, snow, heavy snow, heavy snow with large flakes, light blizzard, blizzard and

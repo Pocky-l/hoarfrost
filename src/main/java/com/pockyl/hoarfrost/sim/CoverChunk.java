@@ -260,7 +260,8 @@ public final class CoverChunk {
 
     /**
      * After a survey: carries the snow over from the surfaces before by the height its top reached, where a surface
-     * moved by a small step at most; snow under a block placed on it is gone, a hole dug out starts bare.
+     * moved by a small step at most; snow under a block placed on it is gone, snow on a block broken under it keeps its
+     * depth, a hole dug out starts bare.
      */
     void carryOver() {
         if (carried == null) {
@@ -287,9 +288,12 @@ public final class CoverChunk {
                     float distance = Math.abs(oldBase[oe] - base[e]);
                     // Only over a small step (a slab, a carpet): a hole dug into the ground starts bare instead of filling
                     // with the snow that lay above it.
-                    if (distance <= CARRY_STEP && distance < best && oldTops[oe] > base[e]) {
+                    // The snow keeps its own depth where the surface dropped (a trapdoor or a carpet broken under it): the
+                    // space the block took is not filled with snow. On a raised surface only what still sticks out stays.
+                    float carriedDepth = oldTops[oe] - Math.max(oldBase[oe], base[e]);
+                    if (distance <= CARRY_STEP && distance < best && carriedDepth > 0.0F) {
                         best = distance;
-                        depth[e] = oldTops[oe] - base[e];
+                        depth[e] = carriedDepth;
                         packed[e] = oldPacked[oe];
                     }
                 }

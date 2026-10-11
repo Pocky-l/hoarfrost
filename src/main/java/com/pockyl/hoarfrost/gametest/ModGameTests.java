@@ -340,6 +340,41 @@ public final class ModGameTests {
     }
 
     @GameTest(template = "arena", skyAccess = true)
+    public static void aBrokenTrapdoorLeavesNoSnow(GameTestHelper helper) {
+        floor(helper);
+        helper.setBlock(new BlockPos(10, 1, 10), Blocks.BIRCH_TRAPDOOR);
+        helper.setBlock(new BlockPos(12, 1, 10), Blocks.BIRCH_TRAPDOOR);
+        SnowSimulation sim = simulation(helper);
+        // A bare trapdoor broken before any snow fell, another one after snow covered it.
+        double bareBefore = onTrapdoor(helper, sim, 10, 10);
+        breakBlock(helper, sim, new BlockPos(10, 1, 10));
+        helper.assertTrue(depth(helper, sim, 10, 1, 10) <= bareBefore + 1.0E-4,
+                "a bare trapdoor left snow behind: " + bareBefore + " -> " + depth(helper, sim, 10, 1, 10));
+        calm(sim, SnowKind.SNOW);
+        weather(sim, 40);
+        double onTrapdoor = onTrapdoor(helper, sim, 12, 10);
+        breakBlock(helper, sim, new BlockPos(12, 1, 10));
+        helper.assertTrue(Math.abs(depth(helper, sim, 12, 1, 10) - onTrapdoor) < 0.01,
+                "the snow on the trapdoor grew: " + onTrapdoor + " -> " + depth(helper, sim, 12, 1, 10));
+        helper.succeed();
+    }
+
+    /** Depth of the snow on a closed bottom trapdoor at relative (x, 1, z). */
+    private static double onTrapdoor(GameTestHelper helper, SnowSimulation sim, int x, int z) {
+        Vec3 at = helper.absoluteVec(new Vec3(x + 0.5, 1.0 + 3.0 / 16.0, z + 0.5));
+        return sim.cover().depthAt(at.x, at.y + 0.01, at.z);
+    }
+
+    private static void breakBlock(GameTestHelper helper, SnowSimulation sim, BlockPos pos) {
+        helper.setBlock(pos, Blocks.AIR);
+        BlockPos broken = helper.absolutePos(pos);
+        sim.cover().blockChanged(broken.getX(), broken.getZ());
+        for (CoverChunk chunk : sim.cover().chunks()) {
+            sim.prepare(helper.getLevel(), chunk);
+        }
+    }
+
+    @GameTest(template = "arena", skyAccess = true)
     public static void airFlowsOverAndAroundAWall(GameTestHelper helper) {
         floor(helper);
         for (int z = 4; z < SIZE - 4; z++) {
