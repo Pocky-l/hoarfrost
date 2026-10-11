@@ -9,6 +9,7 @@ import net.minecraft.world.level.block.LeavesBlock;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 
 import com.pockyl.hoarfrost.ClientConfig;
+import com.pockyl.hoarfrost.client.compat.DistantHorizonsTint;
 import com.pockyl.hoarfrost.mixin.BlockColorsAccessor;
 
 /**
@@ -53,7 +54,9 @@ public final class LeafFrost {
                 if (getter == null || pos == null || color == -1 || !enabled()) {
                     return color;
                 }
-                float k = (getter.getBlockTint(pos, SNOWY) & 0xFF) / 255.0F;
+                float k = DistantHorizonsTint.handles(getter)
+                        ? DistantHorizonsTint.snowy(getter, COLD)
+                        : (getter.getBlockTint(pos, SNOWY) & 0xFF) / 255.0F;
                 return k <= 0.0F ? color : whiten(color, k);
             }, block);
         }
