@@ -360,6 +360,9 @@ public final class SnowSimulation {
         }
         if (y < top) {
             // Below the top of the column: under a crown or roof, in a cave mouth, or against a wall.
+            if (air.inStructure(level, x, y, z)) {
+                return false;
+            }
             pos.set(Mth.floor(x), Mth.floor(y), Mth.floor(z));
             BlockState state = level.getBlockState(pos);
             if (state.is(BlockTags.LEAVES) || !state.getFluidState().isEmpty()) {

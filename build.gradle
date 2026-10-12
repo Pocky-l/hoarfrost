@@ -39,6 +39,14 @@ repositories {
         }
         filter { includeGroup('maven.modrinth') }
     }
+    maven {
+        // Sable's companion API (optional integration).
+        name = 'Sable'
+        url = 'https://maven.ryanhcode.dev/releases'
+        content {
+            includeGroup 'dev.ryanhcode.sable-companion'
+        }
+    }
 }
 
 neoForge {
@@ -100,6 +108,8 @@ dependencies {
     compileOnly("maven.modrinth:distanthorizons:${distanthorizons_version}") {
         transitive = false
     }
+    // Optional: snow stays out of moving structures. Sable bundles this API; only compat/SableRoofs touches it.
+    compileOnly "dev.ryanhcode.sable-companion:sable-companion-common-1.21.1:${sable_companion_version}"
 }
 
 var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {

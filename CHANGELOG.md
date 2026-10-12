@@ -4,6 +4,11 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-10-12
+### Fixed
+- Compatibility with [Sable](https://www.curseforge.com/minecraft/mc-mods/sable): snow no longer falls inside flying houses, airships and other moving
+  structures. Flakes land on their roofs and decks and stop at their walls.
+
 ## [1.0.2] - 2026-10-12
 ### Fixed
 - Distant trees of [Distant Horizons](https://www.curseforge.com/minecraft/mc-mods/distant-horizons) no longer turn

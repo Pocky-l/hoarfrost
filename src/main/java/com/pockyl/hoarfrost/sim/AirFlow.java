@@ -5,6 +5,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 
+import com.pockyl.hoarfrost.compat.SubLevelRoofs;
 import com.pockyl.hoarfrost.weather.Noise;
 import com.pockyl.hoarfrost.weather.SnowConditions;
 
@@ -67,6 +68,9 @@ public final class AirFlow {
     private final List<Blast> blasts = new ArrayList<>();
     private final List<Wake> wakes = new ArrayList<>();
     private final BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+    /** Roofs of moving structures (Sable) over the grid, traced every tick: they are not in the heightmaps. */
+    private final SubLevelRoofs roofs = new SubLevelRoofs();
+    private int ticks;
 
     private int originX = Integer.MIN_VALUE;
     private int originZ;
@@ -135,6 +139,7 @@ public final class AirFlow {
                 System.arraycopy(side, 0, previousSide, 0, SIZE * SIZE);
             }
         }
+        roofs.update(level, centerX, centerZ, HALF, ++ticks);
         updateEddies(centerX, centerY, centerZ);
         for (int i = blasts.size() - 1; i >= 0; i--) {
             if (++blasts.get(i).age > 50) {
@@ -288,7 +293,16 @@ public final class AirFlow {
     /** Height of the top of what stands at a column (leaves included), or {@code Integer.MIN_VALUE} outside the grid. */
     public int top(double x, double z) {
         int i = index(x, z);
-        return i < 0 ? Integer.MIN_VALUE : heightBlocking[i];
+        if (i < 0) {
+            return Integer.MIN_VALUE;
+        }
+        SubLevelRoofs.Roof roof = roofs.at(Mth.floor(x), Mth.floor(z));
+        return roof != null ? Math.max(heightBlocking[i], roof.height()) : heightBlocking[i];
+    }
+
+    /** Whether a point is inside a block of a moving structure (Sable); those are not where the level has them. */
+    public boolean inStructure(Level level, double x, double y, double z) {
+        return roofs.solid(level, x, y, z);
     }
 
     /** Whether snow falls on a column (false outside the grid). */
