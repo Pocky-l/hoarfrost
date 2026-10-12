@@ -4,6 +4,13 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-10-12
+### Added
+- Integration with [Particle Rain](https://www.curseforge.com/minecraft/mc-mods/particle-rain): Hoarfrost draws the snowfall, Particle Rain the rain, sandstorms, dust, fog
+  and the rest of its particles, all blown by the same wind. Particle Rain's own snow and snowfall sound step aside
+  where Hoarfrost's snow falls. With [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons) both
+  mods agree where it snows. Can be switched off in the config (Snowfall > Particle Rain integration).
+
 ## [1.0.3] - 2026-10-12
 ### Fixed
 - Compatibility with [Sable](https://www.curseforge.com/minecraft/mc-mods/sable): snow no longer falls inside flying houses, airships and other moving

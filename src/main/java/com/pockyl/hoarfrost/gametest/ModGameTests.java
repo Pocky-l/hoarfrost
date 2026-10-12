@@ -14,6 +14,7 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import com.pockyl.hoarfrost.Hoarfrost;
+import com.pockyl.hoarfrost.client.compat.ParticleRain;
 import com.pockyl.hoarfrost.compat.Climate;
 import com.pockyl.hoarfrost.sim.AirFlow;
 import com.pockyl.hoarfrost.sim.CoverChunk;
@@ -29,6 +30,7 @@ import com.pockyl.hoarfrost.weather.Wind;
 import com.pockyl.hoarfrost.world.DriftBuilder;
 
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * In-game tests, run headless by {@code gradlew runGameTestServer}. The snow simulation only needs a {@code Level}, so it
@@ -47,6 +49,26 @@ public final class ModGameTests {
 
     @GameTest(template = "empty")
     public static void modLoads(GameTestHelper helper) {
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void particleRainKeepsAllButTheSnow(GameTestHelper helper) {
+        // Particle Rain's presets by their weather condition: only those that fall with the weather are taken over.
+        for (String weather : List.of("DURING_WEATHER", "ONLY_DURING_NORMAL_WEATHER", "ONLY_DURING_STORMY_WEATHER")) {
+            helper.assertTrue(ParticleRain.fallingPreset(weather), weather + " presets fall");
+        }
+        for (String weather : List.of("AFTER_WEATHER", "CLEAR", "ALWAYS", "SOMETHING_NEW")) {
+            helper.assertTrue(!ParticleRain.fallingPreset(weather), weather + " presets do not fall");
+        }
+        // Nothing read from Particle Rain (it is a client mod): nothing is skipped.
+        helper.assertTrue(!ParticleRain.yieldsSnow(List.of(Biome.Precipitation.SNOW), true), "Unknown presets spawn");
+
+        float[] wind = ParticleRain.alignWind(0.3F, 0.4F, -2.0F, 0.0F);
+        helper.assertTrue(Math.abs(wind[0] + 0.5F) < 1.0E-5F && Math.abs(wind[1]) < 1.0E-5F,
+                "Particle Rain's wind keeps its strength and takes the mod's direction");
+        float[] calm = ParticleRain.alignWind(0.3F, 0.4F, 0.0F, 0.0F);
+        helper.assertTrue(calm[0] == 0.3F && calm[1] == 0.4F, "Calm air leaves Particle Rain's wind alone");
         helper.succeed();
     }
 

@@ -46,6 +46,7 @@
   "hoarfrost.configuration.quality": "Quality",
   "hoarfrost.configuration.snowfall": "Snowfall",
   "hoarfrost.configuration.snowfallEnabled": "Simulated snowfall",
+  "hoarfrost.configuration.particleRain": "Particle Rain integration",
   "hoarfrost.configuration.density": "Flake density",
   "hoarfrost.configuration.distant": "Snow in the distance",
   "hoarfrost.configuration.stream": "Snow streaming past in storms",

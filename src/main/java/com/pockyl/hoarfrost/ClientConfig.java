@@ -73,6 +73,12 @@ public final class ClientConfig {
             .comment("In heavy snow and blizzards, a dense stream of light flakes rushes past the face.")
             .translation(key("stream"))
             .define("stream", true);
+    public static final ModConfigSpec.BooleanValue PARTICLE_RAIN = BUILDER
+            .comment("Particle Rain integration, when Particle Rain is installed: this mod draws the snowfall and Particle Rain the "
+                    + "rain, dust, fog and the rest of its particles, blown by the same wind. Off: Particle Rain draws its own snow "
+                    + "too and hides this mod's falling snow.")
+            .translation(key("particleRain"))
+            .define("particleRain", true);
 
     static {
         BUILDER.pop();

@@ -52,6 +52,8 @@
 
 [![Sable](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sable.png)](https://www.curseforge.com/minecraft/mc-mods/sable) ✅ **[Sable](https://www.curseforge.com/minecraft/mc-mods/sable)** (optional) - snow lands on the roofs of flying houses and airships and no longer drifts through their walls.
 
+[![Particle Rain](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/particle-rain.png)](https://www.curseforge.com/minecraft/mc-mods/particle-rain) ✅ **[Particle Rain](https://www.curseforge.com/minecraft/mc-mods/particle-rain)** (optional) - Hoarfrost draws the snow, Particle Rain the rain, sand and fog, all in the same wind.
+
 ## Controls
 
 No key bindings. Operators can force the weather for testing:
@@ -73,7 +75,7 @@ Nothing to craft: the mod has no items.
 In the mod list (Mods > Hoarfrost > Config) or in the config files:
 
 - `hoarfrost-client.toml`: quality preset (flake counts, how far snow is simulated and drawn), snowfall on/off,
-  flake density, snow in the distance, clouds of snow in storms, the stream of flakes in storms, snow on the ground, snow
+  flake density, snow in the distance, clouds of snow in storms, the stream of flakes in storms, Particle Rain integration, snow on the ground, snow
   on distant land, snowy leaves, footprints, powder, haze, bright snowy sky, wind volume, hush, snow footsteps.
 - `hoarfrost-server.toml` (per world): chances of each kind of snow, thunderstorms as blizzards, following Serene Seasons,
   drifts (on/off, highest drift, growth speed).

@@ -11,7 +11,9 @@
     "FogRendererMixin",
     "LevelRendererMixin",
     "SoundEngineAccessor",
-    "SoundManagerAccessor"
+    "SoundManagerAccessor",
+    "compat.ParticleRainSpawnerMixin",
+    "compat.ParticleRainWindMixin"
   ],
   "injectors": {
     "defaultRequire": 1

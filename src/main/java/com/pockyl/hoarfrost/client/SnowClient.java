@@ -41,6 +41,8 @@ import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 
 import com.pockyl.hoarfrost.ClientConfig;
 import com.pockyl.hoarfrost.Hoarfrost;
+import com.pockyl.hoarfrost.client.compat.ParticleRain;
+import com.pockyl.hoarfrost.client.compat.ShaderPacks;
 import com.pockyl.hoarfrost.client.render.CoverRenderer;
 import com.pockyl.hoarfrost.client.render.FlakeRenderer;
 import com.pockyl.hoarfrost.client.render.SnowFog;
@@ -106,6 +108,9 @@ public final class SnowClient {
         return simulation != null && ClientConfig.SNOWFALL.get() && hasWeather(Minecraft.getInstance().level);
     }
 
+    /** Whether the vanilla weather pass ran this frame (Particle Rain cancels it). */
+    private static boolean snowfallDrawn;
+
     /** The leaves setting the chunk meshes were built with. */
     private static Boolean snowyLeaves;
 
@@ -163,6 +168,7 @@ public final class SnowClient {
         ticks++;
         Vec3 camera = cameraPosition(minecraft);
         ClientWeather.tick(level, camera);
+        ParticleRain.refresh();
         if (simulation == null) {
             simulation = new SnowSimulation(SETTINGS, ClientWeather.conditions());
             flakeRenderer = new FlakeRenderer();
@@ -431,6 +437,7 @@ public final class SnowClient {
 
     /** Draws the falling snow at the start of the vanilla weather pass. */
     public static void renderSnowfall(LightTexture lightTexture, float partialTick, double camX, double camY, double camZ) {
+        snowfallDrawn = true;
         if (!ownsSnowfall() || flakeRenderer == null) {
             return;
         }
@@ -438,8 +445,30 @@ public final class SnowClient {
         flakeRenderer.render(simulation.flakes(), lightTexture, camera, partialTick, camX, camY, camZ);
     }
 
+    /**
+     * Particle Rain cancels the whole vanilla weather pass, and with it the snowfall this mod draws there. The flakes are
+     * then drawn right after that pass instead: same render target, matrices and fog. A shader pack is put into its
+     * weather pass for them, which Iris only does around the vanilla call.
+     */
+    private static void renderSkippedSnowfall(Camera camera, float partialTick) {
+        Vec3 cam = camera.getPosition();
+        Object phase = ShaderPacks.beginWeatherPhase();
+        try {
+            renderSnowfall(Minecraft.getInstance().gameRenderer.lightTexture(), partialTick, cam.x, cam.y, cam.z);
+        } finally {
+            ShaderPacks.endWeatherPhase(phase);
+        }
+    }
+
     @SubscribeEvent
     public static void onRenderStage(RenderLevelStageEvent event) {
+        if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_WEATHER) {
+            if (!snowfallDrawn && ParticleRain.active() && ownsSnowfall()) {
+                renderSkippedSnowfall(event.getCamera(), event.getPartialTick().getGameTimeDeltaPartialTick(false));
+            }
+            snowfallDrawn = false;
+            return;
+        }
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_CUTOUT_BLOCKS || coverRenderer == null || !SETTINGS.cover) {
             return;
         }
@@ -541,6 +570,12 @@ public final class SnowClient {
     public static void onPlaySound(PlaySoundEvent event) {
         SoundInstance sound = event.getSound();
         if (sound != null && event.getName().startsWith("entity.lightning_bolt.") && snowyAround()) {
+            event.setSound(null);
+            return;
+        }
+        // Particle Rain's snowfall sound: the snow here is this mod's, and so is its sound.
+        if (sound != null && event.getName().startsWith("weather.snow") && ParticleRain.MOD_ID.equals(sound.getLocation().getNamespace())
+                && ParticleRain.active() && ownsSnowfall()) {
             event.setSound(null);
             return;
         }

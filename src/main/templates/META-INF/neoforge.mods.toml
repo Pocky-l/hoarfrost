@@ -33,5 +33,13 @@ description='''${mod_description}'''
     ordering="NONE"
     side="BOTH"
 
+# Particle Rain is never compiled against: any version may be installed, hooks that do not fit it are skipped.
+[[dependencies.${mod_id}]]
+    modId="particlerain"
+    type="optional"
+    versionRange="[0,)"
+    ordering="NONE"
+    side="CLIENT"
+
 [[mixins]]
 config="${mod_id}.mixins.json"

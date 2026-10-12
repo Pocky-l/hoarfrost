@@ -41,6 +41,8 @@ snow and real drifts
 
 [![Sable](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sable.png)](https://www.curseforge.com/minecraft/mc-mods/sable) ✅ **[Sable](https://www.curseforge.com/minecraft/mc-mods/sable)** (optional) - snow lands on the roofs of flying houses and airships and no longer drifts through their walls.
 
+[![Particle Rain](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/particle-rain.png)](https://www.curseforge.com/minecraft/mc-mods/particle-rain) ✅ **[Particle Rain](https://www.curseforge.com/minecraft/mc-mods/particle-rain)** (optional) - Hoarfrost draws the snow, Particle Rain the rain, sand and fog, all in the same wind.
+
 ## ⚙️ Configuration
 
 *Mods > Hoarfrost > Config*: a quality preset and a switch for every effect. Per world: chances of each kind of snow,
