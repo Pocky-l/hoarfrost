@@ -381,6 +381,27 @@ public final class ModGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = "arena", skyAccess = true)
+    public static void railsAndRedstoneStayClear(GameTestHelper helper) {
+        floor(helper);
+        helper.setBlock(new BlockPos(10, 1, 10), Blocks.RAIL);
+        helper.setBlock(new BlockPos(12, 1, 10), Blocks.REDSTONE_WIRE);
+        SnowSimulation sim = simulation(helper);
+        calm(sim, SnowKind.SNOW);
+        weather(sim, 40);
+        helper.assertTrue(depth(helper, sim, 14, 1, 10) > 0.01, "snow lies on the open floor");
+        helper.assertTrue(depth(helper, sim, 10, 1, 10) < 1.0E-4, "no snow under a rail");
+        helper.assertTrue(depth(helper, sim, 12, 1, 10) < 1.0E-4, "no snow under redstone dust");
+        helper.setBlock(new BlockPos(14, 1, 10), Blocks.STONE_PRESSURE_PLATE);
+        BlockPos placed = helper.absolutePos(new BlockPos(14, 1, 10));
+        sim.cover().blockChanged(placed.getX(), placed.getZ());
+        for (CoverChunk chunk : sim.cover().chunks()) {
+            sim.prepare(helper.getLevel(), chunk);
+        }
+        helper.assertTrue(depth(helper, sim, 14, 1, 10) < 1.0E-4, "a pressure plate placed on snow shows");
+        helper.succeed();
+    }
+
     /** Depth of the snow on a closed bottom trapdoor at relative (x, 1, z). */
     private static double onTrapdoor(GameTestHelper helper, SnowSimulation sim, int x, int z) {
         Vec3 at = helper.absoluteVec(new Vec3(x + 0.5, 1.0 + 3.0 / 16.0, z + 0.5));

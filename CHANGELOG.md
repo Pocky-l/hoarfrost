@@ -4,6 +4,11 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - Unreleased
+### Fixed
+- Settled snow no longer hides rails, redstone dust, tripwire and pressure plates: the ground under them stays clear,
+  as with vanilla snow layers. Placing one on snowy ground clears the snow under it.
+
 ## [1.1.0] - 2026-10-12
 ### Added
 - Integration with [Particle Rain](https://www.curseforge.com/minecraft/mc-mods/particle-rain): Hoarfrost draws the snowfall, Particle Rain the rain, sandstorms, dust, fog

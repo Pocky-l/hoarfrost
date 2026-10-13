@@ -5,7 +5,9 @@ import net.minecraft.core.Direction;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.block.RedStoneWireBlock;
 import net.minecraft.world.level.block.SnowLayerBlock;
+import net.minecraft.world.level.block.TripWireBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
@@ -72,6 +74,7 @@ public final class CoverSurvey {
     private final byte[] capBox = new byte[2 * WINDOW * WINDOW * 4];
     private final BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
     private final BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
+    private final BlockPos.MutableBlockPos above = new BlockPos.MutableBlockPos();
     private final float[] blurred = new float[1 + CoverChunk.DIRECTIONS];
     private final int[] reach = new int[25];
     private Level level;
@@ -229,6 +232,15 @@ public final class CoverSurvey {
                 && !(state.getBlock() instanceof SnowLayerBlock);
     }
 
+    /**
+     * Thin things lying on a block that the player must keep seeing: rails, redstone dust, tripwire and pressure plates.
+     * Snow does not lie under them, as vanilla snow layers do not.
+     */
+    private static boolean keptClear(BlockState state) {
+        return state.is(BlockTags.RAILS) || state.is(BlockTags.PRESSURE_PLATES) || state.getBlock() instanceof RedStoneWireBlock
+                || state.getBlock() instanceof TripWireBlock;
+    }
+
     /** Sets up the surface of the block at {@code y} in window slot {@code w}; false when snow cannot lie on it. */
     private boolean surface(Level level, BlockState state, int y, int w) {
         if (!state.getFluidState().isEmpty() && state.getCollisionShape(level, pos).isEmpty()) {
@@ -236,6 +248,9 @@ public final class CoverSurvey {
         }
         VoxelShape shape = state.getShape(level, pos);
         if (shape.isEmpty()) {
+            return false;
+        }
+        if (keptClear(level.getBlockState(above.setWithOffset(pos, Direction.UP)))) {
             return false;
         }
         double maxY = shape.max(Direction.Axis.Y);
