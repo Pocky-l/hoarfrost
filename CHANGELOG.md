@@ -4,7 +4,7 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.1] - Unreleased
+## [1.1.1] - 2026-10-13
 ### Fixed
 - Settled snow no longer hides rails, redstone dust, tripwire and pressure plates: the ground under them stays clear,
   as with vanilla snow layers. Placing one on snowy ground clears the snow under it.
