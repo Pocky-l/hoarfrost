@@ -10,36 +10,35 @@ displayName="${mod_name}"
 authors="${mod_authors}"
 displayURL="${mod_url}"
 logoFile="logo.png"
+# Works on the client alone and on servers without the mod; a server with the mod accepts clients without it.
+displayTest="IGNORE_ALL_VERSION"
 description='''${mod_description}'''
 
 [[dependencies.${mod_id}]]
-    modId="neoforge"
-    type="required"
-    versionRange="[${neo_version},)"
+    modId="forge"
+    mandatory=true
+    versionRange="${forge_version_range}"
     ordering="NONE"
     side="BOTH"
 
 [[dependencies.${mod_id}]]
     modId="minecraft"
-    type="required"
+    mandatory=true
     versionRange="${minecraft_version_range}"
     ordering="NONE"
     side="BOTH"
 
 [[dependencies.${mod_id}]]
     modId="sereneseasons"
-    type="optional"
-    versionRange="[10.1,)"
+    mandatory=false
+    versionRange="${serene_seasons_version_range}"
     ordering="NONE"
     side="BOTH"
 
 # Particle Rain is never compiled against: any version may be installed, hooks that do not fit it are skipped.
 [[dependencies.${mod_id}]]
     modId="particlerain"
-    type="optional"
-    versionRange="[0,)"
+    mandatory=false
+    versionRange="${particle_rain_version_range}"
     ordering="NONE"
     side="CLIENT"
-
-[[mixins]]
-config="${mod_id}.mixins.json"
