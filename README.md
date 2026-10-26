@@ -27,12 +27,13 @@
   under roofs; flakes, crystals, clumps and grains drift with it.
 - 🏔️ **Soft snow on the ground** - one smooth cover on land, roofs and crowns, with drifts in the lee, wind-swept ridges
   and caps on fence posts; out to the render distance, melting near lamps.
-- 💨 **Snow with physics** - wind charges, explosions, gusts and running feet blow up powder; footprints and trodden
-  paths that fresh snow fills again.
+- 💨 **Snow with physics** - wind charges, explosions, gusts and running feet blow up powder; footprints that depend on
+  the ground (a rim of snow on soil, crisp prints on stone, slips that sweep the ice bare) and trodden paths that fresh
+  snow fills again.
 - 🌫️ **Storms with volume** - clouds of snow rolling over the land, a bright overcast sky and a blue-grey haze, never
   indoors or underground.
-- 🌲 **White leaves in snowy biomes**, as in Bedrock Edition, and real snow drifts piling up when the mod is on the
-  server.
+- 🌲 **Snow on the trees** - green leaves with a cap of snow on the crowns that falls off when you brush, bump or break
+  them, and real snow drifts piling up when the mod is on the server.
 - 🔇 **A quiet winter soundscape** - the hush of falling snow, wind growing to a howl, muffled indoors, footsteps
   crunching and squeaking.
 
@@ -46,7 +47,7 @@
 
 [![Iris](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/iris.png)](https://modrinth.com/mod/iris) ✅ **[Iris](https://modrinth.com/mod/iris)** (shader packs) - flakes and the snow cover take on the pack's look and lighting.
 
-[![Sodium](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sodium.png)](https://modrinth.com/mod/sodium) ✅ **[Sodium](https://modrinth.com/mod/sodium)** - works, white leaves included.
+[![Sodium](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sodium.png)](https://modrinth.com/mod/sodium) ✅ **[Sodium](https://modrinth.com/mod/sodium)** - works, snowy leaves included.
 
 [![Sound Physics Remastered](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sound-physics-remastered.png)](https://www.curseforge.com/minecraft/mc-mods/sound-physics-remastered) ✅ **[Sound Physics Remastered](https://www.curseforge.com/minecraft/mc-mods/sound-physics-remastered)** (optional) - the hush of falling snow lets Sound Physics do the muffling.
 

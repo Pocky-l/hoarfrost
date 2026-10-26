@@ -52,12 +52,17 @@ public final class CoverChunk {
     /** Packed light just above the surface. */
     final int[] light = new int[ENTRIES];
 
-    // Footprints: centre, the surface they are on, radius and how deep they press.
+    // Footprints: centre, the surface they are on, foot radius, how deep they press, the direction of the step, how far a
+    // slip stretched them and the footing they were pressed on (see Footing).
     final float[] dentX = new float[MAX_DENTS];
     final float[] dentZ = new float[MAX_DENTS];
     final float[] dentRadius = new float[MAX_DENTS];
     final float[] dentDepth = new float[MAX_DENTS];
     final byte[] dentSurface = new byte[MAX_DENTS];
+    final float[] dentDirX = new float[MAX_DENTS];
+    final float[] dentDirZ = new float[MAX_DENTS];
+    final float[] dentStretch = new float[MAX_DENTS];
+    final byte[] dentFooting = new byte[MAX_DENTS];
     int dents;
 
     boolean surveyed;
@@ -143,6 +148,22 @@ public final class CoverChunk {
         return dentSurface[i];
     }
 
+    public float dentDirX(int i) {
+        return dentDirX[i];
+    }
+
+    public float dentDirZ(int i) {
+        return dentDirZ[i];
+    }
+
+    public float dentStretch(int i) {
+        return dentStretch[i];
+    }
+
+    public Footing dentFooting(int i) {
+        return Footing.of(dentFooting[i]);
+    }
+
     /** The cap box of a narrow top in blocks: {@code k} = 0 min x, 1 max x, 2 min z, 3 max z. */
     public float capBox(int surface, int column, int k) {
         return capBox[(surface * COLUMNS + column) * 4 + k] / 16.0F;
@@ -206,14 +227,12 @@ public final class CoverChunk {
         return was;
     }
 
-    void addDent(float x, float z, int surface, float radius, float amount) {
+    void addDent(float x, float z, int surface, float radius, float amount, float dirX, float dirZ, float stretch, Footing footing) {
         if (dents == MAX_DENTS) {
             // The oldest dent makes room.
-            System.arraycopy(dentX, 1, dentX, 0, MAX_DENTS - 1);
-            System.arraycopy(dentZ, 1, dentZ, 0, MAX_DENTS - 1);
-            System.arraycopy(dentRadius, 1, dentRadius, 0, MAX_DENTS - 1);
-            System.arraycopy(dentDepth, 1, dentDepth, 0, MAX_DENTS - 1);
-            System.arraycopy(dentSurface, 1, dentSurface, 0, MAX_DENTS - 1);
+            for (int i = 1; i < MAX_DENTS; i++) {
+                keepDent(i, i - 1, dentDepth[i]);
+            }
             dents--;
         }
         dentX[dents] = x;
@@ -221,6 +240,10 @@ public final class CoverChunk {
         dentRadius[dents] = radius;
         dentDepth[dents] = amount;
         dentSurface[dents] = (byte) surface;
+        dentDirX[dents] = dirX;
+        dentDirZ[dents] = dirZ;
+        dentStretch[dents] = stretch;
+        dentFooting[dents] = (byte) footing.ordinal();
         dents++;
         touched();
     }
@@ -231,11 +254,7 @@ public final class CoverChunk {
         for (int i = 0; i < dents; i++) {
             float left = dentDepth[i] - amount;
             if (left > 0.004F) {
-                dentX[kept] = dentX[i];
-                dentZ[kept] = dentZ[i];
-                dentRadius[kept] = dentRadius[i];
-                dentDepth[kept] = left;
-                dentSurface[kept] = dentSurface[i];
+                keepDent(i, kept, left);
                 kept++;
             }
         }
@@ -243,6 +262,18 @@ public final class CoverChunk {
             addChange(amount * 2.0F);
         }
         dents = kept;
+    }
+
+    private void keepDent(int from, int to, float depth) {
+        dentX[to] = dentX[from];
+        dentZ[to] = dentZ[from];
+        dentRadius[to] = dentRadius[from];
+        dentDepth[to] = depth;
+        dentSurface[to] = dentSurface[from];
+        dentDirX[to] = dentDirX[from];
+        dentDirZ[to] = dentDirZ[from];
+        dentStretch[to] = dentStretch[from];
+        dentFooting[to] = dentFooting[from];
     }
 
     /** Drops the survey (blocks changed); the snow is kept to be matched to the new surfaces. */

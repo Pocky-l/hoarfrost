@@ -3,6 +3,7 @@ package com.pockyl.hoarfrost.sim;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
@@ -189,31 +190,42 @@ public final class SnowCover {
     // Changes
     // ------------------------------------------------------------------------------------------------------------
 
+    /** A foot pressed into the snow: the footing under it, the depth of snow stepped into (0 if none). */
+    public record Step(Footing footing, float depth) {
+        public static final Step NONE = new Step(Footing.SOFT, 0.0F);
+    }
+
     /**
-     * A foot pressed into the snow: a soft dent, and the column a little more trodden.
+     * A foot pressed into the snow: a print shaped by what lies under the snow (see {@link Footing}), and the column a
+     * little more trodden.
      *
-     * @return the depth of snow stepped into, 0 if none
+     * @param dirX    direction of the step (a unit vector, or 0 for a foot coming straight down)
+     * @param stretch how much a slip on ice lengthens the print (1 for none)
      */
-    public float step(double x, double y, double z, float radius, float weight) {
+    public Step step(BlockGetter level, double x, double y, double z, float dirX, float dirZ, float stretch, float radius, float weight) {
         int bx = Mth.floor(x);
         int bz = Mth.floor(z);
         CoverChunk chunk = chunkAt(bx, bz);
         if (chunk == null || !chunk.surveyed) {
-            return 0.0F;
+            return Step.NONE;
         }
         int column = CoverChunk.index(bx, bz);
         int s = surfaceBelow(chunk, column, y);
         if (s < 0) {
-            return 0.0F;
+            return Step.NONE;
         }
         int e = s * CoverChunk.COLUMNS + column;
         float depth = chunk.depth[e];
         if (depth < 0.012F || (chunk.flags[e] & CoverChunk.CAP) != 0) {
-            return 0.0F;
+            return Step.NONE;
         }
-        chunk.addDent((float) x, (float) z, s, radius, Math.min(depth * 0.75F, 0.07F + 0.06F * weight));
-        chunk.packed[e] = Math.min(1.0F, chunk.packed[e] + 0.12F * weight);
-        return depth;
+        Footing footing = Footing.at(level, bx, chunk.base[e], bz, depth);
+        if (footing != Footing.ICE) {
+            stretch = 1.0F;
+        }
+        chunk.addDent((float) x, (float) z, s, radius, footing.press(depth, weight), dirX, dirZ, stretch, footing);
+        chunk.packed[e] = Math.min(1.0F, chunk.packed[e] + footing.packing * weight);
+        return new Step(footing, depth);
     }
 
     /** Snow blown off the ground by a blast: where it was and how much. */

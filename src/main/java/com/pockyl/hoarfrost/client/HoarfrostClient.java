@@ -26,6 +26,7 @@ public final class HoarfrostClient {
         // Last, so the leaves' colours of other mods are wrapped too.
         modBus.addListener(EventPriority.LOWEST, LeafFrost::onRegisterColors);
         modBus.addListener(LeafFrost::onRegisterResolvers);
+        modBus.addListener(LeafFrost::onModifyBakingResult);
         if (ModList.get().isLoaded("distanthorizons")) {
             DistantHorizonsFog.register();
         }

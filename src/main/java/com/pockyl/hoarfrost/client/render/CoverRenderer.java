@@ -34,6 +34,7 @@ import com.pockyl.hoarfrost.client.FarSnow;
 import com.pockyl.hoarfrost.client.compat.ShaderPacks;
 import com.pockyl.hoarfrost.sim.CoverChunk;
 import com.pockyl.hoarfrost.sim.CoverSurvey;
+import com.pockyl.hoarfrost.sim.Footing;
 import com.pockyl.hoarfrost.sim.SnowCover;
 
 import java.util.ArrayList;
@@ -97,6 +98,12 @@ public final class CoverRenderer implements AutoCloseable {
     /** Brightness of the sides of the snow, like the sides of vanilla blocks. */
     private static final float SIDE_SHADE = 0.82F;
     private static final ResourceLocation VANILLA_SNOW = ResourceLocation.withDefaultNamespace("block/snow");
+    /** Grid of a block near the camera, and of a block a footprint touches (fine enough to show its shape). */
+    private static final int NEAR_DETAIL = 4;
+    private static final int PRINT_DETAIL = 8;
+    private static final int GRID = (PRINT_DETAIL + 1) * (PRINT_DETAIL + 1);
+    /** Step for the slope of the surface in a print. */
+    private static final float SLOPE_STEP = 0.02F;
 
     private final SnowCover cover;
     private final FarSnowRenderer far;
@@ -123,12 +130,14 @@ public final class CoverRenderer implements AutoCloseable {
     private final float[] nBlock = new float[9];
     private final float[] nSky = new float[9];
     private final boolean[] nDrop = new boolean[9];
-    private final float[] gridY = new float[25];
-    private final float[] gridAlpha = new float[25];
-    private final float[] gridNx = new float[25];
-    private final float[] gridNy = new float[25];
-    private final float[] gridNz = new float[25];
-    private final int[] gridLight = new int[25];
+    private final float[] gridY = new float[GRID];
+    private final float[] gridAlpha = new float[GRID];
+    private final float[] gridNx = new float[GRID];
+    private final float[] gridNy = new float[GRID];
+    private final float[] gridNz = new float[GRID];
+    private final int[] gridLight = new int[GRID];
+    /** Brightness of each vertex beyond its slope: the trodden floor of a print is a little darker. */
+    private final float[] gridShade = new float[GRID];
     private final float[] wu = new float[3];
     private final float[] wv = new float[3];
     private final float[] du = new float[3];
@@ -140,6 +149,12 @@ public final class CoverRenderer implements AutoCloseable {
     private final float[] dentR = new float[CoverChunk.MAX_DENTS * 9];
     private final float[] dentD = new float[CoverChunk.MAX_DENTS * 9];
     private final float[] dentBase = new float[CoverChunk.MAX_DENTS * 9];
+    private final float[] dentDirX = new float[CoverChunk.MAX_DENTS * 9];
+    private final float[] dentDirZ = new float[CoverChunk.MAX_DENTS * 9];
+    private final float[] dentStretch = new float[CoverChunk.MAX_DENTS * 9];
+    /** How far from its centre a dent and its rim reach, in blocks. */
+    private final float[] dentReach = new float[CoverChunk.MAX_DENTS * 9];
+    private final Footing[] dentFooting = new Footing[CoverChunk.MAX_DENTS * 9];
     private int dentCount;
     private int quads;
     private float minY;
@@ -332,12 +347,12 @@ public final class CoverRenderer implements AutoCloseable {
             int detail = mesh.detail;
             // Finer near the camera, with some slack so a mesh does not flip between two levels.
             if (distance < NEAR - HYSTERESIS) {
-                detail = 4;
+                detail = NEAR_DETAIL;
             } else if (distance > NEAR + HYSTERESIS && distance < MIDDLE - HYSTERESIS) {
                 detail = 2;
             } else if (distance > MIDDLE + HYSTERESIS) {
                 detail = 1;
-            } else if (detail == 1 && distance < MIDDLE - HYSTERESIS || detail == 4 && distance > NEAR + HYSTERESIS) {
+            } else if (detail == 1 && distance < MIDDLE - HYSTERESIS || detail == NEAR_DETAIL && distance > NEAR + HYSTERESIS) {
                 detail = 2;
             }
             mesh.detail = detail;
@@ -467,7 +482,7 @@ public final class CoverRenderer implements AutoCloseable {
             return;
         }
         mesh.originY = Math.floor(lowest);
-        gatherDents(chunk, mesh.detail == 4);
+        gatherDents(chunk, mesh.detail == NEAR_DETAIL);
         BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         quads = 0;
         minY = Float.MAX_VALUE;
@@ -521,7 +536,10 @@ public final class CoverRenderer implements AutoCloseable {
                     float x = source.dentX(i);
                     float z = source.dentZ(i);
                     float r = source.dentRadius(i);
-                    if (x + r < chunk.x * 16 - 1 || x - r > chunk.x * 16 + 17 || z + r < chunk.z * 16 - 1 || z - r > chunk.z * 16 + 17) {
+                    Footing footing = source.dentFooting(i);
+                    float reach = r * footing.reach(source.dentStretch(i));
+                    if (x + reach < chunk.x * 16 - 1 || x - reach > chunk.x * 16 + 17 || z + reach < chunk.z * 16 - 1
+                            || z - reach > chunk.z * 16 + 17) {
                         continue;
                     }
                     int column = CoverChunk.index((int) Math.floor(x), (int) Math.floor(z));
@@ -530,6 +548,11 @@ public final class CoverRenderer implements AutoCloseable {
                     dentR[dentCount] = r;
                     dentD[dentCount] = source.dentDepth(i);
                     dentBase[dentCount] = source.base(source.dentSurface(i), column);
+                    dentDirX[dentCount] = source.dentDirX(i);
+                    dentDirZ[dentCount] = source.dentDirZ(i);
+                    dentStretch[dentCount] = source.dentStretch(i);
+                    dentReach[dentCount] = reach;
+                    dentFooting[dentCount] = footing;
                     dentCount++;
                 }
             }
@@ -642,6 +665,10 @@ public final class CoverRenderer implements AutoCloseable {
         int worldX = chunk.x * 16 + lx;
         int worldZ = chunk.z * 16 + lz;
         float packed = chunk.packed(surface, column);
+        boolean printed = detail == NEAR_DETAIL && printed(worldX, worldZ, b);
+        if (printed) {
+            detail = PRINT_DETAIL;
+        }
         int size = detail + 1;
         for (int j = 0; j <= detail; j++) {
             float v = j / (float) detail;
@@ -667,26 +694,38 @@ public final class CoverRenderer implements AutoCloseable {
                         sky += w * nSky[n];
                     }
                 }
-                if (dentCount > 0) {
+                int g = j * size + i;
+                gridShade[g] = 1.0F;
+                if (printed) {
                     float px = worldX + u;
                     float pz = worldZ + v;
+                    float lower = 0.0F;
+                    float lowerX = 0.0F;
+                    float lowerZ = 0.0F;
+                    float deepest = 0.0F;
                     for (int k = 0; k < dentCount; k++) {
-                        float ex = px - dentX[k];
-                        float ez = pz - dentZ[k];
-                        float r = dentR[k];
-                        float q = (ex * ex + ez * ez) / (r * r);
-                        if (q >= 1.0F || Math.abs(dentBase[k] - b) > CoverSurvey.SAME_LEVEL) {
+                        float reach = dentReach[k];
+                        if (Math.abs(px - dentX[k]) > reach || Math.abs(pz - dentZ[k]) > reach
+                                || Math.abs(dentBase[k] - b) > CoverSurvey.SAME_LEVEL) {
                             continue;
                         }
-                        float press = Math.min(dentD[k] * (1.0F - q) * (1.0F - q), depth * 0.85F);
+                        lower += dent(k, px, pz);
+                        lowerX += dent(k, px + SLOPE_STEP, pz);
+                        lowerZ += dent(k, px, pz + SLOPE_STEP);
+                        deepest = Math.max(deepest, depth * dentFooting[k].share);
+                    }
+                    if (lower != 0.0F || lowerX != 0.0F || lowerZ != 0.0F) {
+                        // A print never goes below the block; a rim only rises where snow lies.
+                        float press = lower > 0.0F ? Math.min(lower, deepest) : lower * Math.min(1.0F, depth / 0.02F);
                         height -= press;
                         depth -= press;
-                        float grad = 4.0F * dentD[k] * (1.0F - q) / (r * r);
-                        slopeX += grad * ex;
-                        slopeZ += grad * ez;
+                        slopeX -= (lowerX - lower) / SLOPE_STEP;
+                        slopeZ -= (lowerZ - lower) / SLOPE_STEP;
+                        if (press > 0.0F) {
+                            gridShade[g] = 1.0F - 0.1F * Math.min(1.0F, press / 0.05F);
+                        }
                     }
                 }
-                int g = j * size + i;
                 float y = Math.max(height, b + LIFT);
                 if (depth <= 0.0F) {
                     y = b + LIFT;
@@ -701,6 +740,9 @@ public final class CoverRenderer implements AutoCloseable {
                 gridNz[g] = -slopeZ / length;
                 gridLight[g] = (int) (block * 16.0F) | (int) (sky * 16.0F) << 16;
             }
+        }
+        if (printed) {
+            stitch(worldX, worldZ, b, size);
         }
         float step = 1.0F / detail;
         float texU = (u1 - u0) / TEXTURE_BLOCKS;
@@ -748,6 +790,66 @@ public final class CoverRenderer implements AutoCloseable {
         }
     }
 
+    /** Whether a footprint reaches the block column (x, z) with its surface at {@code base}. */
+    private boolean printed(int x, int z, float base) {
+        for (int k = 0; k < dentCount; k++) {
+            float reach = dentReach[k];
+            if (dentX[k] + reach >= x && dentX[k] - reach <= x + 1 && dentZ[k] + reach >= z && dentZ[k] - reach <= z + 1
+                    && Math.abs(dentBase[k] - base) <= CoverSurvey.SAME_LEVEL) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** How much dent {@code k} lowers the snow at (x, z); negative on its rim. */
+    private float dent(int k, float x, float z) {
+        float ex = (x - dentX[k]) / dentR[k];
+        float ez = (z - dentZ[k]) / dentR[k];
+        float dirX = dentDirX[k];
+        float dirZ = dentDirZ[k];
+        Footing footing = dentFooting[k];
+        if (dirX == 0.0F && dirZ == 0.0F) {
+            // Straight down (a landing): round.
+            return footing.lower(0.0F, (float) Math.sqrt(ex * ex + ez * ez) * footing.side, 1.0F, dentD[k]);
+        }
+        return footing.lower(ex * dirX + ez * dirZ, ez * dirX - ex * dirZ, dentStretch[k], dentD[k]);
+    }
+
+    /**
+     * A finely gridded block next to a coarse one: the extra vertices on their shared edge follow the coarse edge, so no
+     * slit opens between them.
+     */
+    private void stitch(int x, int z, float base, int size) {
+        int detail = size - 1;
+        int ratio = PRINT_DETAIL / NEAR_DETAIL;
+        if (!printed(x - 1, z, base)) {
+            stitchEdge(0, size, detail, ratio);
+        }
+        if (!printed(x + 1, z, base)) {
+            stitchEdge(detail, size, detail, ratio);
+        }
+        if (!printed(x, z - 1, base)) {
+            stitchEdge(0, 1, detail, ratio);
+        }
+        if (!printed(x, z + 1, base)) {
+            stitchEdge(detail * size, 1, detail, ratio);
+        }
+    }
+
+    private void stitchEdge(int first, int stride, int detail, int ratio) {
+        for (int k = 0; k < detail; k += ratio) {
+            int a = first + stride * k;
+            int c = first + stride * (k + ratio);
+            for (int m = 1; m < ratio; m++) {
+                float t = m / (float) ratio;
+                int g = first + stride * (k + m);
+                gridY[g] = gridY[a] + (gridY[c] - gridY[a]) * t;
+                gridAlpha[g] = gridAlpha[a] + (gridAlpha[c] - gridAlpha[a]) * t;
+            }
+        }
+    }
+
     private void topVertex(BufferBuilder builder, float x, float z, int g, float u, float v, float packed) {
         float y = gridY[g];
         float nx = gridNx[g];
@@ -755,7 +857,7 @@ public final class CoverRenderer implements AutoCloseable {
         float nz = gridNz[g];
         float lit = Math.max(0.0F, (nx * LIGHT_X + ny * LIGHT_Y + nz * LIGHT_Z) / FLAT_LIGHT);
         // Flat snow is as bright as the top of a vanilla snow block; slopes facing away from the light a little darker.
-        float shade = Math.min(1.0F, 0.8F + 0.2F * lit) * (1.0F - 0.08F * packed);
+        float shade = Math.min(1.0F, 0.8F + 0.2F * lit) * (1.0F - 0.08F * packed) * gridShade[g];
         int alpha = (int) (gridAlpha[g] * 255.0F);
         builder.addVertex(x, y, z, alpha << 24 | tint(shade), u, v, OverlayTexture.NO_OVERLAY, gridLight[g], nx, ny, nz);
         minY = Math.min(minY, y);
@@ -853,6 +955,7 @@ public final class CoverRenderer implements AutoCloseable {
                 gridNz[g] = -slopeV / length;
                 gridAlpha[g] = 1.0F;
                 gridLight[g] = packedLight;
+                gridShade[g] = 1.0F;
             }
         }
         float texU = (u1 - u0) / TEXTURE_BLOCKS;

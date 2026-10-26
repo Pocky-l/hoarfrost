@@ -10,6 +10,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import com.pockyl.hoarfrost.compat.Climate;
 import com.pockyl.hoarfrost.weather.SnowConditions;
+import com.pockyl.hoarfrost.world.LeafSnow;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -181,6 +182,9 @@ public final class SnowSimulation {
         gale();
         if (settings.powder && settings.cover) {
             spindrift();
+        }
+        if (settings.powder && settings.leafSnow) {
+            shedCrowns(level);
         }
     }
 
@@ -736,10 +740,17 @@ public final class SnowSimulation {
         }
     }
 
-    /** In strong wind, gusts lift loose powder off exposed snow; it skims along the ground in streaks. */
+    /**
+     * In strong wind, gusts lift loose powder off exposed snow; it skims along the ground in streaks. A moderate wind only
+     * sets a few grains creeping over the snow, low and slow.
+     */
     private void spindrift() {
         float windiness = weather.windiness();
-        if (windiness < 0.25F || weather.snow <= 0.0F && windiness < 0.4F) {
+        if (windiness < 0.25F) {
+            creep(windiness);
+            return;
+        }
+        if (weather.snow <= 0.0F && windiness < 0.4F) {
             return;
         }
         int tries = Math.round(48.0F * windiness * windiness);
@@ -768,6 +779,99 @@ public final class SnowSimulation {
                 continue;
             }
             lift(x, y + 0.02, z, scratch[0], 0.02F + excess * 0.12F, scratch[2], 0.02F, 2 + (int) (excess * 20.0F), 70.0F);
+        }
+    }
+
+    /** A breeze over fresh snow: here and there a few grains roll and hop along the surface. */
+    private void creep(float windiness) {
+        if (windiness < 0.08F) {
+            return;
+        }
+        for (int n = 0; n < 8; n++) {
+            float angle = random.next() * Mth.TWO_PI;
+            float r = 14.0F * (float) Math.sqrt(random.next());
+            double x = camX + Mth.cos(angle) * r;
+            double z = camZ + Mth.sin(angle) * r;
+            int bx = Mth.floor(x);
+            int bz = Mth.floor(z);
+            CoverChunk chunk = cover.chunkAt(bx, bz);
+            if (chunk == null || !chunk.surveyed() || random.next() > windiness * 1.2F * weather.gustAt(x, z)) {
+                continue;
+            }
+            int column = CoverChunk.index(bx, bz);
+            float depth = chunk.depth(CoverChunk.TOP, column);
+            float base = chunk.base(CoverChunk.TOP, column);
+            if (depth < 0.02F || chunk.packed(CoverChunk.TOP, column) > 0.5F || base < air.top(x, z) - 0.01F) {
+                continue;
+            }
+            double y = base + depth;
+            air.sample(x, y + 0.2, z, scratch);
+            lift(x, y + 0.01, z, scratch[0] * 0.7F, 0.006F, scratch[2] * 0.7F, 0.004F, random.next() < 0.5F ? 1 : 2, random.range(25.0F, 50.0F),
+                    0.0F);
+        }
+    }
+
+    /** Strong gusts shake the snow off the tops of crowns now and then. */
+    private void shedCrowns(Level level) {
+        float windiness = weather.windiness();
+        if (windiness < 0.2F) {
+            return;
+        }
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int n = 0; n < 4; n++) {
+            float angle = random.next() * Mth.TWO_PI;
+            float r = 18.0F * (float) Math.sqrt(random.next());
+            double x = camX + Mth.cos(angle) * r;
+            double z = camZ + Mth.sin(angle) * r;
+            float push = weather.windSpeed * weather.gustAt(x, z);
+            if (random.next() > Math.clamp((push - 0.25F) * 0.15F, 0.0F, 0.06F)) {
+                continue;
+            }
+            int top = air.top(x, z);
+            if (top == Integer.MIN_VALUE) {
+                continue;
+            }
+            pos.set(Mth.floor(x), top - 1, Mth.floor(z));
+            if (level.getBlockState(pos).is(BlockTags.LEAVES)) {
+                shake(level, pos, 0.35F);
+            }
+        }
+    }
+
+    /**
+     * Snow shaken off a snowy leaves block - brushed, bumped, broken or hit by a gust: powder puffs off its top and clumps
+     * drop out of its underside with a veil of dust sifting after them. Nothing happens to leaves without snow.
+     *
+     * @param strength 0..1, how hard it was shaken
+     */
+    public void shake(Level level, BlockPos pos, float strength) {
+        if (!settings.powder || !settings.leafSnow || LeafSnow.mask(level, pos) == 0) {
+            return;
+        }
+        double x = pos.getX() + 0.5;
+        double z = pos.getZ() + 0.5;
+        lift(x, pos.getY() + 1.02, z, 0.0F, 0.02F + strength * 0.05F, 0.0F, 0.02F + strength * 0.03F, Math.round(4 + 14 * strength),
+                random.range(40.0F, 80.0F), 0.45F);
+        lift(x, pos.getY() - 0.1, z, 0.0F, -0.02F, 0.0F, 0.01F, Math.round(6 + 26 * strength), random.range(60.0F, 120.0F), 0.35F);
+        int clumps = Math.round(1 + 5 * strength * random.next());
+        int room = settings.powderGrains - flakes.count(Flakes.POWDER);
+        for (int n = 0; n < Math.min(clumps, room); n++) {
+            int i = flakes.add(Flakes.POWDER, pos.getX() + random.range(0.1F, 0.9F), pos.getY() - 0.05, pos.getZ() + random.range(0.1F, 0.9F));
+            if (i < 0) {
+                return;
+            }
+            flakes.shape[i] = random.next() < 0.5F ? Flakes.CLUMP : Flakes.CLUMP_ALT;
+            flakes.size[i] = random.range(3.0F, 6.0F);
+            flakes.fall[i] = random.range(0.08F, 0.12F);
+            flakes.sway[i] = random.range(0.001F, 0.004F);
+            flakes.swing[i] = random.range(0.1F, 0.3F);
+            flakes.phase[i] = random.next() * Mth.TWO_PI;
+            flakes.spinRate[i] = random.signed() * 0.2F;
+            flakes.vx[i] = random.signed() * 0.01F;
+            flakes.vy[i] = -0.03F;
+            flakes.vz[i] = random.signed() * 0.01F;
+            flakes.life[i] = 100.0F;
+            flakes.light[i] = 0xF00000;
         }
     }
 
@@ -812,24 +916,37 @@ public final class SnowSimulation {
      * @param moveX  movement this tick
      * @param weight 1 for a player; heavier creatures press deeper
      */
-    public void step(double x, double y, double z, float moveX, float moveZ, float radius, float weight) {
+    public void step(Level level, double x, double y, double z, float moveX, float moveZ, float radius, float weight) {
         if (!settings.cover || !settings.footprints) {
             return;
         }
-        float depth = cover.step(x, y, z, radius, weight);
         float speed = (float) Math.sqrt(moveX * moveX + moveZ * moveZ);
-        if (settings.powder && depth > 0.03F && speed > 0.05F) {
-            int count = Math.round(Math.min(14.0F, (speed * 30.0F) * Math.min(1.0F, depth * 6.0F)));
-            lift(x, y + 0.05, z, moveX * 0.4F, 0.05F + speed * 0.25F, moveZ * 0.4F, 0.03F, count, 60.0F);
+        float dirX = speed > 1.0E-4F ? moveX / speed : 0.0F;
+        float dirZ = speed > 1.0E-4F ? moveZ / speed : 0.0F;
+        // On ice the foot slides on: the faster the step, the longer the scuff.
+        float slip = 1.0F + Math.min(1.5F, speed * 5.0F);
+        SnowCover.Step step = cover.step(level, x, y, z, dirX, dirZ, slip, radius, weight);
+        float depth = step.depth();
+        if (!settings.powder || depth <= 0.0F || speed <= 0.05F) {
+            return;
+        }
+        // Even a dusting puffs a little under a boot; deep snow is kicked forward in clumps of powder.
+        int count = Math.round(Math.min(14.0F, speed * 30.0F * (0.2F + 0.8F * Math.min(1.0F, depth * 6.0F))));
+        switch (step.footing()) {
+            case ICE -> lift(x + dirX * radius, y + 0.02, z + dirZ * radius, moveX * 0.9F, 0.02F + speed * 0.06F, moveZ * 0.9F, 0.02F,
+                    count, 40.0F);
+            case DEEP -> lift(x + dirX * radius, y + 0.08, z + dirZ * radius, moveX * 0.6F, 0.07F + speed * 0.3F, moveZ * 0.6F, 0.04F,
+                    count + 4, 70.0F);
+            default -> lift(x, y + 0.05, z, moveX * 0.4F, 0.05F + speed * 0.25F, moveZ * 0.4F, 0.03F, count, 60.0F);
         }
     }
 
     /** A creature landed in the snow from a fall: a deeper print and a puff of powder all around. */
-    public void land(double x, double y, double z, float width, float fallSpeed) {
+    public void land(Level level, double x, double y, double z, float width, float fallSpeed) {
         if (!settings.cover || !settings.footprints) {
             return;
         }
-        float depth = cover.step(x, y, z, width * 0.55F, 1.5F);
+        float depth = cover.step(level, x, y, z, 0.0F, 0.0F, 1.0F, width * 0.55F, 1.5F).depth();
         if (settings.powder && depth > 0.02F) {
             int count = Math.round(Math.min(60.0F, fallSpeed * 70.0F));
             for (int n = 0; n < 8; n++) {

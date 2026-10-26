@@ -2,30 +2,38 @@ package com.pockyl.hoarfrost.client;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockColor;
+import net.minecraft.client.renderer.block.BlockModelShaper;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.resources.model.BakedModel;
+import net.minecraft.client.resources.model.Material;
+import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.world.level.ColorResolver;
+import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 
 import com.pockyl.hoarfrost.ClientConfig;
+import com.pockyl.hoarfrost.Hoarfrost;
 import com.pockyl.hoarfrost.client.compat.DistantHorizonsTint;
+import com.pockyl.hoarfrost.client.render.SnowyLeavesModel;
 import com.pockyl.hoarfrost.mixin.BlockColorsAccessor;
+import com.pockyl.hoarfrost.world.LeafSnow;
+
+import java.util.Map;
 
 /**
- * White leaves in snowy biomes, as in Bedrock Edition: the leaves keep their own texture and lose their green tint for
- * white. Like Bedrock, a biome counts as snowy below a base temperature of 0.15.
+ * Snow on the leaves in snowy biomes: the leaves stay green and the faces snow would fall on - the top of the crown and
+ * the edges hanging from it - carry a snow cap ({@link SnowyLeavesModel}). Every leaves block, modded or not, gets it.
  *
- * <p>The leaves' own colour handlers are wrapped, so every tree, modded or not, keeps its colour elsewhere. Whether a
- * biome is snowy is a colour resolver, so vanilla biome blending (and Sodium's) fades the frost over the biome border,
- * and it works with shader packs.
+ * <p>Distant Horizons builds its far land from block colours, not from models: there the leaves of snowy biomes are
+ * paled towards white instead, which reads the same from afar.
  */
 public final class LeafFrost {
-    /** Bedrock's limit: leaves in biomes colder than this turn white. */
-    private static final float COLD = 0.15F;
-
-    /** 0xFF where the biome is snowy, 0 elsewhere; blended over the biome border like grass colours. */
-    private static final ColorResolver SNOWY = (biome, x, z) -> biome.getBaseTemperature() < COLD ? 0xFF : 0;
+    /** How far distant leaves in snowy biomes pale towards white. */
+    private static final float DISTANT_FROST = 0.55F;
 
     private LeafFrost() {
     }
@@ -35,10 +43,29 @@ public final class LeafFrost {
     }
 
     static void onRegisterResolvers(RegisterColorHandlersEvent.ColorResolvers event) {
-        event.register(SNOWY);
+        event.register(LeafSnow.SNOWY);
     }
 
-    /** Wraps the colours of all leaves. Registered last, so it wraps what other mods registered. */
+    /** Wraps the model of every leaves block state. */
+    static void onModifyBakingResult(ModelEvent.ModifyBakingResult event) {
+        TextureAtlasSprite top = event.getTextureGetter().apply(new Material(InventoryMenu.BLOCK_ATLAS, Hoarfrost.id("block/leaf_snow_top")));
+        TextureAtlasSprite side = event.getTextureGetter().apply(new Material(InventoryMenu.BLOCK_ATLAS, Hoarfrost.id("block/leaf_snow_side")));
+        Map<ModelResourceLocation, BakedModel> models = event.getModels();
+        for (Block block : BuiltInRegistries.BLOCK) {
+            if (!(block instanceof LeavesBlock)) {
+                continue;
+            }
+            for (BlockState state : block.getStateDefinition().getPossibleStates()) {
+                ModelResourceLocation location = BlockModelShaper.stateToModelLocation(state);
+                BakedModel model = models.get(location);
+                if (model != null && !(model instanceof SnowyLeavesModel)) {
+                    models.put(location, new SnowyLeavesModel(model, top, side, LeafFrost::enabled));
+                }
+            }
+        }
+    }
+
+    /** Wraps the colours of all leaves for Distant Horizons. Registered last, so it wraps what other mods registered. */
     static void onRegisterColors(RegisterColorHandlersEvent.Block event) {
         BlockColorsAccessor accessor = (BlockColorsAccessor) event.getBlockColors();
         for (Block block : BuiltInRegistries.BLOCK) {
@@ -51,12 +78,10 @@ public final class LeafFrost {
             }
             event.register((state, getter, pos, tint) -> {
                 int color = original.getColor(state, getter, pos, tint);
-                if (getter == null || pos == null || color == -1 || !enabled()) {
+                if (getter == null || pos == null || color == -1 || !DistantHorizonsTint.handles(getter) || !enabled()) {
                     return color;
                 }
-                float k = DistantHorizonsTint.handles(getter)
-                        ? DistantHorizonsTint.snowy(getter, COLD)
-                        : (getter.getBlockTint(pos, SNOWY) & 0xFF) / 255.0F;
+                float k = DistantHorizonsTint.snowy(getter, LeafSnow.COLD) * DISTANT_FROST;
                 return k <= 0.0F ? color : whiten(color, k);
             }, block);
         }
@@ -72,7 +97,7 @@ public final class LeafFrost {
         return color & 0xFF000000 | r << 16 | g << 8 | b;
     }
 
-    /** The setting changed: the chunk meshes hold the old leaf colours. */
+    /** The setting changed: the chunk meshes hold the old leaves. */
     static void rebuild() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.levelRenderer != null && minecraft.level != null) {

@@ -29,6 +29,8 @@ public final class SnowSettings {
     public boolean footprints = true;
     /** Wind, blasts and feet lift powder off the snow. */
     public boolean powder = true;
+    /** Snow lies on the leaves in snowy biomes (and can be shaken off). */
+    public boolean leafSnow = true;
     /** Snow on the ground is simulated and drawn out to this distance. */
     public float coverRadius = 80.0F;
     /** Time per tick for surveying land and seeding snow, in nanoseconds. */

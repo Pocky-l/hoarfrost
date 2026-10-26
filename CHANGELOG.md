@@ -4,6 +4,21 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-10-26
+### Added
+- Footprints depend on what lies under the snow: on soil a boot-shaped dent with a trodden floor and a rim of pushed-up
+  snow, in deep snow a deeper hole with a furrow dragged behind, on stone and planks a crisp shallow print, and on ice
+  the foot slips - a long scuff that sweeps the snow off down to the ice. Left and right feet take turns.
+- Snow comes off snowy leaves: walking over a crown, landing on it, bumping your head on leaves, pushing into a hedge or
+  breaking leaves shakes down a shower of clumps and powder, and strong gusts shake the crowns now and then.
+- Livelier snow: steps puff a little powder even in a thin dusting, and a moderate breeze sets grains creeping over
+  fresh snow.
+
+### Changed
+- Leaves in snowy biomes keep their green and carry a cap of snow on the top of the crowns and over their edges, instead
+  of turning white. With [Distant Horizons](https://www.curseforge.com/minecraft/mc-mods/distant-horizons) the distant
+  crowns are paled instead.
+
 ## [1.1.2] - 2026-10-26
 ### Fixed
 - The haze of heavy snow and blizzards now covers the distant land of

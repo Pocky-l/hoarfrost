@@ -2,6 +2,7 @@ package com.pockyl.hoarfrost.client;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -11,12 +12,14 @@ import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.protocol.game.ClientboundExplodePacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LightningBolt;
@@ -80,6 +83,8 @@ public final class SnowClient {
     /** Distance walked since the last footprint, and the fall speed of the tick before, per entity. */
     private static final Int2FloatOpenHashMap STRIDE = new Int2FloatOpenHashMap();
     private static final Int2FloatOpenHashMap LAST_FALL = new Int2FloatOpenHashMap();
+    /** Entities whose next print is the right foot. */
+    private static final IntOpenHashSet RIGHT_FOOT = new IntOpenHashSet();
 
     private static volatile boolean configChanged = true;
     private static SnowSimulation simulation;
@@ -133,6 +138,7 @@ public final class SnowClient {
         SETTINGS.cover = ClientConfig.COVER.get();
         SETTINGS.footprints = ClientConfig.FOOTPRINTS.get();
         SETTINGS.powder = ClientConfig.POWDER.get();
+        SETTINGS.leafSnow = ClientConfig.SNOWY_LEAVES.get();
         if (snowyLeaves != null && snowyLeaves != ClientConfig.SNOWY_LEAVES.get()) {
             LeafFrost.rebuild();
         }
@@ -191,6 +197,7 @@ public final class SnowClient {
         if (ticks % 200 == 0) {
             STRIDE.clear();
             LAST_FALL.clear();
+            RIGHT_FOOT.clear();
         }
     }
 
@@ -223,6 +230,7 @@ public final class SnowClient {
         FAR.clear();
         STRIDE.clear();
         LAST_FALL.clear();
+        RIGHT_FOOT.clear();
     }
 
     private static Vec3 cameraPosition(Minecraft minecraft) {
@@ -259,12 +267,15 @@ public final class SnowClient {
             float lastFall = LAST_FALL.get(id);
             LAST_FALL.put(id, (float) moveY);
             boolean flying = entity instanceof Player player && player.getAbilities().flying;
+            if (SETTINGS.leafSnow && !flying) {
+                brushLeaves(entity, moveX, moveY, moveZ, lastFall);
+            }
             if (!entity.onGround() || flying) {
                 continue;
             }
             float weight = Math.clamp(width * entity.getBbHeight() / 1.08F, 0.4F, 2.5F);
             if (lastFall < -0.3F) {
-                simulation.land(entity.getX(), entity.getY(), entity.getZ(), width, -lastFall);
+                simulation.land(level, entity.getX(), entity.getY(), entity.getZ(), width, -lastFall);
             }
             float horizontal = (float) Math.sqrt(moveX * moveX + moveZ * moveZ);
             if (horizontal < 0.01F) {
@@ -274,13 +285,52 @@ public final class SnowClient {
             float walked = STRIDE.get(id) + horizontal;
             if (walked >= stride) {
                 walked = walked > stride * 2.0F ? 0.0F : walked - stride;
-                // Alternate feet a little to each side of the path.
-                float side = (ticks + id) % 2 == 0 ? 0.13F : -0.13F;
+                // Left and right foot in turn, a little to each side of the path.
+                float side = RIGHT_FOOT.remove(id) ? 0.13F : -0.13F;
+                if (side < 0.0F) {
+                    RIGHT_FOOT.add(id);
+                }
                 double footX = entity.getX() - moveZ / horizontal * side * width / 0.6F;
                 double footZ = entity.getZ() + moveX / horizontal * side * width / 0.6F;
-                simulation.step(footX, entity.getY(), footZ, (float) moveX, (float) moveZ, 0.17F * Math.max(1.0F, width / 0.6F), weight);
+                simulation.step(level, footX, entity.getY(), footZ, (float) moveX, (float) moveZ, 0.17F * Math.max(1.0F, width / 0.6F), weight);
             }
             STRIDE.put(id, walked);
+        }
+    }
+
+    /**
+     * A creature touching snowy leaves shakes their snow off: walking over a crown, landing on it, bumping its head on
+     * leaves in a jump or pushing into a hedge.
+     */
+    private static void brushLeaves(Entity entity, double moveX, double moveY, double moveZ, float lastFall) {
+        float horizontal = (float) Math.sqrt(moveX * moveX + moveZ * moveZ);
+        if (entity.onGround()) {
+            BlockPos below = entity.getOnPos();
+            if (level.getBlockState(below).is(BlockTags.LEAVES)) {
+                if (lastFall < -0.3F) {
+                    simulation.shake(level, below, 1.0F);
+                } else if (horizontal > 0.03F && level.random.nextFloat() < horizontal * 0.6F) {
+                    simulation.shake(level, below, 0.3F);
+                }
+            }
+        }
+        if (entity.verticalCollision && !entity.onGround() && moveY >= 0.0) {
+            BlockPos above = BlockPos.containing(entity.getX(), entity.getBoundingBox().maxY + 0.1, entity.getZ());
+            if (level.getBlockState(above).is(BlockTags.LEAVES)) {
+                simulation.shake(level, above, 0.8F);
+            }
+        }
+        if (entity.horizontalCollision && level.random.nextFloat() < 0.15F) {
+            Direction facing = entity.getDirection();
+            double reach = entity.getBbWidth() * 0.5 + 0.2;
+            for (double up : new double[] {0.5, 1.5}) {
+                BlockPos ahead = BlockPos.containing(entity.getX() + facing.getStepX() * reach, entity.getY() + up,
+                        entity.getZ() + facing.getStepZ() * reach);
+                if (level.getBlockState(ahead).is(BlockTags.LEAVES)) {
+                    simulation.shake(level, ahead, 0.5F);
+                    break;
+                }
+            }
         }
     }
 
@@ -392,6 +442,10 @@ public final class SnowClient {
     public static void onBlockChanged(ClientLevel changed, BlockPos pos, BlockState oldState, BlockState newState) {
         if (simulation == null || changed != level || oldState == newState) {
             return;
+        }
+        if (oldState.is(BlockTags.LEAVES) && !newState.is(BlockTags.LEAVES)) {
+            // The snow on broken leaves comes down with them.
+            simulation.shake(level, pos, 1.0F);
         }
         int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING, pos.getX(), pos.getZ());
         if (pos.getY() < top - 48) {
