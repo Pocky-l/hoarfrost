@@ -22,7 +22,7 @@ import java.util.function.BiPredicate;
  *
  * <p>Flakes fall at their own speed through the moving air: they follow it with a little delay (large flakes more
  * slowly), sway and tumble on the way down, ride up over obstacles, curl into lees and are blown in under overhangs and
- * into cave mouths, where they settle. Snow lifted off the ground - by gusts, wind charges and explosions, by feet - is
+ * into cave mouths, where they settle. Snow lifted off the ground - by gusts and explosions, by feet - is
  * powder: fine grains that rise in a cloud, drift with the wind and sink back slowly.
  */
 public final class SnowSimulation {
@@ -201,7 +201,7 @@ public final class SnowSimulation {
         // At first the whole space fills at once; afterwards falling flakes are replaced as they land or blow away.
         int budget = filled ? Math.max(24, target / 30) : missing;
         filled = true;
-        float topShare = Math.clamp(weather.fallSpeed / (weather.fallSpeed + weather.windSpeed * 0.7F), 0.2F, 0.9F);
+        float topShare = Mth.clamp(weather.fallSpeed / (weather.fallSpeed + weather.windSpeed * 0.7F), 0.2F, 0.9F);
         float radius = settings.radius;
         for (int attempt = 0; attempt < budget * 2 && budget > 0; attempt++) {
             double x;
@@ -236,7 +236,7 @@ public final class SnowSimulation {
         }
         float g = weather.gustAt(x, z);
         float crowd = (weather.gustiness - 0.45F) / 0.55F;
-        float keep = Math.clamp(g * g / 1.6F, 0.12F, 1.0F);
+        float keep = Mth.clamp(g * g / 1.6F, 0.12F, 1.0F);
         return random.next() < Mth.lerp(crowd, 1.0F, keep);
     }
 
@@ -536,14 +536,14 @@ public final class SnowSimulation {
             float rx = (float) Math.abs(x - camX) / STREAM_X;
             float ry = (float) Math.abs(y - camY) / STREAM_Y;
             float rz = (float) Math.abs(z - camZ) / STREAM_X;
-            float edge = Math.clamp((1.0F - Math.max(rx, Math.max(ry, rz))) * 4.0F, 0.0F, 1.0F);
+            float edge = Mth.clamp((1.0F - Math.max(rx, Math.max(ry, rz))) * 4.0F, 0.0F, 1.0F);
             // Not under a roof or in the ground: there the stream does not blow.
             boolean open = y >= air.top(x, z);
             float target = open ? edge : 0.0F;
             if (flakes.life[i] >= 0.0F) {
                 target *= flakes.life[i] / 10.0F;
             }
-            flakes.alpha[i] += Math.clamp(target - flakes.alpha[i], -0.25F, 0.12F);
+            flakes.alpha[i] += Mth.clamp(target - flakes.alpha[i], -0.25F, 0.12F);
         }
     }
 
@@ -631,7 +631,7 @@ public final class SnowSimulation {
             // Fades in and out over its life; denser where a gust carries it, so squalls roll past as clouds.
             float age = 1.0F - life / flakes.span[i];
             float envelope = Mth.sin((float) Math.PI * age);
-            float gust = Math.clamp((weather.gustAt(x, z) - 0.6F) / 1.0F, 0.15F, 1.3F);
+            float gust = Mth.clamp((weather.gustAt(x, z) - 0.6F) / 1.0F, 0.15F, 1.3F);
             flakes.alpha[i] = envelope * gust * flakes.sway[i] * Math.min(1.0F, weather.clouds * 1.5F);
         }
     }
@@ -666,7 +666,7 @@ public final class SnowSimulation {
                 continue;
             }
             float gust = weather.gustAt(x, z);
-            if (random.next() > Math.clamp(gust * gust / 1.4F, 0.25F, 1.0F)) {
+            if (random.next() > Mth.clamp(gust * gust / 1.4F, 0.25F, 1.0F)) {
                 continue;
             }
             air.sample(x, y, z, scratch);
@@ -776,7 +776,7 @@ public final class SnowSimulation {
     // ------------------------------------------------------------------------------------------------------------
 
     /**
-     * A blast of air: a wind charge or an explosion. The air bursts out and up, carrying the falling flakes with it; the
+     * A blast of air: an explosion. The air bursts out and up, carrying the falling flakes with it; the
      * snow around is blown off the ground into a cloud of powder that rises, drifts and settles.
      */
     public void blast(double x, double y, double z, float radius, float strength) {

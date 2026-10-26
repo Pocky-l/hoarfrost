@@ -105,8 +105,8 @@ public final class Soundscape {
         float highs = covered ? 0.22F : 1.0F;
         float gust = ClientWeather.gust();
         // Gusts swell the wind and lulls let it sink, more so the stormier it is.
-        float swell = Mth.lerp(weather.gustiness, 1.0F, Math.clamp(0.55F + 0.45F * gust, 0.35F, 1.5F));
-        float howl = Math.clamp(0.35F + (gust - 0.9F) * 1.2F, 0.0F, 1.2F);
+        float swell = Mth.lerp(weather.gustiness, 1.0F, Mth.clamp(0.55F + 0.45F * gust, 0.35F, 1.5F));
+        float howl = Mth.clamp(0.35F + (gust - 0.9F) * 1.2F, 0.0F, 1.2F);
         float speed = weather.windSpeed;
         double ux = speed > 1.0E-4F ? -weather.windDirX : 1.0;
         double uz = speed > 1.0E-4F ? -weather.windDirZ : 0.0;

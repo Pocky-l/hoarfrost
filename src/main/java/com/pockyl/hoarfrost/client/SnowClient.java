@@ -10,8 +10,6 @@ import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.ParticleOptions;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.protocol.game.ClientboundExplodePacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -26,18 +24,18 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.FogType;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.client.event.CustomizeGuiOverlayEvent;
-import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
-import net.neoforged.neoforge.client.event.ViewportEvent;
-import net.neoforged.neoforge.client.event.sound.PlaySoundEvent;
-import net.neoforged.neoforge.client.event.sound.PlaySoundSourceEvent;
-import net.neoforged.neoforge.client.event.sound.PlayStreamingSourceEvent;
-import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
+import net.minecraftforge.client.event.CustomizeGuiOverlayEvent;
+import net.minecraftforge.client.event.RenderLevelStageEvent;
+import net.minecraftforge.client.event.ViewportEvent;
+import net.minecraftforge.client.event.sound.PlaySoundEvent;
+import net.minecraftforge.client.event.sound.PlaySoundSourceEvent;
+import net.minecraftforge.client.event.sound.PlayStreamingSourceEvent;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.EntityJoinLevelEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 
 import com.pockyl.hoarfrost.ClientConfig;
 import com.pockyl.hoarfrost.Hoarfrost;
@@ -66,7 +64,7 @@ import java.util.Locale;
  * surveyed, seeded, saved); feeds it moving creatures, footsteps, landings, blasts and block changes; drives drawing, fog
  * and sound.
  */
-@EventBusSubscriber(modid = Hoarfrost.MOD_ID, value = Dist.CLIENT)
+@Mod.EventBusSubscriber(modid = Hoarfrost.MOD_ID, value = Dist.CLIENT)
 public final class SnowClient {
     private static final double TELEPORT_DISTANCE = 4.0;
     private static final double STEP_RANGE = 48.0;
@@ -147,7 +145,10 @@ public final class SnowClient {
     // ------------------------------------------------------------------------------------------------------------
 
     @SubscribeEvent
-    public static void onClientTick(ClientTickEvent.Post event) {
+    public static void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
         Minecraft minecraft = Minecraft.getInstance();
         if (configChanged) {
             configChanged = false;
@@ -214,10 +215,7 @@ public final class SnowClient {
             coverRenderer.close();
             coverRenderer = null;
         }
-        if (flakeRenderer != null) {
-            flakeRenderer.close();
-            flakeRenderer = null;
-        }
+        flakeRenderer = null;
         simulation = null;
         FAR.clear();
         STRIDE.clear();
@@ -261,7 +259,7 @@ public final class SnowClient {
             if (!entity.onGround() || flying) {
                 continue;
             }
-            float weight = Math.clamp(width * entity.getBbHeight() / 1.08F, 0.4F, 2.5F);
+            float weight = Mth.clamp(width * entity.getBbHeight() / 1.08F, 0.4F, 2.5F);
             if (lastFall < -0.3F) {
                 simulation.land(entity.getX(), entity.getY(), entity.getZ(), width, -lastFall);
             }
@@ -412,23 +410,14 @@ public final class SnowClient {
     }
 
     /**
-     * Explosions and wind charges: the air bursts out, carrying the flakes with it, and the snow around is blown up into
-     * a cloud of powder.
+     * Explosions: the air bursts out, carrying the flakes with it, and the snow around is blown up into a cloud of powder.
      */
     public static void onExplosion(ClientboundExplodePacket packet) {
         if (simulation == null) {
             return;
         }
-        boolean windCharge = isGust(packet.getSmallExplosionParticles()) || isGust(packet.getLargeExplosionParticles());
         float power = packet.getPower();
-        float radius = windCharge ? 1.6F + power * 0.9F : 1.2F + power * 1.25F;
-        float strength = windCharge ? 0.42F + power * 0.04F : 0.55F + power * 0.08F;
-        simulation.blast(packet.getX(), packet.getY(), packet.getZ(), radius, strength);
-    }
-
-    private static boolean isGust(ParticleOptions particle) {
-        return particle.getType() == ParticleTypes.GUST_EMITTER_SMALL || particle.getType() == ParticleTypes.GUST_EMITTER_LARGE
-                || particle.getType() == ParticleTypes.GUST || particle.getType() == ParticleTypes.SMALL_GUST;
+        simulation.blast(packet.getX(), packet.getY(), packet.getZ(), 1.2F + power * 1.25F, 0.55F + power * 0.08F);
     }
 
     // ------------------------------------------------------------------------------------------------------------
@@ -448,7 +437,7 @@ public final class SnowClient {
     /**
      * Particle Rain cancels the whole vanilla weather pass, and with it the snowfall this mod draws there. The flakes are
      * then drawn right after that pass instead: same render target, matrices and fog. A shader pack is put into its
-     * weather pass for them, which Iris only does around the vanilla call.
+     * weather pass for them, which Oculus only does around the vanilla call.
      */
     private static void renderSkippedSnowfall(Camera camera, float partialTick) {
         Vec3 cam = camera.getPosition();
@@ -464,7 +453,7 @@ public final class SnowClient {
     public static void onRenderStage(RenderLevelStageEvent event) {
         if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_WEATHER) {
             if (!snowfallDrawn && ParticleRain.active() && ownsSnowfall()) {
-                renderSkippedSnowfall(event.getCamera(), event.getPartialTick().getGameTimeDeltaPartialTick(false));
+                renderSkippedSnowfall(event.getCamera(), event.getPartialTick());
             }
             snowfallDrawn = false;
             return;
@@ -472,7 +461,8 @@ public final class SnowClient {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_CUTOUT_BLOCKS || coverRenderer == null || !SETTINGS.cover) {
             return;
         }
-        coverRenderer.render(event.getCamera(), event.getFrustum(), event.getModelViewMatrix(), event.getProjectionMatrix(),
+        // The level's pose: the camera's rotation, the same model-view the terrain is drawn with.
+        coverRenderer.render(event.getCamera(), event.getFrustum(), event.getPoseStack().last().pose(), event.getProjectionMatrix(),
                 Math.min(SETTINGS.coverRadius, Minecraft.getInstance().options.getEffectiveRenderDistance() * 16.0));
     }
 
@@ -495,11 +485,11 @@ public final class SnowClient {
         float far = event.getFarPlaneDistance();
         // Gusts thicken the air, lulls clear it a little.
         float gust = ClientWeather.gust();
-        float target = weather.visibility * 1.15F / Mth.lerp(weather.gustiness, 1.0F, Math.clamp(gust, 0.6F, 1.8F));
+        float target = weather.visibility * 1.15F / Mth.lerp(weather.gustiness, 1.0F, Mth.clamp(gust, 0.6F, 1.8F));
         float k = (float) Math.min(1.0, snow * strength);
         float newFar = target < far ? far + (target - far) * k : far;
         // In the heart of a squall of snow the world is gone for a moment.
-        float squall = Math.clamp((gust - 1.35F) / 0.6F, 0.0F, 1.0F) * Math.clamp((weather.gustiness - 0.5F) * 2.0F, 0.0F, 1.0F) * snow
+        float squall = Mth.clamp((gust - 1.35F) / 0.6F, 0.0F, 1.0F) * Mth.clamp((weather.gustiness - 0.5F) * 2.0F, 0.0F, 1.0F) * snow
                 * (float) Math.min(1.0, strength);
         if (squall > 0.0F) {
             newFar = Math.min(newFar, Mth.lerp(squall, far, SQUALL_VISIBILITY));
@@ -608,7 +598,7 @@ public final class SnowClient {
     @SubscribeEvent
     public static void onDebugText(CustomizeGuiOverlayEvent.DebugText event) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (!minecraft.getDebugOverlay().showDebugScreen() || simulation == null || !hasWeather(minecraft.level)) {
+        if (!minecraft.options.renderDebug || simulation == null || !hasWeather(minecraft.level)) {
             return;
         }
         SnowConditions weather = ClientWeather.conditions();

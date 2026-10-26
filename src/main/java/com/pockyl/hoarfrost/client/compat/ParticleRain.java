@@ -1,7 +1,7 @@
 package com.pockyl.hoarfrost.client.compat;
 
 import net.minecraft.util.Mth;
-import net.neoforged.fml.ModList;
+import net.minecraftforge.fml.ModList;
 
 import com.pockyl.hoarfrost.ClientConfig;
 import com.pockyl.hoarfrost.Hoarfrost;

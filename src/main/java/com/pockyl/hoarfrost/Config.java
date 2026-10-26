@@ -1,6 +1,6 @@
 package com.pockyl.hoarfrost;
 
-import net.neoforged.neoforge.common.ModConfigSpec;
+import net.minecraftforge.common.ForgeConfigSpec;
 
 import com.pockyl.hoarfrost.weather.SnowKind;
 
@@ -9,13 +9,13 @@ import com.pockyl.hoarfrost.weather.SnowKind;
  * server config: it follows the defaults for the course of the snowfall.
  */
 public final class Config {
-    private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
+    private static final ForgeConfigSpec.Builder BUILDER = new ForgeConfigSpec.Builder();
 
     static {
         BUILDER.translation(key("weather")).push("weather");
     }
 
-    private static final ModConfigSpec.IntValue[] WEIGHTS = {
+    private static final ForgeConfigSpec.IntValue[] WEIGHTS = {
             weight(SnowKind.LIGHT_SNOW, "Light snow: a few slow crystals in still air, silent.", 4),
             weight(SnowKind.SNOW, "Snow: a steady snowfall with a soft breeze.", 5),
             weight(SnowKind.HEAVY_SNOW, "Heavy snow: thick snowfall, the land fading into white.", 3),
@@ -23,11 +23,11 @@ public final class Config {
             weight(SnowKind.LIGHT_BLIZZARD, "Light blizzard: fine snow driven by a fresh wind.", 2),
             weight(SnowKind.BLIZZARD, "Blizzard: a howling snowstorm.", 1),
             weight(SnowKind.HEAVY_BLIZZARD, "Heavy blizzard: a whiteout.", 0)};
-    public static final ModConfigSpec.BooleanValue THUNDER_BLIZZARD = BUILDER
+    public static final ForgeConfigSpec.BooleanValue THUNDER_BLIZZARD = BUILDER
             .comment("A thunderstorm in snowy land is one of the blizzards.")
             .translation(key("thunderBlizzard"))
             .define("thunderBlizzard", true);
-    public static final ModConfigSpec.BooleanValue SEASONS = BUILDER
+    public static final ForgeConfigSpec.BooleanValue SEASONS = BUILDER
             .comment("With Serene Seasons: snow falls and lies where the season makes it cold (temperate land in winter, none in "
                     + "a warm summer), and deep winter brings heavier snow and blizzards.")
             .translation(key("seasons"))
@@ -38,16 +38,16 @@ public final class Config {
         BUILDER.translation(key("drifts")).push("drifts");
     }
 
-    public static final ModConfigSpec.BooleanValue DRIFTS = BUILDER
+    public static final ForgeConfigSpec.BooleanValue DRIFTS = BUILDER
             .comment("While snow falls with wind, snow layers pile up in the lee of walls, trees and hills. Changes the world "
                     + "(adds snow layer blocks, never removes anything); only under the open sky.")
             .translation(key("driftsEnabled"))
             .define("enabled", true);
-    public static final ModConfigSpec.IntValue DRIFT_MAX_LAYERS = BUILDER
+    public static final ForgeConfigSpec.IntValue DRIFT_MAX_LAYERS = BUILDER
             .comment("Highest drift in snow layers (8 = a full block). 4 or less can always be walked over.")
             .translation(key("driftMaxLayers"))
             .defineInRange("maxLayers", 4, 1, 8);
-    public static final ModConfigSpec.DoubleValue DRIFT_SPEED = BUILDER
+    public static final ForgeConfigSpec.DoubleValue DRIFT_SPEED = BUILDER
             .comment("How fast drifts grow. 1 = a drift of four layers takes a blizzard of a few minutes.")
             .translation(key("driftSpeed"))
             .defineInRange("speed", 1.0, 0.0, 10.0);
@@ -56,12 +56,12 @@ public final class Config {
         BUILDER.pop();
     }
 
-    public static final ModConfigSpec SPEC = BUILDER.build();
+    public static final ForgeConfigSpec SPEC = BUILDER.build();
 
     private Config() {
     }
 
-    private static ModConfigSpec.IntValue weight(SnowKind kind, String comment, int value) {
+    private static ForgeConfigSpec.IntValue weight(SnowKind kind, String comment, int value) {
         String name = camel(kind.id()) + "Weight";
         return BUILDER.comment(comment + " Relative chance when it starts to snow and every five minutes of a snowfall.")
                 .translation(key(name))
@@ -100,7 +100,7 @@ public final class Config {
     }
 
     /** The value, or its default while the server config is not loaded (on a server without the mod). */
-    public static <T> T value(ModConfigSpec.ConfigValue<T> value) {
+    public static <T> T value(ForgeConfigSpec.ConfigValue<T> value) {
         return SPEC.isLoaded() ? value.get() : value.getDefault();
     }
 

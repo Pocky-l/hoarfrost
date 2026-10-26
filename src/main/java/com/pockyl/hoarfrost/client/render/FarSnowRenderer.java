@@ -2,14 +2,11 @@ package com.pockyl.hoarfrost.client.render;
 
 import com.mojang.blaze3d.shaders.Uniform;
 import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.client.renderer.culling.Frustum;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -35,7 +32,8 @@ final class FarSnowRenderer implements AutoCloseable {
 
     private final FarSnow snow;
     private final Long2ObjectOpenHashMap<Region> regions = new Long2ObjectOpenHashMap<>();
-    private final ByteBufferBuilder bytes = new ByteBufferBuilder(1 << 18);
+    /** Shared by the regions of every world: a builder's memory is never given back. */
+    private static final BufferBuilder BUILDER = new BufferBuilder(1 << 16);
     private final List<Region> dirty = new ArrayList<>();
     private final float[] corner = new float[4];
     private int quads;
@@ -169,7 +167,8 @@ final class FarSnowRenderer implements AutoCloseable {
             return;
         }
         region.originY = Math.floor(lowest);
-        BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+        BufferBuilder builder = BUILDER;
+        builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         quads = 0;
         minY = Float.MAX_VALUE;
         maxY = -Float.MAX_VALUE;
@@ -183,7 +182,7 @@ final class FarSnowRenderer implements AutoCloseable {
                 }
             }
         }
-        MeshData data = builder.build();
+        BufferBuilder.RenderedBuffer data = builder.endOrDiscardIfEmpty();
         if (data == null) {
             region.empty = true;
             return;
@@ -253,10 +252,10 @@ final class FarSnowRenderer implements AutoCloseable {
                 float u2 = look.u(x, 1.0F);
                 float v2 = look.v(z, 1.0F);
                 // Counter-clockwise seen from above. Corners: 0 (-x,-z), 1 (+x,-z), 2 (-x,+z), 3 (+x,+z).
-                builder.addVertex(x0, corner[0], z0, color, u, v, OverlayTexture.NO_OVERLAY, packed, nx, ny, nz);
-                builder.addVertex(x0, corner[2], z0 + 1.0F, color, u, v2, OverlayTexture.NO_OVERLAY, packed, nx, ny, nz);
-                builder.addVertex(x0 + 1.0F, corner[3], z0 + 1.0F, color, u2, v2, OverlayTexture.NO_OVERLAY, packed, nx, ny, nz);
-                builder.addVertex(x0 + 1.0F, corner[1], z0, color, u2, v, OverlayTexture.NO_OVERLAY, packed, nx, ny, nz);
+                CoverRenderer.vertex(builder, x0, corner[0], z0, color, u, v, packed, nx, ny, nz);
+                CoverRenderer.vertex(builder, x0, corner[2], z0 + 1.0F, color, u, v2, packed, nx, ny, nz);
+                CoverRenderer.vertex(builder, x0 + 1.0F, corner[3], z0 + 1.0F, color, u2, v2, packed, nx, ny, nz);
+                CoverRenderer.vertex(builder, x0 + 1.0F, corner[1], z0, color, u2, v, packed, nx, ny, nz);
                 quads++;
                 for (float y : corner) {
                     minY = Math.min(minY, y);
@@ -269,6 +268,5 @@ final class FarSnowRenderer implements AutoCloseable {
     @Override
     public void close() {
         invalidate();
-        bytes.close();
     }
 }

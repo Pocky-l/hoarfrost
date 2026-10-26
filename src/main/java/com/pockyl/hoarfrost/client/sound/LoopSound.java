@@ -6,6 +6,7 @@ import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 
 /**
@@ -75,7 +76,7 @@ final class LoopSound extends AbstractTickableSoundInstance implements Hush.Muff
     }
 
     void setTarget(float volume, double x, double y, double z, float highs) {
-        target = Math.clamp(volume, 0.0F, 1.0F);
+        target = Mth.clamp(volume, 0.0F, 1.0F);
         if (!around) {
             targetX = x;
             targetY = y;
@@ -96,8 +97,8 @@ final class LoopSound extends AbstractTickableSoundInstance implements Hush.Muff
 
     @Override
     public void tick() {
-        volume += Math.clamp(target - volume, -VOLUME_STEP, VOLUME_STEP);
-        highs += Math.clamp(targetHighs - highs, -MUFFLE_STEP, MUFFLE_STEP);
+        volume += Mth.clamp(target - volume, -VOLUME_STEP, VOLUME_STEP);
+        highs += Mth.clamp(targetHighs - highs, -MUFFLE_STEP, MUFFLE_STEP);
         x += (targetX - x) * MOVE;
         y += (targetY - y) * MOVE;
         z += (targetZ - z) * MOVE;

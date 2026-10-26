@@ -24,7 +24,7 @@ import java.util.function.BiPredicate;
  *   <li>under crowns and roofs and in caves only a little of it gets in;</li>
  *   <li>gusts and lulls roll through it (see {@link com.pockyl.hoarfrost.weather.Wind#gust}), and eddies carried along
  *   with it turn the flakes;</li>
- *   <li>blasts (wind charges, explosions) burst outwards and upwards, and moving creatures drag the air along.</li>
+ *   <li>blasts (explosions) burst outwards and upwards, and moving creatures drag the air along.</li>
  * </ul>
  * The land is sampled from heightmaps into a grid around the centre that is refreshed as the centre moves and the wind
  * turns; queries are then a few array lookups.
@@ -238,8 +238,8 @@ public final class AirFlow {
     }
 
     private float smoothAt(float gx, float gz) {
-        int x = Math.clamp(Math.round(gx), 0, SIZE - 1);
-        int z = Math.clamp(Math.round(gz), 0, SIZE - 1);
+        int x = Mth.clamp(Math.round(gx), 0, SIZE - 1);
+        int z = Mth.clamp(Math.round(gz), 0, SIZE - 1);
         return smooth[z * SIZE + x];
     }
 
@@ -268,7 +268,7 @@ public final class AirFlow {
     // Disturbances
     // ------------------------------------------------------------------------------------------------------------
 
-    /** A burst of air: wind charges and explosions. */
+    /** A burst of air: explosions. */
     public void blast(double x, double y, double z, float radius, float strength) {
         blasts.add(new Blast(x, y, z, radius, strength));
     }
@@ -347,7 +347,7 @@ public final class AirFlow {
                 boolean canopy = y >= lerp(heightGround);
                 factor = canopy ? 0.26F : 0.18F;
             } else {
-                factor = Math.clamp((float) Math.log1p(above / 0.35F) / LOG_TOP, 0.18F, 1.0F);
+                factor = Mth.clamp((float) Math.log1p(above / 0.35F) / LOG_TOP, 0.18F, 1.0F);
             }
             float back = 0.0F;
             float sheltered = (float) (blended(shadow, previousShadow) - y);
@@ -364,9 +364,9 @@ public final class AirFlow {
             if (near > 0.0F) {
                 float lift = (float) Math.exp(-Math.max(above, 0.0F) / 2.5F);
                 // Up the windward side, down the lee.
-                vy += speed * Math.clamp(blended(slope, previousSlope), -1.2F, 1.5F) * 0.45F * lift * near;
+                vy += speed * Mth.clamp(blended(slope, previousSlope), -1.2F, 1.5F) * 0.45F * lift * near;
                 // Aside around obstacles.
-                float push = -Math.clamp(blended(side, previousSide), -2.0F, 2.0F) * speed * 0.3F
+                float push = -Mth.clamp(blended(side, previousSide), -2.0F, 2.0F) * speed * 0.3F
                         * (float) Math.exp(-Math.max(above, 0.0F) / 3.0F) * near;
                 vx += -dirZ * push;
                 vz += dirX * push;
@@ -424,8 +424,8 @@ public final class AirFlow {
     private float lerpZ;
 
     private void prepare(double x, double z) {
-        float fx = Math.clamp((float) (x - originX - 0.5), 0.0F, SIZE - 1.001F);
-        float fz = Math.clamp((float) (z - originZ - 0.5), 0.0F, SIZE - 1.001F);
+        float fx = Mth.clamp((float) (x - originX - 0.5), 0.0F, SIZE - 1.001F);
+        float fz = Mth.clamp((float) (z - originZ - 0.5), 0.0F, SIZE - 1.001F);
         int gx = (int) fx;
         int gz = (int) fz;
         lerpIndex = gz * SIZE + gx;
@@ -453,7 +453,7 @@ public final class AirFlow {
     }
 
     private static float smoothstep(float from, float to, float value) {
-        float t = Math.clamp((value - from) / (to - from), 0.0F, 1.0F);
+        float t = Mth.clamp((value - from) / (to - from), 0.0F, 1.0F);
         return t * t * (3.0F - 2.0F * t);
     }
 
@@ -462,9 +462,9 @@ public final class AirFlow {
         float fx = (float) (x / EDDY_CELL) - eddyOriginX;
         float fy = (float) (y / EDDY_CELL) - eddyOriginY;
         float fz = (float) (z / EDDY_CELL) - eddyOriginZ;
-        fx = Math.clamp(fx, 0.0F, EDDY_X - 1.001F);
-        fy = Math.clamp(fy, 0.0F, EDDY_Y - 1.001F);
-        fz = Math.clamp(fz, 0.0F, EDDY_X - 1.001F);
+        fx = Mth.clamp(fx, 0.0F, EDDY_X - 1.001F);
+        fy = Mth.clamp(fy, 0.0F, EDDY_Y - 1.001F);
+        fz = Mth.clamp(fz, 0.0F, EDDY_X - 1.001F);
         int x0 = (int) fx;
         int y0 = (int) fy;
         int z0 = (int) fz;

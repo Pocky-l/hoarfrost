@@ -5,13 +5,15 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.gametest.GameTestHolder;
-import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.minecraftforge.gametest.GameTestHolder;
+import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
 import com.pockyl.hoarfrost.Hoarfrost;
 import com.pockyl.hoarfrost.client.compat.ParticleRain;
@@ -41,6 +43,8 @@ import java.util.List;
 @PrefixGameTestTemplate(false)
 public final class ModGameTests {
     private static final int SIZE = 40;
+    /** Height of the arena structure. */
+    private static final int ARENA_HEIGHT = 14;
     /** Game time advanced per cover update in the tests. */
     private static final int DT = 100;
 
@@ -124,7 +128,7 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "arena", skyAccess = true)
+    @GameTest(template = "arena")
     public static void calmSnowLiesEvenly(GameTestHelper helper) {
         floor(helper);
         SnowSimulation sim = simulation(helper);
@@ -152,7 +156,7 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "arena", skyAccess = true)
+    @GameTest(template = "arena")
     public static void driftSettlesSmoothlyInTheLee(GameTestHelper helper) {
         floor(helper);
         for (int z = 4; z < SIZE - 4; z++) {
@@ -193,7 +197,7 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "arena", skyAccess = true)
+    @GameTest(template = "arena")
     public static void windFillsACaveMouthAndFades(GameTestHelper helper) {
         floor(helper);
         // A hill of stone with a tunnel 4 wide and 3 high, its mouth facing the wind.
@@ -229,7 +233,7 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "arena", skyAccess = true)
+    @GameTest(template = "arena")
     public static void evenCalmSnowUnderACrown(GameTestHelper helper) {
         floor(helper);
         int cx = 20;
@@ -275,7 +279,7 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "arena", skyAccess = true)
+    @GameTest(template = "arena")
     public static void noSnowInAClosedRoom(GameTestHelper helper) {
         floor(helper);
         for (int x = 14; x <= 22; x++) {
@@ -303,7 +307,7 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "arena", skyAccess = true)
+    @GameTest(template = "arena")
     public static void snowLiesOnVanillaSnowLayersAndMeltsAtLamps(GameTestHelper helper) {
         floor(helper);
         for (int x = 10; x < 20; x++) {
@@ -333,7 +337,7 @@ public final class ModGameTests {
         });
     }
 
-    @GameTest(template = "arena", skyAccess = true)
+    @GameTest(template = "arena")
     public static void aDugShaftStartsBare(GameTestHelper helper) {
         floor(helper);
         for (int x = 0; x < SIZE; x++) {
@@ -361,7 +365,7 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "arena", skyAccess = true)
+    @GameTest(template = "arena")
     public static void aBrokenTrapdoorLeavesNoSnow(GameTestHelper helper) {
         floor(helper);
         helper.setBlock(new BlockPos(10, 1, 10), Blocks.BIRCH_TRAPDOOR);
@@ -381,7 +385,7 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "arena", skyAccess = true)
+    @GameTest(template = "arena")
     public static void railsAndRedstoneStayClear(GameTestHelper helper) {
         floor(helper);
         helper.setBlock(new BlockPos(10, 1, 10), Blocks.RAIL);
@@ -417,7 +421,7 @@ public final class ModGameTests {
         }
     }
 
-    @GameTest(template = "arena", skyAccess = true)
+    @GameTest(template = "arena")
     public static void airFlowsOverAndAroundAWall(GameTestHelper helper) {
         floor(helper);
         for (int z = 4; z < SIZE - 4; z++) {
@@ -448,7 +452,7 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "arena", skyAccess = true)
+    @GameTest(template = "arena")
     public static void windChargeLiftsPowderThatSettles(GameTestHelper helper) {
         floor(helper);
         SnowSimulation sim = simulation(helper);
@@ -481,7 +485,7 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "arena", skyAccess = true)
+    @GameTest(template = "arena")
     public static void feetPressDentsAndPackPaths(GameTestHelper helper) {
         floor(helper);
         SnowSimulation sim = simulation(helper);
@@ -498,7 +502,7 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "arena", skyAccess = true)
+    @GameTest(template = "arena")
     public static void serverDriftsPileUpInTheLee(GameTestHelper helper) {
         floor(helper);
         for (int z = 4; z < SIZE - 4; z++) {
@@ -524,10 +528,33 @@ public final class ModGameTests {
     // Helpers
     // ------------------------------------------------------------------------------------------------------------
 
+    /** The stone floor of the arena, under an open sky. */
     private static void floor(GameTestHelper helper) {
+        openSky(helper);
         for (int x = 0; x < SIZE; x++) {
             for (int z = 0; z < SIZE; z++) {
                 helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+            }
+        }
+    }
+
+    /**
+     * Clears everything above the arena up to the top of the world. Forge's game tests for 1.20.1 have no sky access
+     * option: they clear only a few blocks above the structure, and land higher up would roof the arena over.
+     */
+    private static void openSky(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int x = 0; x < SIZE; x++) {
+            for (int z = 0; z < SIZE; z++) {
+                BlockPos above = helper.absolutePos(new BlockPos(x, ARENA_HEIGHT, z));
+                int top = level.getHeight(Heightmap.Types.WORLD_SURFACE, above.getX(), above.getZ());
+                for (int y = above.getY(); y < top; y++) {
+                    pos.set(above.getX(), y, above.getZ());
+                    if (!level.getBlockState(pos).isAir()) {
+                        level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+                    }
+                }
             }
         }
     }

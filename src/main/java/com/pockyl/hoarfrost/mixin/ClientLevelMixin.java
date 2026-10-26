@@ -14,7 +14,7 @@ import com.pockyl.hoarfrost.client.SnowClient;
 import com.pockyl.hoarfrost.client.render.SnowSky;
 
 /**
- * Block changes the client sees (the snow on the ground follows what is built and dug; NeoForge has no client-side block
+ * Block changes the client sees (the snow on the ground follows what is built and dug; Forge has no client-side block
  * change event), and the sky under snow clouds: vanilla darkens it for any precipitation like for rain, a snowy sky is
  * bright and milky, and no lightning flashes over snowy land. The return values are adjusted (chainable), not replaced.
  */

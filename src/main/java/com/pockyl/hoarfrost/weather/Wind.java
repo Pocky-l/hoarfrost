@@ -1,5 +1,7 @@
 package com.pockyl.hoarfrost.weather;
 
+import net.minecraft.util.Mth;
+
 /**
  * The large-scale wind of a snowfall, derived only from the game time (synced to every client), so every player and the
  * server feel the same wind:
@@ -57,6 +59,6 @@ public final class Wind {
         float big = Noise.value(rx / 48.0, rz / 48.0, GUST_SEED) - 0.5F;
         float small = Noise.value(rx / 22.0, rz / 22.0, GUST_SEED + 1) - 0.5F;
         float g = 1.0F + gustiness * 0.85F * (big * 2.2F + small * 0.55F);
-        return Math.clamp(g, 0.12F, 2.4F);
+        return Mth.clamp(g, 0.12F, 2.4F);
     }
 }

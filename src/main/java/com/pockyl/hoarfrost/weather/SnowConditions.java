@@ -1,5 +1,7 @@
 package com.pockyl.hoarfrost.weather;
 
+import net.minecraft.util.Mth;
+
 /**
  * The weather a snow simulation runs in, set every tick by its owner (the client's weather, a game test or the server).
  * The kind's parameters are blended, so a change of kind glides over several seconds instead of switching; the wind is
@@ -101,7 +103,7 @@ public final class SnowConditions {
 
     /** How windy it is, 0 (calm) .. 1 (a heavy blizzard's gale). */
     public float windiness() {
-        return Math.clamp(windSpeed / 0.75F, 0.0F, 1.0F);
+        return Mth.clamp(windSpeed / 0.75F, 0.0F, 1.0F);
     }
 
     /** The gust factor at a point: see {@link Wind#gust}. */

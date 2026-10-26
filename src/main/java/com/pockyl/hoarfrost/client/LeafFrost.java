@@ -6,7 +6,8 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.LeavesBlock;
-import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
+import net.minecraftforge.client.event.RegisterColorHandlersEvent;
+import net.minecraftforge.registries.ForgeRegistries;
 
 import com.pockyl.hoarfrost.ClientConfig;
 import com.pockyl.hoarfrost.client.compat.DistantHorizonsTint;
@@ -17,7 +18,7 @@ import com.pockyl.hoarfrost.mixin.BlockColorsAccessor;
  * white. Like Bedrock, a biome counts as snowy below a base temperature of 0.15.
  *
  * <p>The leaves' own colour handlers are wrapped, so every tree, modded or not, keeps its colour elsewhere. Whether a
- * biome is snowy is a colour resolver, so vanilla biome blending (and Sodium's) fades the frost over the biome border,
+ * biome is snowy is a colour resolver, so vanilla biome blending (and Embeddium's) fades the frost over the biome border,
  * and it works with shader packs.
  */
 public final class LeafFrost {
@@ -45,7 +46,7 @@ public final class LeafFrost {
             if (!(block instanceof LeavesBlock)) {
                 continue;
             }
-            BlockColor original = accessor.hoarfrost$colors().get(block);
+            BlockColor original = accessor.hoarfrost$colors().get(ForgeRegistries.BLOCKS.getDelegateOrThrow(block));
             if (original == null) {
                 continue;
             }

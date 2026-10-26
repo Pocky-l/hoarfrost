@@ -58,7 +58,7 @@ public final class SnowSky {
         }
         float scale = m + f * (1.0F - m);
         float l = luma(c.x, c.y, c.z) / scale * f * (1.0F - m);
-        return new Vec3(Math.clamp((c.x - l) / m, 0.0, 1.0), Math.clamp((c.y - l) / m, 0.0, 1.0), Math.clamp((c.z - l) / m, 0.0, 1.0));
+        return new Vec3(Mth.clamp((c.x - l) / m, 0.0, 1.0), Mth.clamp((c.y - l) / m, 0.0, 1.0), Mth.clamp((c.z - l) / m, 0.0, 1.0));
     }
 
     /**

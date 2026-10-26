@@ -13,9 +13,9 @@ import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 
 import com.pockyl.hoarfrost.Hoarfrost;
 import com.pockyl.hoarfrost.compat.Climate;
@@ -30,7 +30,7 @@ import java.util.Locale;
  * {@code /hoarfrost} for operators: let it snow with a given kind ({@code /hoarfrost weather <kind> [seconds]}), clear the
  * weather, show the state. Only vanilla argument types are used, so clients without the mod can use the command too.
  */
-@EventBusSubscriber(modid = Hoarfrost.MOD_ID)
+@Mod.EventBusSubscriber(modid = Hoarfrost.MOD_ID)
 public final class SnowCommands {
     private static final int DEFAULT_SECONDS = 600;
     private static final String[] COMPASS = {"E", "SE", "S", "SW", "W", "NW", "N", "NE"};

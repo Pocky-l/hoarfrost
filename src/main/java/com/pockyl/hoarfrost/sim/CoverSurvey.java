@@ -3,6 +3,7 @@ package com.pockyl.hoarfrost.sim;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.RedStoneWireBlock;
@@ -127,7 +128,7 @@ public final class CoverSurvey {
                     blur(s, lx + MARGIN, lz + MARGIN);
                     chunk.calm[e] = blurred[0];
                     for (int d = 0; d < CoverChunk.DIRECTIONS; d++) {
-                        chunk.windy[e * CoverChunk.DIRECTIONS + d] = (byte) Math.clamp(Math.round(blurred[1 + d] * 64.0F), 0, 255);
+                        chunk.windy[e * CoverChunk.DIRECTIONS + d] = (byte) Mth.clamp(Math.round(blurred[1 + d] * 64.0F), 0, 255);
                     }
                 }
             }
@@ -324,9 +325,9 @@ public final class CoverSurvey {
             }
         }
         float relief = b - sum / 49.0F;
-        float ridge = Math.clamp((relief - 0.4F) / 3.0F, 0.0F, 1.0F);
-        float hollow = Math.clamp((-relief - 0.3F) / 2.0F, 0.0F, 1.0F);
-        calm[w] = catchShare * Math.clamp(1.0F + 0.18F * hollow - 0.1F * ridge, 0.3F, 1.3F);
+        float ridge = Mth.clamp((relief - 0.4F) / 3.0F, 0.0F, 1.0F);
+        float hollow = Mth.clamp((-relief - 0.3F) / 2.0F, 0.0F, 1.0F);
+        calm[w] = catchShare * Mth.clamp(1.0F + 0.18F * hollow - 0.1F * ridge, 0.3F, 1.3F);
         for (int d = 0; d < CoverChunk.DIRECTIONS; d++) {
             float lee = 0.0F;
             for (int k = 1; k <= LEE_REACH; k++) {
@@ -343,7 +344,7 @@ public final class CoverSurvey {
                 }
             }
             windy[w * CoverChunk.DIRECTIONS + d] = catchShare
-                    * Math.clamp(0.62F + 2.3F * lee + 0.7F * bank + 0.6F * hollow - 0.55F * ridge, 0.06F, 3.9F);
+                    * Mth.clamp(0.62F + 2.3F * lee + 0.7F * bank + 0.6F * hollow - 0.55F * ridge, 0.06F, 3.9F);
         }
     }
 
@@ -372,7 +373,7 @@ public final class CoverSurvey {
         for (int d = 0; d < CoverChunk.DIRECTIONS; d++) {
             spill = Math.max(spill, ray(level, ox, oy, oz, DIR_X[d], 1.4F, DIR_Z[d], CALM_REACH, 6.0F));
         }
-        calm[w] = Math.clamp(through + spill * 0.9F, 0.0F, 1.0F);
+        calm[w] = Mth.clamp(through + spill * 0.9F, 0.0F, 1.0F);
         for (int d = 0; d < CoverChunk.DIRECTIONS; d++) {
             // The wind blows towards d: the snow comes in from the opposite side.
             float intake = 0.0F;
@@ -386,7 +387,7 @@ public final class CoverSurvey {
                 intake += ray(level, ox, oy, oz, rx, rise, rz, INTAKE_REACH, RAY_LENGTH);
             }
             intake = Math.min(1.3F, intake / 4.0F * 1.6F);
-            windy[w * CoverChunk.DIRECTIONS + d] = Math.clamp(through * 0.75F + intake * 1.25F + spill * 0.4F, 0.0F, 2.5F);
+            windy[w * CoverChunk.DIRECTIONS + d] = Mth.clamp(through * 0.75F + intake * 1.25F + spill * 0.4F, 0.0F, 2.5F);
         }
     }
 

@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import com.pockyl.hoarfrost.client.SnowClient;
 
 /**
- * Explosions (TNT, creepers, wind charges) reach the client only as this packet; NeoForge's explosion events are
+ * Explosions (TNT, creepers) reach the client only as this packet; Forge's explosion events are
  * server-side. Injected at the tail, which only runs on the main thread.
  */
 @Mixin(ClientPacketListener.class)

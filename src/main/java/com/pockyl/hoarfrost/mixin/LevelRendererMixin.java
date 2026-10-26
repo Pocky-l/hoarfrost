@@ -18,7 +18,7 @@ import com.pockyl.hoarfrost.client.SnowClient;
  * <p>Vanilla draws both in one pass. The snow columns are taken out of it by changing the precipitation stored for each
  * column, not by redirecting the call that computes it: rain mods such as Petrichor redirect that call, and two
  * redirects of one call cannot coexist, while this chains with them. The flakes are drawn at the start of the pass,
- * where shader packs (Iris) already render with their weather program; the dimension's special effects are left
+ * where shader packs (Oculus) already render with their weather program; the dimension's special effects are left
  * alone, since only one mod can own those.
  */
 @Mixin(LevelRenderer.class)

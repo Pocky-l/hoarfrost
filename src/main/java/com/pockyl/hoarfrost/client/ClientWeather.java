@@ -73,7 +73,7 @@ public final class ClientWeather {
         if (ticks % 10 == 1 || !initialized) {
             surveyLand(level, camera);
         }
-        presence = initialized ? presence + Math.clamp(presenceTarget - presence, -0.02F, 0.02F) : presenceTarget;
+        presence = initialized ? presence + Mth.clamp(presenceTarget - presence, -0.02F, 0.02F) : presenceTarget;
         worldSnow = level.getRainLevel(1.0F);
         snow = worldSnow * presence;
         SnowKind target = targetKind(level);

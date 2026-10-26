@@ -65,7 +65,7 @@ final class GustSound extends AbstractTickableSoundInstance implements Hush.Muff
         z += dirZ * speed;
         float envelope = Mth.sin((float) Math.PI * age / life);
         volume = Math.max(0.0001F, gain * envelope * loudness);
-        highs += Math.clamp(targetHighs - highs, -0.04F, 0.04F);
+        highs += Mth.clamp(targetHighs - highs, -0.04F, 0.04F);
         appliedHighs = Hush.update(this, highs, appliedHighs);
     }
 }

@@ -5,7 +5,6 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.fml.ModList;
 
 import com.pockyl.hoarfrost.Hoarfrost;
 
@@ -17,13 +16,12 @@ import org.jetbrains.annotations.Nullable;
  * through. Like Sable's own fix for vanilla rain, every column under a structure is traced from the top of its bounds
  * down along the structure's own vertical to the first block that stops motion or holds a fluid.
  *
- * <p>Without Sable there are no roofs. Only {@link SableRoofs} touches Sable, and only once {@link #loaded()} said it is
- * installed; if its API ever changes under us, the integration switches itself off instead of crashing the game.
+ * <p>Sable has no Minecraft 1.20.1 version, so on 1.20.1 there are never roofs: this class keeps the callers the same
+ * as on 1.21.1, where a Sable survey fills them.
  */
 public final class SubLevelRoofs {
     public static final String SABLE = "sable";
 
-    private static Boolean loaded;
     private static volatile boolean broken;
 
     /** Where the snow meets a structure over a column: the exact height and the block it lands on. */
@@ -46,13 +44,9 @@ public final class SubLevelRoofs {
     private Survey survey;
     private int lastTick = Integer.MIN_VALUE;
 
-    /** Whether Sable is installed. */
+    /** Whether Sable is installed: never on Minecraft 1.20.1. */
     public static boolean loaded() {
-        if (loaded == null) {
-            ModList mods = ModList.get();
-            loaded = mods != null && mods.isLoaded(SABLE);
-        }
-        return loaded;
+        return false;
     }
 
     /** Traces the structures within {@code radius} columns of a point; once per tick, later calls in the tick are free. */
@@ -67,7 +61,7 @@ public final class SubLevelRoofs {
         }
         try {
             if (survey == null) {
-                survey = SableRoofs.create();
+                return;
             }
             int cx = Mth.floor(x);
             int cz = Mth.floor(z);

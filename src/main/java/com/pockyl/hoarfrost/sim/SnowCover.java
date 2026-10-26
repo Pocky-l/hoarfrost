@@ -61,7 +61,7 @@ public final class SnowCover {
 
     /** The depth snow levels off at for a deposition. */
     public static float capacity(float deposition) {
-        return OPEN_DEPTH * (float) Math.pow(Math.clamp(deposition, 0.0F, 3.5F), 0.85);
+        return OPEN_DEPTH * (float) Math.pow(Mth.clamp(deposition, 0.0F, 3.5F), 0.85);
     }
 
     /**

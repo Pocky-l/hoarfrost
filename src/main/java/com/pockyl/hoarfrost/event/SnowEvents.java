@@ -5,16 +5,16 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.player.Player;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-import net.neoforged.neoforge.event.tick.LevelTickEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.EntityJoinLevelEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 
 import com.pockyl.hoarfrost.Config;
 import com.pockyl.hoarfrost.Hoarfrost;
 import com.pockyl.hoarfrost.compat.Climate;
+import com.pockyl.hoarfrost.network.ModNetwork;
 import com.pockyl.hoarfrost.network.SnowSyncPayload;
 import com.pockyl.hoarfrost.weather.SnowConditions;
 import com.pockyl.hoarfrost.weather.SnowData;
@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.WeakHashMap;
 
 /** Server side of the snow: keeps clients in sync and lets the wind build drifts around the players. */
-@EventBusSubscriber(modid = Hoarfrost.MOD_ID)
+@Mod.EventBusSubscriber(modid = Hoarfrost.MOD_ID)
 public final class SnowEvents {
     private static final int SYNC_INTERVAL = 40;
     /** Wind (blocks per tick) from which snow starts drifting. */
@@ -40,8 +40,8 @@ public final class SnowEvents {
     }
 
     @SubscribeEvent
-    public static void onLevelTick(LevelTickEvent.Post event) {
-        if (!(event.getLevel() instanceof ServerLevel level) || !SnowData.hasWeather(level)) {
+    public static void onLevelTick(TickEvent.LevelTickEvent event) {
+        if (event.phase != TickEvent.Phase.END || !(event.level instanceof ServerLevel level) || !SnowData.hasWeather(level)) {
             return;
         }
         SnowData data = SnowData.get(level);
@@ -50,7 +50,7 @@ public final class SnowEvents {
         boolean changed = !LAST_SENT.containsKey(level) || LAST_SENT.get(level) != kind;
         if (changed || level.getGameTime() % SYNC_INTERVAL == 0) {
             LAST_SENT.put(level, kind);
-            PacketDistributor.sendToPlayersInDimension(level, new SnowSyncPayload(kind == null ? -1 : kind.ordinal()));
+            ModNetwork.sendToPlayersInDimension(level, new SnowSyncPayload(kind == null ? -1 : kind.ordinal()));
         }
         if (kind != null && Config.value(Config.DRIFTS)) {
             buildDrifts(level, wind(level, kind));
@@ -89,7 +89,7 @@ public final class SnowEvents {
     private static void sendTo(Player player) {
         if (player instanceof ServerPlayer serverPlayer && serverPlayer.level() instanceof ServerLevel level) {
             SnowKind kind = SnowData.hasWeather(level) ? SnowData.get(level).currentKind(level) : null;
-            PacketDistributor.sendToPlayer(serverPlayer, new SnowSyncPayload(kind == null ? -1 : kind.ordinal()));
+            ModNetwork.sendToPlayer(serverPlayer, new SnowSyncPayload(kind == null ? -1 : kind.ordinal()));
         }
     }
 
@@ -97,7 +97,7 @@ public final class SnowEvents {
     public static void syncLevel(ServerLevel level) {
         SnowKind kind = SnowData.get(level).currentKind(level);
         LAST_SENT.put(level, kind);
-        PacketDistributor.sendToPlayersInDimension(level, new SnowSyncPayload(kind == null ? -1 : kind.ordinal()));
+        ModNetwork.sendToPlayersInDimension(level, new SnowSyncPayload(kind == null ? -1 : kind.ordinal()));
     }
 
     /** The wind of the snowfall now (the same the clients feel). */

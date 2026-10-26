@@ -1,6 +1,6 @@
 package com.pockyl.hoarfrost;
 
-import net.neoforged.neoforge.common.ModConfigSpec;
+import net.minecraftforge.common.ForgeConfigSpec;
 
 /**
  * Visuals and sound. Only loaded on the client.
@@ -41,9 +41,9 @@ public final class ClientConfig {
         }
     }
 
-    private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
+    private static final ForgeConfigSpec.Builder BUILDER = new ForgeConfigSpec.Builder();
 
-    public static final ModConfigSpec.EnumValue<Quality> QUALITY = BUILDER
+    public static final ForgeConfigSpec.EnumValue<Quality> QUALITY = BUILDER
             .comment("Quality preset: how many flakes, how far they and the snow on the ground are simulated and drawn. Lower it "
                     + "on weak computers.")
             .translation(key("quality"))
@@ -53,27 +53,27 @@ public final class ClientConfig {
         BUILDER.translation(key("snowfall")).push("snowfall");
     }
 
-    public static final ModConfigSpec.BooleanValue SNOWFALL = BUILDER
+    public static final ForgeConfigSpec.BooleanValue SNOWFALL = BUILDER
             .comment("Replace the vanilla snowfall with simulated flakes. Off: vanilla snow is drawn.")
             .translation(key("snowfallEnabled"))
             .define("enabled", true);
-    public static final ModConfigSpec.DoubleValue DENSITY = BUILDER
+    public static final ForgeConfigSpec.DoubleValue DENSITY = BUILDER
             .comment("Multiplier for the number of flakes.")
             .translation(key("density"))
             .defineInRange("density", 1.0, 0.1, 3.0);
-    public static final ModConfigSpec.BooleanValue DISTANT = BUILDER
+    public static final ForgeConfigSpec.BooleanValue DISTANT = BUILDER
             .comment("Snow falling in the middle distance, beyond the simulated flakes.")
             .translation(key("distant"))
             .define("distant", true);
-    public static final ModConfigSpec.BooleanValue CLOUDS = BUILDER
+    public static final ForgeConfigSpec.BooleanValue CLOUDS = BUILDER
             .comment("In heavy snow and blizzards, clouds of snow roll low over the land with the wind and the squalls.")
             .translation(key("clouds"))
             .define("clouds", true);
-    public static final ModConfigSpec.BooleanValue STREAM = BUILDER
+    public static final ForgeConfigSpec.BooleanValue STREAM = BUILDER
             .comment("In heavy snow and blizzards, a dense stream of light flakes rushes past the face.")
             .translation(key("stream"))
             .define("stream", true);
-    public static final ModConfigSpec.BooleanValue PARTICLE_RAIN = BUILDER
+    public static final ForgeConfigSpec.BooleanValue PARTICLE_RAIN = BUILDER
             .comment("Particle Rain integration, when Particle Rain is installed: this mod draws the snowfall and Particle Rain the "
                     + "rain, dust, fog and the rest of its particles, blown by the same wind. Off: Particle Rain draws its own snow "
                     + "too and hides this mod's falling snow.")
@@ -85,25 +85,25 @@ public final class ClientConfig {
         BUILDER.translation(key("ground")).push("ground");
     }
 
-    public static final ModConfigSpec.BooleanValue COVER = BUILDER
+    public static final ForgeConfigSpec.BooleanValue COVER = BUILDER
             .comment("Snow settles on the ground, roofs, crowns and posts: more in the lee and in hollows, less on windswept "
                     + "ridges, a little under crowns and in cave mouths. Melts near lamps and in warm land.")
             .translation(key("cover"))
             .define("cover", true);
-    public static final ModConfigSpec.BooleanValue DISTANT_COVER = BUILDER
+    public static final ForgeConfigSpec.BooleanValue DISTANT_COVER = BUILDER
             .comment("Snow lies on distant land out to the render distance, and on the crowns of trees there (simplified).")
             .translation(key("distantCover"))
             .define("distant", true);
-    public static final ModConfigSpec.BooleanValue SNOWY_LEAVES = BUILDER
+    public static final ForgeConfigSpec.BooleanValue SNOWY_LEAVES = BUILDER
             .comment("Leaves in snowy biomes are white, as in Bedrock Edition.")
             .translation(key("snowyLeaves"))
             .define("snowyLeaves", true);
-    public static final ModConfigSpec.BooleanValue FOOTPRINTS = BUILDER
+    public static final ForgeConfigSpec.BooleanValue FOOTPRINTS = BUILDER
             .comment("Feet press dents into the snow and pack paths.")
             .translation(key("footprints"))
             .define("footprints", true);
-    public static final ModConfigSpec.BooleanValue POWDER = BUILDER
-            .comment("Gusts, wind charges, explosions and feet lift powder off the snow; it rises in a cloud and settles slowly.")
+    public static final ForgeConfigSpec.BooleanValue POWDER = BUILDER
+            .comment("Gusts, explosions and feet lift powder off the snow; it rises in a cloud and settles slowly.")
             .translation(key("powder"))
             .define("powder", true);
 
@@ -112,11 +112,11 @@ public final class ClientConfig {
         BUILDER.translation(key("atmosphere")).push("atmosphere");
     }
 
-    public static final ModConfigSpec.DoubleValue FOG = BUILDER
+    public static final ForgeConfigSpec.DoubleValue FOG = BUILDER
             .comment("How much falling snow closes in the view distance (a heavy blizzard becomes a whiteout). 0 = vanilla fog.")
             .translation(key("fog"))
             .defineInRange("fog", 1.0, 0.0, 2.0);
-    public static final ModConfigSpec.BooleanValue BRIGHT_SKY = BUILDER
+    public static final ForgeConfigSpec.BooleanValue BRIGHT_SKY = BUILDER
             .comment("A snowy sky is soft and bright instead of the dark grey of rain.")
             .translation(key("brightSky"))
             .define("brightSky", true);
@@ -126,15 +126,15 @@ public final class ClientConfig {
         BUILDER.translation(key("sound")).push("sound");
     }
 
-    public static final ModConfigSpec.DoubleValue WIND_VOLUME = BUILDER
+    public static final ForgeConfigSpec.DoubleValue WIND_VOLUME = BUILDER
             .comment("Volume of the wind of snowy weather. Light snow is always silent.")
             .translation(key("windVolume"))
             .defineInRange("windVolume", 1.0, 0.0, 2.0);
-    public static final ModConfigSpec.DoubleValue HUSH = BUILDER
+    public static final ForgeConfigSpec.DoubleValue HUSH = BUILDER
             .comment("How much falling snow hushes the sounds of the world outdoors. 0 = off.")
             .translation(key("hush"))
             .defineInRange("hush", 1.0, 0.0, 1.5);
-    public static final ModConfigSpec.BooleanValue SNOW_STEPS = BUILDER
+    public static final ForgeConfigSpec.BooleanValue SNOW_STEPS = BUILDER
             .comment("Footsteps crunch in snow: fresh powder and trodden snow sound different.")
             .translation(key("snowSteps"))
             .define("snowSteps", true);
@@ -143,7 +143,7 @@ public final class ClientConfig {
         BUILDER.pop();
     }
 
-    public static final ModConfigSpec SPEC = BUILDER.build();
+    public static final ForgeConfigSpec SPEC = BUILDER.build();
 
     private ClientConfig() {
     }

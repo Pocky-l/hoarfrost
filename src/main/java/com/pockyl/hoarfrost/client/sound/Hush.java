@@ -7,7 +7,8 @@ import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.ChannelAccess;
 import net.minecraft.client.sounds.SoundEngine;
 import net.minecraft.sounds.SoundSource;
-import net.neoforged.fml.ModList;
+import net.minecraft.util.Mth;
+import net.minecraftforge.fml.ModList;
 import org.lwjgl.openal.AL10;
 import org.lwjgl.openal.ALC10;
 import org.lwjgl.openal.EXTEfx;
@@ -99,7 +100,7 @@ public final class Hush {
      * @param amount 0 (no hush) .. 1 (the deep hush of a heavy snowfall)
      */
     public static void setWorld(float amount) {
-        float a = Math.clamp(amount, 0.0F, 1.0F);
+        float a = Mth.clamp(amount, 0.0F, 1.0F);
         float highs = 1.0F - 0.6F * a;
         float gain = 1.0F - 0.25F * a;
         worldHighs = highs;
@@ -163,8 +164,8 @@ public final class Hush {
             AL10.alSourcei(source, EXTEfx.AL_DIRECT_FILTER, EXTEfx.AL_FILTER_NULL);
         } else {
             // A filter is copied into the source when attached, so one filter object serves every source.
-            EXTEfx.alFilterf(filter, EXTEfx.AL_LOWPASS_GAIN, Math.clamp(gain, 0.0F, 1.0F));
-            EXTEfx.alFilterf(filter, EXTEfx.AL_LOWPASS_GAINHF, Math.clamp(highs, 0.0F, 1.0F));
+            EXTEfx.alFilterf(filter, EXTEfx.AL_LOWPASS_GAIN, Mth.clamp(gain, 0.0F, 1.0F));
+            EXTEfx.alFilterf(filter, EXTEfx.AL_LOWPASS_GAINHF, Mth.clamp(highs, 0.0F, 1.0F));
             AL10.alSourcei(source, EXTEfx.AL_DIRECT_FILTER, filter);
         }
         AL10.alGetError();

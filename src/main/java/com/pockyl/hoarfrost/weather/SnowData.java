@@ -1,6 +1,5 @@
 package com.pockyl.hoarfrost.weather;
 
-import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
@@ -11,13 +10,12 @@ import com.pockyl.hoarfrost.compat.Climate;
 /** The server's snow state for one level: a kind of snow forced by command, saved with the world. */
 public final class SnowData extends SavedData {
     private static final String NAME = "hoarfrost_snow";
-    private static final SavedData.Factory<SnowData> FACTORY = new SavedData.Factory<>(SnowData::new, SnowData::load);
 
     private int forcedKind = -1;
     private long forcedUntil;
 
     public static SnowData get(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(FACTORY, NAME);
+        return level.getDataStorage().computeIfAbsent(SnowData::load, SnowData::new, NAME);
     }
 
     /** Whether this level has weather at all (the overworld and dimensions like it). */
@@ -25,7 +23,7 @@ public final class SnowData extends SavedData {
         return level.dimensionType().hasSkyLight() && !level.dimensionType().hasCeiling();
     }
 
-    private static SnowData load(CompoundTag tag, HolderLookup.Provider registries) {
+    private static SnowData load(CompoundTag tag) {
         SnowData data = new SnowData();
         SnowKind kind = SnowKind.byId(tag.getString("forced"));
         data.forcedKind = kind == null ? -1 : kind.ordinal();
@@ -34,7 +32,7 @@ public final class SnowData extends SavedData {
     }
 
     @Override
-    public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
+    public CompoundTag save(CompoundTag tag) {
         SnowKind kind = SnowKind.byOrdinal(forcedKind);
         tag.putString("forced", kind == null ? "" : kind.id());
         tag.putLong("forcedUntil", forcedUntil);

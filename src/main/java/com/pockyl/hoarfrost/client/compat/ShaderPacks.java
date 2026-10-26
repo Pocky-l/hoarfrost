@@ -1,19 +1,29 @@
 package com.pockyl.hoarfrost.client.compat;
 
-import net.neoforged.fml.ModList;
+import net.minecraftforge.fml.ModList;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 
 /**
- * Shader packs of <a href="https://modrinth.com/mod/iris">Iris</a> (or its Forge port Oculus), asked through Iris' public
- * API by reflection, so neither is needed to build or run the mod.
+ * Shader packs of <a href="https://www.curseforge.com/minecraft/mc-mods/oculus">Oculus</a>, the Forge port of Iris, asked
+ * through its public API by reflection, so it is not needed to build or run the mod. Oculus 1.7 has the package layout of
+ * Iris 1.7 ({@code net.irisshaders.iris}), older releases that of Iris 1.6 ({@code net.coderbot.iris}); both are looked
+ * up.
  * <p>
- * Flakes and snow cover use vanilla shaders, which Iris swaps for the pack's programs; what changes with a pack is the vertex
- * layout of the meshes (see {@code CoverRenderer}).
+ * Flakes and snow cover use vanilla shaders, which Oculus swaps for the pack's programs; what changes with a pack is the
+ * vertex layout of the meshes (see {@code CoverRenderer}).
  */
 public final class ShaderPacks {
+    /** The mod class, the pipeline manager, the world pipeline and its phases: Oculus 1.7 and later, then 1.6 and earlier. */
+    private static final String[][] PIPELINE_CLASSES = {
+            {"net.irisshaders.iris.Iris", "net.irisshaders.iris.pipeline.PipelineManager",
+                    "net.irisshaders.iris.pipeline.WorldRenderingPipeline", "net.irisshaders.iris.pipeline.WorldRenderingPhase"},
+            {"net.coderbot.iris.Iris", "net.coderbot.iris.pipeline.PipelineManager",
+                    "net.coderbot.iris.pipeline.WorldRenderingPipeline", "net.coderbot.iris.pipeline.WorldRenderingPhase"}
+    };
+
     private static final MethodHandle IN_USE;
     private static final MethodHandle PIPELINE;
     private static final MethodHandle GET_PHASE;
@@ -37,24 +47,28 @@ public final class ShaderPacks {
             }
             // Internals (not part of the API): without them flakes drawn outside the vanilla weather pass use the pack's
             // particle program.
-            try {
-                Class<?> manager = Class.forName("net.irisshaders.iris.pipeline.PipelineManager");
-                Class<?> worldPipeline = Class.forName("net.irisshaders.iris.pipeline.WorldRenderingPipeline");
-                Class<?> phase = Class.forName("net.irisshaders.iris.pipeline.WorldRenderingPhase");
-                pipeline = MethodHandles.filterReturnValue(
-                        lookup.findStatic(Class.forName("net.irisshaders.iris.Iris"), "getPipelineManager", MethodType.methodType(manager)),
-                        lookup.findVirtual(manager, "getPipelineNullable", MethodType.methodType(worldPipeline)))
-                        .asType(MethodType.methodType(Object.class));
-                getPhase = lookup.findVirtual(worldPipeline, "getPhase", MethodType.methodType(phase))
-                        .asType(MethodType.methodType(Object.class, Object.class));
-                setPhase = lookup.findVirtual(worldPipeline, "setPhase", MethodType.methodType(void.class, phase))
-                        .asType(MethodType.methodType(void.class, Object.class, Object.class));
-                weatherPhase = phase.getField("RAIN_SNOW").get(null);
-            } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
-                pipeline = null;
-                getPhase = null;
-                setPhase = null;
-                weatherPhase = null;
+            for (String[] names : PIPELINE_CLASSES) {
+                try {
+                    Class<?> manager = Class.forName(names[1]);
+                    Class<?> worldPipeline = Class.forName(names[2]);
+                    Class<?> phase = Class.forName(names[3]);
+                    MethodHandle find = MethodHandles.filterReturnValue(
+                            lookup.findStatic(Class.forName(names[0]), "getPipelineManager", MethodType.methodType(manager)),
+                            lookup.findVirtual(manager, "getPipelineNullable", MethodType.methodType(worldPipeline)))
+                            .asType(MethodType.methodType(Object.class));
+                    MethodHandle get = lookup.findVirtual(worldPipeline, "getPhase", MethodType.methodType(phase))
+                            .asType(MethodType.methodType(Object.class, Object.class));
+                    MethodHandle set = lookup.findVirtual(worldPipeline, "setPhase", MethodType.methodType(void.class, phase))
+                            .asType(MethodType.methodType(void.class, Object.class, Object.class));
+                    Object weather = phase.getField("RAIN_SNOW").get(null);
+                    pipeline = find;
+                    getPhase = get;
+                    setPhase = set;
+                    weatherPhase = weather;
+                    break;
+                } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
+                    // Not this layout; try the next one.
+                }
             }
         }
         IN_USE = inUse;
@@ -80,7 +94,7 @@ public final class ShaderPacks {
     }
 
     /**
-     * Puts the pack into its weather pass, as if the vanilla weather were being drawn: Iris only does that around the
+     * Puts the pack into its weather pass, as if the vanilla weather were being drawn: Oculus only does that around the
      * vanilla call, so flakes drawn after it would otherwise get the pack's particle program.
      *
      * @return what to give {@link #endWeatherPhase} afterwards; null when nothing was changed

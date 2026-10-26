@@ -3,9 +3,7 @@ package com.pockyl.hoarfrost.client.render;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.BufferUploader;
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -31,7 +29,7 @@ import com.pockyl.hoarfrost.sim.Flakes;
  *   <li>A flake driven fast across the view (a blizzard) is drawn as a streak along its path, as the eye sees it.</li>
  * </ul>
  */
-public final class FlakeRenderer implements AutoCloseable {
+public final class FlakeRenderer {
     private static final ResourceLocation TEXTURE = Hoarfrost.id("textures/fx/flakes.png");
     private static final int SPRITES = 16;
     private static final int STREAK = 8;
@@ -48,7 +46,8 @@ public final class FlakeRenderer implements AutoCloseable {
     /** Speed across the view (blocks per tick) from which a flake is seen as a streak: only in strong wind. */
     private static final float STREAK_SPEED = 0.14F;
 
-    private final ByteBufferBuilder bytes = new ByteBufferBuilder(1 << 21);
+    /** One builder for every renderer: its memory is never given back, so it is not made again for each world. */
+    private static BufferBuilder builder;
     private int lastCount;
 
     public int lastCount() {
@@ -69,13 +68,13 @@ public final class FlakeRenderer implements AutoCloseable {
         RenderSystem.disableCull();
         Minecraft.getInstance().getTextureManager().getTexture(TEXTURE).setFilter(true, false);
         RenderSystem.setShaderTexture(0, TEXTURE);
-        BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
+        if (builder == null) {
+            builder = new BufferBuilder(1 << 18);
+        }
+        builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
         write(builder, flakes, camX, camY, camZ, partialTick, camera.getLeftVector(), camera.getUpVector(), camera.getLookVector(),
                 viewCone());
-        MeshData mesh = builder.build();
-        if (mesh != null) {
-            BufferUploader.drawWithShader(mesh);
-        }
+        BufferUploader.drawWithShader(builder.end());
         RenderSystem.enableCull();
         RenderSystem.depthMask(true);
         RenderSystem.disableBlend();
@@ -223,10 +222,10 @@ public final class FlakeRenderer implements AutoCloseable {
                 by *= half;
                 bz *= half;
                 // Counter-clockwise seen from the camera, as shader packs expect.
-                builder.addVertex(x - ax - bx, y - ay - by, z - az - bz).setUv(u1, 1.0F).setColor(red, green, blue, a).setLight(light);
-                builder.addVertex(x - ax + bx, y - ay + by, z - az + bz).setUv(u1, 0.0F).setColor(red, green, blue, a).setLight(light);
-                builder.addVertex(x + ax + bx, y + ay + by, z + az + bz).setUv(u0, 0.0F).setColor(red, green, blue, a).setLight(light);
-                builder.addVertex(x + ax - bx, y + ay - by, z + az - bz).setUv(u0, 1.0F).setColor(red, green, blue, a).setLight(light);
+                builder.vertex(x - ax - bx, y - ay - by, z - az - bz).uv(u1, 1.0F).color(red, green, blue, a).uv2(light).endVertex();
+                builder.vertex(x - ax + bx, y - ay + by, z - az + bz).uv(u1, 0.0F).color(red, green, blue, a).uv2(light).endVertex();
+                builder.vertex(x + ax + bx, y + ay + by, z + az + bz).uv(u0, 0.0F).color(red, green, blue, a).uv2(light).endVertex();
+                builder.vertex(x + ax - bx, y + ay - by, z + az - bz).uv(u0, 1.0F).color(red, green, blue, a).uv2(light).endVertex();
                 count++;
             }
         }
@@ -234,12 +233,7 @@ public final class FlakeRenderer implements AutoCloseable {
     }
 
     private static float smoothstep(float from, float to, float value) {
-        float t = Math.clamp((value - from) / (to - from), 0.0F, 1.0F);
+        float t = Mth.clamp((value - from) / (to - from), 0.0F, 1.0F);
         return t * t * (3.0F - 2.0F * t);
-    }
-
-    @Override
-    public void close() {
-        bytes.close();
     }
 }

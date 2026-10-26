@@ -4,25 +4,22 @@ import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.shaders.Uniform;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.client.renderer.culling.Frustum;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -59,13 +56,7 @@ import java.util.List;
  * program.
  */
 public final class CoverRenderer implements AutoCloseable {
-    private static final RenderType COVER = RenderType.create(Hoarfrost.MOD_ID + "_snow_cover", DefaultVertexFormat.BLOCK,
-            VertexFormat.Mode.QUADS, 1 << 16, false, false, RenderType.CompositeState.builder()
-                    .setLightmapState(RenderStateShard.LIGHTMAP)
-                    .setShaderState(RenderStateShard.RENDERTYPE_CUTOUT_MIPPED_SHADER)
-                    .setTextureState(RenderStateShard.BLOCK_SHEET_MIPPED)
-                    .setCullState(RenderStateShard.NO_CULL)
-                    .createCompositeState(false));
+    private static final RenderType COVER = CoverType.create();
     private static final ResourceLocation TEXTURE = Hoarfrost.id("block/snow_cover");
     /** Blocks the snow texture spans in each direction. */
     private static final int TEXTURE_BLOCKS = 4;
@@ -94,13 +85,14 @@ public final class CoverRenderer implements AutoCloseable {
     private static final float FLAT_LIGHT = LIGHT_Y / (float) Math.sqrt(LIGHT_X * LIGHT_X + LIGHT_Y * LIGHT_Y + LIGHT_Z * LIGHT_Z);
     /** Brightness of the sides of the snow, like the sides of vanilla blocks. */
     private static final float SIDE_SHADE = 0.82F;
-    private static final ResourceLocation VANILLA_SNOW = ResourceLocation.withDefaultNamespace("block/snow");
+    private static final ResourceLocation VANILLA_SNOW = new ResourceLocation("block/snow");
 
     private final SnowCover cover;
     private final FarSnowRenderer far;
     private final Long2ObjectOpenHashMap<Mesh> meshes = new Long2ObjectOpenHashMap<>();
     private final List<Mesh> dirty = new ArrayList<>();
-    private final ByteBufferBuilder bytes = new ByteBufferBuilder(1 << 18);
+    /** Shared by the meshes of every world: a builder's memory is never given back. */
+    private static final BufferBuilder BUILDER = new BufferBuilder(1 << 16);
     private float u0;
     private float v0;
     private float u1;
@@ -192,7 +184,7 @@ public final class CoverRenderer implements AutoCloseable {
     public void render(Camera camera, Frustum frustum, Matrix4f modelView, Matrix4f projection, double radius) {
         updateSprite();
         Vec3 cam = camera.getPosition();
-        // While a shader pack is active, Iris reads BLOCK vertices in its larger terrain layout - also from buffers built
+        // While a shader pack is active, Oculus reads BLOCK vertices in its larger terrain layout - also from buffers built
         // before: switching a pack on or off rebuilds every mesh.
         if (ShaderPacks.inUse() != shaderPack) {
             shaderPack = !shaderPack;
@@ -208,7 +200,7 @@ public final class CoverRenderer implements AutoCloseable {
             COVER.clearRenderState();
             return;
         }
-        shader.setDefaultUniforms(VertexFormat.Mode.QUADS, modelView, projection, Minecraft.getInstance().getWindow());
+        setDefaultUniforms(shader, modelView, projection);
         shader.apply();
         Uniform offset = shader.CHUNK_OFFSET;
         int drawn = 0;
@@ -402,7 +394,8 @@ public final class CoverRenderer implements AutoCloseable {
         }
         mesh.originY = Math.floor(lowest);
         gatherDents(chunk, mesh.detail == 4);
-        BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+        BufferBuilder builder = BUILDER;
+        builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         quads = 0;
         minY = Float.MAX_VALUE;
         maxY = -Float.MAX_VALUE;
@@ -423,7 +416,7 @@ public final class CoverRenderer implements AutoCloseable {
                 }
             }
         }
-        MeshData data = builder.build();
+        BufferBuilder.RenderedBuffer data = builder.endOrDiscardIfEmpty();
         if (data == null) {
             mesh.empty = true;
             mesh.quads = 0;
@@ -626,7 +619,7 @@ public final class CoverRenderer implements AutoCloseable {
                     y = b + LIFT;
                 }
                 gridY[g] = (float) (y - originY);
-                float cover = Math.clamp(depth / FULL_COVER, 0.0F, 1.0F);
+                float cover = Mth.clamp(depth / FULL_COVER, 0.0F, 1.0F);
                 cover = cover * cover * (3.0F - 2.0F * cover);
                 gridAlpha[g] = depth <= 0.0005F ? 0.0F : 0.47F + 0.53F * cover;
                 float length = (float) Math.sqrt(slopeX * slopeX + 1.0F + slopeZ * slopeZ);
@@ -691,7 +684,7 @@ public final class CoverRenderer implements AutoCloseable {
         // Flat snow is as bright as the top of a vanilla snow block; slopes facing away from the light a little darker.
         float shade = Math.min(1.0F, 0.8F + 0.2F * lit) * (1.0F - 0.08F * packed);
         int alpha = (int) (gridAlpha[g] * 255.0F);
-        builder.addVertex(x, y, z, alpha << 24 | tint(shade), u, v, OverlayTexture.NO_OVERLAY, gridLight[g], nx, ny, nz);
+        vertex(builder, x, y, z, alpha << 24 | tint(shade), u, v, gridLight[g], nx, ny, nz);
         minY = Math.min(minY, y);
         maxY = Math.max(maxY, y);
     }
@@ -737,15 +730,15 @@ public final class CoverRenderer implements AutoCloseable {
             // Counter-clockwise seen from outside: which end comes first depends on the side.
             boolean flip = alongX ? nz < 0.0F : nx > 0.0F;
             if (flip) {
-                builder.addVertex(xb, bottom, zb, colorB, ub, va, OverlayTexture.NO_OVERLAY, lightB, nx, 0.0F, nz);
-                builder.addVertex(xa, bottom, za, colorA, ua, va, OverlayTexture.NO_OVERLAY, lightA, nx, 0.0F, nz);
-                builder.addVertex(xa, ya, za, colorA, ua, vTopA, OverlayTexture.NO_OVERLAY, lightA, nx, 0.0F, nz);
-                builder.addVertex(xb, yb, zb, colorB, ub, vTopB, OverlayTexture.NO_OVERLAY, lightB, nx, 0.0F, nz);
+                vertex(builder, xb, bottom, zb, colorB, ub, va, lightB, nx, 0.0F, nz);
+                vertex(builder, xa, bottom, za, colorA, ua, va, lightA, nx, 0.0F, nz);
+                vertex(builder, xa, ya, za, colorA, ua, vTopA, lightA, nx, 0.0F, nz);
+                vertex(builder, xb, yb, zb, colorB, ub, vTopB, lightB, nx, 0.0F, nz);
             } else {
-                builder.addVertex(xa, bottom, za, colorA, ua, va, OverlayTexture.NO_OVERLAY, lightA, nx, 0.0F, nz);
-                builder.addVertex(xb, bottom, zb, colorB, ub, va, OverlayTexture.NO_OVERLAY, lightB, nx, 0.0F, nz);
-                builder.addVertex(xb, yb, zb, colorB, ub, vTopB, OverlayTexture.NO_OVERLAY, lightB, nx, 0.0F, nz);
-                builder.addVertex(xa, ya, za, colorA, ua, vTopA, OverlayTexture.NO_OVERLAY, lightA, nx, 0.0F, nz);
+                vertex(builder, xa, bottom, za, colorA, ua, va, lightA, nx, 0.0F, nz);
+                vertex(builder, xb, bottom, zb, colorB, ub, va, lightB, nx, 0.0F, nz);
+                vertex(builder, xb, yb, zb, colorB, ub, vTopB, lightB, nx, 0.0F, nz);
+                vertex(builder, xa, ya, za, colorA, ua, vTopA, lightA, nx, 0.0F, nz);
             }
             minY = Math.min(minY, bottom);
             quads++;
@@ -836,25 +829,88 @@ public final class CoverRenderer implements AutoCloseable {
             float vTop = v0 + texV * Math.min(1.0F, ya - bottom);
             boolean flip = alongX ? nz < 0.0F : nx > 0.0F;
             if (flip) {
-                builder.addVertex(xb, bottom, zb, color, ub, v0, OverlayTexture.NO_OVERLAY, light, nx, 0.0F, nz);
-                builder.addVertex(xa, bottom, za, color, ua, v0, OverlayTexture.NO_OVERLAY, light, nx, 0.0F, nz);
-                builder.addVertex(xa, ya, za, color, ua, vTop, OverlayTexture.NO_OVERLAY, light, nx, 0.0F, nz);
-                builder.addVertex(xb, yb, zb, color, ub, vTop, OverlayTexture.NO_OVERLAY, light, nx, 0.0F, nz);
+                vertex(builder, xb, bottom, zb, color, ub, v0, light, nx, 0.0F, nz);
+                vertex(builder, xa, bottom, za, color, ua, v0, light, nx, 0.0F, nz);
+                vertex(builder, xa, ya, za, color, ua, vTop, light, nx, 0.0F, nz);
+                vertex(builder, xb, yb, zb, color, ub, vTop, light, nx, 0.0F, nz);
             } else {
-                builder.addVertex(xa, bottom, za, color, ua, v0, OverlayTexture.NO_OVERLAY, light, nx, 0.0F, nz);
-                builder.addVertex(xb, bottom, zb, color, ub, v0, OverlayTexture.NO_OVERLAY, light, nx, 0.0F, nz);
-                builder.addVertex(xb, yb, zb, color, ub, vTop, OverlayTexture.NO_OVERLAY, light, nx, 0.0F, nz);
-                builder.addVertex(xa, ya, za, color, ua, vTop, OverlayTexture.NO_OVERLAY, light, nx, 0.0F, nz);
+                vertex(builder, xa, bottom, za, color, ua, v0, light, nx, 0.0F, nz);
+                vertex(builder, xb, bottom, zb, color, ub, v0, light, nx, 0.0F, nz);
+                vertex(builder, xb, yb, zb, color, ub, vTop, light, nx, 0.0F, nz);
+                vertex(builder, xa, ya, za, color, ua, vTop, light, nx, 0.0F, nz);
             }
             minY = Math.min(minY, bottom);
             quads++;
         }
     }
 
+    /** One vertex in the block format (which has no overlay). */
+    static void vertex(BufferBuilder builder, float x, float y, float z, int argb, float u, float v, int light, float nx, float ny,
+            float nz) {
+        builder.vertex(x, y, z).color(argb >> 16 & 0xFF, argb >> 8 & 0xFF, argb & 0xFF, argb >>> 24).uv(u, v).uv2(light)
+                .normal(nx, ny, nz).endVertex();
+    }
+
+    /**
+     * Sets the uniforms and samplers the game fills in for every shader, as it does before drawing the chunk layers. The
+     * caller then applies the shader.
+     */
+    private static void setDefaultUniforms(ShaderInstance shader, Matrix4f modelView, Matrix4f projection) {
+        for (int i = 0; i < 12; i++) {
+            shader.setSampler("Sampler" + i, RenderSystem.getShaderTexture(i));
+        }
+        if (shader.MODEL_VIEW_MATRIX != null) {
+            shader.MODEL_VIEW_MATRIX.set(modelView);
+        }
+        if (shader.PROJECTION_MATRIX != null) {
+            shader.PROJECTION_MATRIX.set(projection);
+        }
+        if (shader.COLOR_MODULATOR != null) {
+            shader.COLOR_MODULATOR.set(RenderSystem.getShaderColor());
+        }
+        if (shader.FOG_START != null) {
+            shader.FOG_START.set(RenderSystem.getShaderFogStart());
+        }
+        if (shader.FOG_END != null) {
+            shader.FOG_END.set(RenderSystem.getShaderFogEnd());
+        }
+        if (shader.FOG_COLOR != null) {
+            shader.FOG_COLOR.set(RenderSystem.getShaderFogColor());
+        }
+        if (shader.FOG_SHAPE != null) {
+            shader.FOG_SHAPE.set(RenderSystem.getShaderFogShape().getIndex());
+        }
+        if (shader.TEXTURE_MATRIX != null) {
+            shader.TEXTURE_MATRIX.set(RenderSystem.getTextureMatrix());
+        }
+        if (shader.GAME_TIME != null) {
+            shader.GAME_TIME.set(RenderSystem.getShaderGameTime());
+        }
+        RenderSystem.setupShaderLights(shader);
+    }
+
     @Override
     public void close() {
         closeAll();
         far.close();
-        bytes.close();
+    }
+
+    /**
+     * Only here to reach the render state shards, which only subclasses of the render types may use; never made.
+     */
+    private abstract static class CoverType extends RenderType {
+        private CoverType() {
+            super(null, null, null, 0, false, false, null, null);
+        }
+
+        static RenderType create() {
+            return RenderType.create(Hoarfrost.MOD_ID + "_snow_cover", DefaultVertexFormat.BLOCK, VertexFormat.Mode.QUADS, 1 << 16,
+                    false, false, CompositeState.builder()
+                            .setLightmapState(LIGHTMAP)
+                            .setShaderState(RENDERTYPE_CUTOUT_MIPPED_SHADER)
+                            .setTextureState(BLOCK_SHEET_MIPPED)
+                            .setCullState(NO_CULL)
+                            .createCompositeState(false));
+        }
     }
 }
