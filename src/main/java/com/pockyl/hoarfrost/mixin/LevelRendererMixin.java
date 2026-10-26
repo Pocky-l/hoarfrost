@@ -28,6 +28,15 @@ abstract class LevelRendererMixin {
         SnowClient.renderSnowfall(lightTexture, partialTick, camX, camY, camZ);
     }
 
+    /**
+     * Every redraw of a chunk section passes here, also with Sodium (which replaces the body) and from dynamic light mods
+     * (LambDynamicLights redraws the sections around its moving lights): the snow on those chunks checks its light.
+     */
+    @Inject(method = "setSectionDirty(IIIZ)V", at = @At("HEAD"), require = 0)
+    private void hoarfrost$sectionChanged(int sectionX, int sectionY, int sectionZ, boolean important, CallbackInfo ci) {
+        SnowClient.onSectionChanged(sectionX, sectionZ);
+    }
+
     @ModifyVariable(method = "renderSnowAndRain", at = @At("STORE"))
     private Biome.Precipitation hoarfrost$rainOnly(Biome.Precipitation precipitation) {
         return precipitation == Biome.Precipitation.SNOW && SnowClient.ownsSnowfall() ? Biome.Precipitation.NONE : precipitation;

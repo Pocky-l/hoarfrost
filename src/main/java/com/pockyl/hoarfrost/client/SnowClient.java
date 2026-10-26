@@ -1,5 +1,6 @@
 package com.pockyl.hoarfrost.client;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -466,6 +467,13 @@ public final class SnowClient {
                 Math.min(SETTINGS.coverRadius, Minecraft.getInstance().options.getEffectiveRenderDistance() * 16.0));
     }
 
+    /** A chunk section is to be redrawn (a block or the light changed there). */
+    public static void onSectionChanged(int sectionX, int sectionZ) {
+        if (coverRenderer != null && RenderSystem.isOnRenderThread()) {
+            coverRenderer.sectionChanged(sectionX, sectionZ);
+        }
+    }
+
     @SubscribeEvent
     public static void onRenderFog(ViewportEvent.RenderFog event) {
         if (event.getMode() == FogRenderer.FogMode.FOG_TERRAIN) {
@@ -483,35 +491,43 @@ public final class SnowClient {
         }
         SnowConditions weather = ClientWeather.conditions();
         float far = event.getFarPlaneDistance();
+        // With distant land (Distant Horizons) the view reaches far past the vanilla chunks: the haze closes in from
+        // there, so a storm hides the near and the distant land alike instead of ending at the render distance.
+        float reach = Math.max(far, SnowFog.distantReach());
         // Gusts thicken the air, lulls clear it a little.
         float gust = ClientWeather.gust();
         float target = weather.visibility * 1.15F / Mth.lerp(weather.gustiness, 1.0F, Mth.clamp(gust, 0.6F, 1.8F));
         float k = (float) Math.min(1.0, snow * strength);
-        float newFar = target < far ? far + (target - far) * k : far;
+        float newFar = target < reach ? reach + (target - reach) * k : reach;
         // In the heart of a squall of snow the world is gone for a moment.
         float squall = Mth.clamp((gust - 1.35F) / 0.6F, 0.0F, 1.0F) * Mth.clamp((weather.gustiness - 0.5F) * 2.0F, 0.0F, 1.0F) * snow
                 * (float) Math.min(1.0, strength);
         if (squall > 0.0F) {
-            newFar = Math.min(newFar, Mth.lerp(squall, far, SQUALL_VISIBILITY));
+            newFar = Math.min(newFar, Mth.lerp(squall, reach, SQUALL_VISIBILITY));
             k = Math.max(k, squall);
         }
-        if (newFar >= far) {
-            return;
-        }
-        if (event.getMode() == FogRenderer.FogMode.FOG_SKY) {
-            // The sky itself fades into the snowy air.
-            event.setFarPlaneDistance(newFar);
-            event.setCanceled(true);
+        if (newFar >= reach) {
             return;
         }
         // The haze thickens gradually from just in front of the camera instead of standing as a wall.
-        float newNear = Math.min(event.getNearPlaneDistance(), newFar * (0.18F - 0.16F * k));
-        event.setFarPlaneDistance(newFar);
-        event.setNearPlaneDistance(Math.max(0.0F, newNear));
-        event.setCanceled(true);
-        if (event.getMode() == FogRenderer.FogMode.FOG_TERRAIN) {
-            SnowFog.setTerrain(Math.max(0.0F, newNear), newFar, k);
+        float newNear = Math.max(0.0F, newFar * (0.18F - 0.16F * k));
+        if (newFar < far) {
+            newNear = Math.max(0.0F, Math.min(event.getNearPlaneDistance(), newNear));
         }
+        if (event.getMode() == FogRenderer.FogMode.FOG_TERRAIN) {
+            SnowFog.setTerrain(newNear, newFar, far, k);
+        }
+        if (newFar >= far) {
+            // The haze ends on the distant land: the vanilla fog stays, or SnowFog puts the haze back if the distant
+            // land's mod turned the vanilla fog off.
+            return;
+        }
+        event.setFarPlaneDistance(newFar);
+        if (event.getMode() != FogRenderer.FogMode.FOG_SKY) {
+            // The sky itself just fades into the snowy air.
+            event.setNearPlaneDistance(newNear);
+        }
+        event.setCanceled(true);
     }
 
     @SubscribeEvent
