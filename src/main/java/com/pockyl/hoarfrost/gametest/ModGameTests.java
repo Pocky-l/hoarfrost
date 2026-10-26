@@ -1,6 +1,7 @@
 package com.pockyl.hoarfrost.gametest;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
@@ -21,6 +22,7 @@ import com.pockyl.hoarfrost.compat.Climate;
 import com.pockyl.hoarfrost.sim.AirFlow;
 import com.pockyl.hoarfrost.sim.CoverChunk;
 import com.pockyl.hoarfrost.sim.Flakes;
+import com.pockyl.hoarfrost.sim.Footing;
 import com.pockyl.hoarfrost.sim.SnowCover;
 import com.pockyl.hoarfrost.sim.SnowSettings;
 import com.pockyl.hoarfrost.sim.SnowSimulation;
@@ -30,6 +32,7 @@ import com.pockyl.hoarfrost.weather.SnowKind;
 import com.pockyl.hoarfrost.weather.SnowSchedule;
 import com.pockyl.hoarfrost.weather.Wind;
 import com.pockyl.hoarfrost.world.DriftBuilder;
+import com.pockyl.hoarfrost.world.LeafSnow;
 
 import java.util.Arrays;
 import java.util.List;
@@ -54,6 +57,31 @@ public final class ModGameTests {
     @GameTest(template = "empty")
     public static void modLoads(GameTestHelper helper) {
         helper.succeed();
+    }
+
+    @GameTest(template = "arena")
+    public static void snowCapsTheTopOfACrown(GameTestHelper helper) {
+        BlockState leaves = Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
+        for (int x = 10; x <= 12; x++) {
+            helper.setBlock(new BlockPos(x, 3, 10), leaves);
+        }
+        helper.setBlock(new BlockPos(11, 4, 10), leaves);
+        helper.setBlock(new BlockPos(9, 3, 10), Blocks.STONE);
+        ServerLevel level = helper.getLevel();
+        helper.succeedWhen(() -> {
+            int middle = LeafSnow.shape(level, helper.absolutePos(new BlockPos(11, 3, 10)));
+            int edge = LeafSnow.shape(level, helper.absolutePos(new BlockPos(10, 3, 10)));
+            int crown = LeafSnow.shape(level, helper.absolutePos(new BlockPos(11, 4, 10)));
+            helper.assertTrue(middle == 0, "leaves under leaves stay green");
+            helper.assertTrue((crown & LeafSnow.TOP) != 0 && (crown & LeafSnow.SIDES) == LeafSnow.SIDES,
+                    "the top of the crown is capped and the snow hangs over all its sides");
+            helper.assertTrue((edge & LeafSnow.TOP) != 0, "open leaves are capped");
+            int north = LeafSnow.side(Direction.NORTH);
+            int west = LeafSnow.side(Direction.WEST);
+            int east = LeafSnow.side(Direction.EAST);
+            helper.assertTrue((edge & north) != 0, "a side facing the air gets the band");
+            helper.assertTrue((edge & west) == 0 && (edge & east) == 0, "no band against stone or other leaves");
+        });
     }
 
     @GameTest(template = "empty")
@@ -493,12 +521,50 @@ public final class ModGameTests {
         weather(sim, 40);
         Vec3 foot = helper.absoluteVec(new Vec3(20.5, 1.0, 20.5));
         double depth = sim.cover().depthAt(foot.x, foot.y, foot.z);
-        sim.step(foot.x, foot.y, foot.z, 0.2F, 0.0F, 0.17F, 1.0F);
+        sim.step(helper.getLevel(), foot.x, foot.y, foot.z, 0.2F, 0.0F, 0.17F, 1.0F);
         CoverChunk chunk = sim.cover().chunkAt((int) Math.floor(foot.x), (int) Math.floor(foot.z));
         helper.assertTrue(chunk.dentCount() == 1, "a dent is pressed");
         helper.assertTrue(chunk.dentDepth(0) <= depth, "a dent goes no deeper than the snow");
         helper.assertTrue(sim.cover().packedAt(foot.x, foot.y, foot.z) > 0.0F, "the snow is trodden");
         helper.assertTrue(sim.cover().depthAt(foot.x, foot.y, foot.z) == depth, "a dent takes no snow away");
+        helper.succeed();
+    }
+
+    @GameTest(template = "arena")
+    public static void printsFollowTheFooting(GameTestHelper helper) {
+        floor(helper);
+        for (int x = 26; x <= 30; x++) {
+            for (int z = 26; z <= 30; z++) {
+                helper.setBlock(new BlockPos(x, 0, z), Blocks.ICE);
+                helper.setBlock(new BlockPos(x - 16, 0, z), Blocks.DIRT);
+            }
+        }
+        SnowSimulation sim = simulation(helper);
+        calm(sim, SnowKind.SNOW);
+        weather(sim, 40);
+        ServerLevel level = helper.getLevel();
+        Vec3 stone = helper.absoluteVec(new Vec3(20.5, 1.0, 10.5));
+        Vec3 dirt = helper.absoluteVec(new Vec3(12.5, 1.0, 28.5));
+        Vec3 ice = helper.absoluteVec(new Vec3(28.5, 1.0, 28.5));
+        sim.step(level, stone.x, stone.y, stone.z, 0.2F, 0.0F, 0.17F, 1.0F);
+        sim.step(level, dirt.x, dirt.y, dirt.z, 0.2F, 0.0F, 0.17F, 1.0F);
+        sim.step(level, ice.x, ice.y, ice.z, 0.2F, 0.0F, 0.17F, 1.0F);
+        CoverChunk onStone = sim.cover().chunkAt((int) Math.floor(stone.x), (int) Math.floor(stone.z));
+        CoverChunk onDirt = sim.cover().chunkAt((int) Math.floor(dirt.x), (int) Math.floor(dirt.z));
+        CoverChunk onIce = sim.cover().chunkAt((int) Math.floor(ice.x), (int) Math.floor(ice.z));
+        int a = onStone.dentCount() - 1;
+        int b = onDirt.dentCount() - 1;
+        int c = onIce.dentCount() - 1;
+        helper.assertTrue(a >= 0 && onStone.dentFooting(a) == Footing.HARD, "stone takes a crisp print");
+        helper.assertTrue(b >= 0 && onDirt.dentFooting(b) == Footing.SOFT, "soil takes a soft print");
+        helper.assertTrue(c >= 0 && onIce.dentFooting(c) == Footing.ICE, "a foot slips on ice");
+        helper.assertTrue(onStone.dentDepth(a) < onDirt.dentDepth(b), "a print on stone is shallower than on soil");
+        double iceDepth = sim.cover().depthAt(ice.x, ice.y, ice.z);
+        helper.assertTrue(Math.abs(onIce.dentDepth(c) - iceDepth) < 1.0E-6, "the slip sweeps the snow off down to the ice");
+        helper.assertTrue(onIce.dentStretch(c) > 1.5F && Math.abs(onIce.dentDirX(c)) == 1.0F, "the scuff runs along the step");
+        // The rim: snow pushed up just beside a soft print, none on the far side of a scuff on ice.
+        helper.assertTrue(Footing.SOFT.lower(0.0F, Footing.SOFT.side * 1.3F, 1.0F, 0.1F) < 0.0F, "a soft print has a rim");
+        helper.assertTrue(Footing.ICE.lower(-Footing.ICE.back * 1.3F, 0.0F, 2.0F, 0.1F) == 0.0F, "a scuff heaps snow only ahead");
         helper.succeed();
     }
 

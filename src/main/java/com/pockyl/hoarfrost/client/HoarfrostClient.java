@@ -2,6 +2,7 @@ package com.pockyl.hoarfrost.client;
 
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.ConfigScreenHandler;
+import net.minecraftforge.client.event.ModelEvent;
 import net.minecraftforge.client.event.RegisterColorHandlersEvent;
 import net.minecraftforge.client.event.sound.SoundEngineLoadEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -59,5 +60,10 @@ public final class HoarfrostClient {
     @SubscribeEvent
     public static void onRegisterResolvers(RegisterColorHandlersEvent.ColorResolvers event) {
         LeafFrost.onRegisterResolvers(event);
+    }
+
+    @SubscribeEvent
+    public static void onModifyBakingResult(ModelEvent.ModifyBakingResult event) {
+        LeafFrost.onModifyBakingResult(event);
     }
 }
