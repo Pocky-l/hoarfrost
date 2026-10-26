@@ -52,6 +52,8 @@
 
 [![Sable](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sable.png)](https://www.curseforge.com/minecraft/mc-mods/sable) ✅ **[Sable](https://www.curseforge.com/minecraft/mc-mods/sable)** (optional) - snow lands on the roofs of flying houses and airships and no longer drifts through their walls.
 
+[![LambDynamicLights](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/lambdynamiclights.png)](https://modrinth.com/mod/lambdynamiclights) ✅ **[LambDynamicLights](https://modrinth.com/mod/lambdynamiclights)** (optional) - a torch in hand or a glowing mob lights up the snow around it like the ground.
+
 [![Particle Rain](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/particle-rain.png)](https://www.curseforge.com/minecraft/mc-mods/particle-rain) ✅ **[Particle Rain](https://www.curseforge.com/minecraft/mc-mods/particle-rain)** (optional) - Hoarfrost draws the snow, Particle Rain the rain, sand and fog, all in the same wind.
 
 ## Controls

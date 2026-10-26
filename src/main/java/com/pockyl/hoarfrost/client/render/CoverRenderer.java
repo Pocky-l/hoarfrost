@@ -13,6 +13,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShaderInstance;
@@ -36,6 +37,7 @@ import com.pockyl.hoarfrost.sim.CoverSurvey;
 import com.pockyl.hoarfrost.sim.SnowCover;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
@@ -99,6 +101,8 @@ public final class CoverRenderer implements AutoCloseable {
     private final SnowCover cover;
     private final FarSnowRenderer far;
     private final Long2ObjectOpenHashMap<Mesh> meshes = new Long2ObjectOpenHashMap<>();
+    /** The light each chunk's snow is drawn with this frame (lightmap coordinates per surface), filled when first asked. */
+    private final Long2ObjectOpenHashMap<int[]> drawLight = new Long2ObjectOpenHashMap<>();
     private final List<Mesh> dirty = new ArrayList<>();
     private final ByteBufferBuilder bytes = new ByteBufferBuilder(1 << 18);
     private float u0;
@@ -161,6 +165,12 @@ public final class CoverRenderer implements AutoCloseable {
         int detail = 1;
         double distanceSq;
         int quads;
+        /** Hash of the light the mesh was built with. */
+        int builtLight;
+        /** The world redrew blocks here (light may have changed): compare the light on the next frame. */
+        boolean relit;
+        /** The light differs from the built one: rebuild. */
+        boolean lightStale;
 
         Mesh(CoverChunk chunk) {
             this.chunk = chunk;
@@ -179,6 +189,18 @@ public final class CoverRenderer implements AutoCloseable {
 
     public int lastQuads() {
         return lastQuads;
+    }
+
+    /**
+     * The world marked a chunk section for redrawing: a block or the light changed there. Dynamic light mods
+     * (LambDynamicLights) light the world through the vanilla light colour and redraw sections as their lights move, so
+     * the snow there takes the new light too.
+     */
+    public void sectionChanged(int sectionX, int sectionZ) {
+        Mesh mesh = meshes.get(ChunkPos.asLong(sectionX, sectionZ));
+        if (mesh != null) {
+            mesh.relit = true;
+        }
     }
 
     public int meshCount() {
@@ -283,6 +305,7 @@ public final class CoverRenderer implements AutoCloseable {
 
     private void collect(Vec3 cam, double radius) {
         dirty.clear();
+        drawLight.clear();
         double keepSq = (radius + 24.0) * (radius + 24.0);
         for (Iterator<Mesh> it = meshes.values().iterator(); it.hasNext(); ) {
             Mesh mesh = it.next();
@@ -318,11 +341,52 @@ public final class CoverRenderer implements AutoCloseable {
                 detail = 2;
             }
             mesh.detail = detail;
+            if (mesh.relit) {
+                mesh.relit = false;
+                mesh.lightStale |= mesh.builtRevision != Integer.MIN_VALUE && Arrays.hashCode(drawLight(chunk)) != mesh.builtLight;
+            }
             int neighbours = neighbourState(chunk);
-            if (mesh.builtRevision != chunk.revision() || mesh.builtDetail != detail || mesh.builtNeighbours != neighbours) {
+            if (mesh.builtRevision != chunk.revision() || mesh.builtDetail != detail || mesh.builtNeighbours != neighbours
+                    || mesh.lightStale) {
                 dirty.add(mesh);
             }
         }
+    }
+
+    /**
+     * The light the snow of a chunk is drawn with, as lightmap coordinates per surface. The block light is read now
+     * through the vanilla light colour of the block the snow lies in - so the snow is lit like the blocks around it,
+     * also by dynamic lights of other mods, which add their light there. The sky light stays the surveyed one (the client
+     * may not have lit new chunks yet, which would draw open snow black).
+     */
+    private int[] drawLight(CoverChunk chunk) {
+        long key = ChunkPos.asLong(chunk.x, chunk.z);
+        int[] lights = drawLight.get(key);
+        if (lights != null) {
+            return lights;
+        }
+        lights = new int[CoverChunk.ENTRIES];
+        ClientLevel world = Minecraft.getInstance().level;
+        for (int e = 0; e < CoverChunk.ENTRIES; e++) {
+            int surface = e / CoverChunk.COLUMNS;
+            int column = e % CoverChunk.COLUMNS;
+            if (!chunk.has(surface, column)) {
+                continue;
+            }
+            int stored = chunk.light(surface, column);
+            int block = (stored >> 4 & 0xF) * 16;
+            if (world != null) {
+                probe.set(chunk.x * 16 + (column & 15), (int) Math.floor(chunk.base(surface, column) + 0.02F), chunk.z * 16 + (column >> 4));
+                block = LevelRenderer.getLightColor(world, probe) & 0xFFFF;
+            }
+            lights[e] = Math.min(block, 0xF0) | (stored >> 20 & 0xF) * 16 << 16;
+        }
+        drawLight.put(key, lights);
+        return lights;
+    }
+
+    private int drawLight(CoverChunk chunk, int surface, int column) {
+        return drawLight(chunk)[surface * CoverChunk.COLUMNS + column];
     }
 
     /** Which neighbouring chunks are there and surveyed: the edges of a mesh look into them. */
@@ -388,6 +452,8 @@ public final class CoverRenderer implements AutoCloseable {
         mesh.builtRevision = chunk.revision();
         mesh.builtDetail = mesh.detail;
         mesh.builtNeighbours = neighbourState(chunk);
+        mesh.builtLight = Arrays.hashCode(drawLight(chunk));
+        mesh.lightStale = false;
         float lowest = Float.MAX_VALUE;
         for (int e = 0; e < CoverChunk.ENTRIES; e++) {
             float b = chunk.base(e / CoverChunk.COLUMNS, e % CoverChunk.COLUMNS);
@@ -479,9 +545,9 @@ public final class CoverRenderer implements AutoCloseable {
         int column = CoverChunk.index(lx, lz);
         float b = chunk.base(surface, column);
         float d = chunk.depth(surface, column);
-        int light = chunk.light(surface, column);
-        float block = (light >> 4 & 0xF);
-        float sky = (light >> 20 & 0xF);
+        int light = drawLight(chunk, surface, column);
+        float block = (light & 0xFFFF) / 16.0F;
+        float sky = (light >>> 16) / 16.0F;
         int worldX = chunk.x * 16 + lx;
         int worldZ = chunk.z * 16 + lz;
         for (int oz = -1; oz <= 1; oz++) {
@@ -525,9 +591,9 @@ public final class CoverRenderer implements AutoCloseable {
                     float nd = other.depth(best, otherColumn);
                     nHeight[n] = other.base(best, otherColumn) + nd;
                     nDepth[n] = nd;
-                    int otherLight = other.light(best, otherColumn);
-                    nBlock[n] = otherLight >> 4 & 0xF;
-                    nSky[n] = otherLight >> 20 & 0xF;
+                    int otherLight = drawLight(other, best, otherColumn);
+                    nBlock[n] = (otherLight & 0xFFFF) / 16.0F;
+                    nSky[n] = (otherLight >>> 16) / 16.0F;
                 } else if (wallBeside(x, b, z)) {
                     nHeight[n] = b + d;
                     nDepth[n] = d;
@@ -764,8 +830,7 @@ public final class CoverRenderer implements AutoCloseable {
         float x1 = lx + chunk.capBox(surface, column, 1) + overhang;
         float z0 = lz + chunk.capBox(surface, column, 2) - overhang;
         float z1 = lz + chunk.capBox(surface, column, 3) + overhang;
-        int light = chunk.light(surface, column);
-        int packedLight = (light >> 4 & 0xF) * 16 | (light >> 20 & 0xF) * 16 << 16;
+        int packedLight = drawLight(chunk, surface, column);
         float bottom = (float) (b - originY) - Math.min(0.04F, d * 0.4F);
         float top = (float) (b - originY) + LIFT;
         int n = 4;

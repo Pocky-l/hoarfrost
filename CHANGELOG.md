@@ -4,6 +4,15 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - Unreleased
+### Fixed
+- The haze of heavy snow and blizzards now covers the distant land of
+  [Distant Horizons](https://www.curseforge.com/minecraft/mc-mods/distant-horizons) too. It used to end at the vanilla
+  render distance, leaving the far land clear and green behind a hard edge; now the near and the far land fade into the
+  storm alike.
+- With [LambDynamicLights](https://modrinth.com/mod/lambdynamiclights) the lying snow is lit by torches in hand, glowing
+  mobs and other moving lights like the ground around it, instead of staying dark.
+
 ## [1.1.1] - 2026-10-13
 ### Fixed
 - Settled snow no longer hides rails, redstone dust, tripwire and pressure plates: the ground under them stays clear,

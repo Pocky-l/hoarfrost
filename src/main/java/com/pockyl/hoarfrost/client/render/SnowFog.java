@@ -2,29 +2,50 @@ package com.pockyl.hoarfrost.client.render;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 
+import java.util.function.IntSupplier;
+
 /**
  * The haze of falling snow as set up for this frame, kept for whoever draws fog after the vanilla fog event: mods that
  * turn the vanilla fog off (Distant Horizons does by default, to show its distant land) would take the snowstorm with
  * it, and Distant Horizons draws its own fog over its distant land.
  */
 public final class SnowFog {
+    private static final IntSupplier NO_DISTANT_LAND = () -> 0;
+
     private static boolean terrain;
     private static float near;
     private static float far;
+    /** Where the vanilla chunks end and distant land (if any) begins. */
+    private static float seam;
     /** The haze this frame, for distant land; 0 without one. */
     private static float strength;
     private static float red;
     private static float green;
     private static float blue;
+    private static IntSupplier distantLand = NO_DISTANT_LAND;
 
     private SnowFog() {
     }
 
-    /** The snowy haze of the land this frame (the fog event set it). */
-    public static void setTerrain(float nearPlane, float farPlane, float k) {
+    /** A mod that draws land beyond the vanilla render distance tells how far, in blocks (0 when it draws none now). */
+    public static void setDistantLand(IntSupplier blocks) {
+        distantLand = blocks;
+    }
+
+    /** How far distant land reaches beyond the vanilla chunks, in blocks; 0 without it. */
+    public static int distantReach() {
+        return distantLand.getAsInt();
+    }
+
+    /**
+     * The snowy haze of the land this frame (the fog event set it). With distant land its far plane may lie beyond the
+     * vanilla chunks ({@code vanillaFar}): the near land then carries only the beginning of the haze.
+     */
+    public static void setTerrain(float nearPlane, float farPlane, float vanillaFar, float k) {
         terrain = true;
         near = nearPlane;
         far = farPlane;
+        seam = vanillaFar;
         strength = k;
     }
 
@@ -62,6 +83,10 @@ public final class SnowFog {
 
     public static float far() {
         return far;
+    }
+
+    public static float seam() {
+        return seam;
     }
 
     public static float red() {
