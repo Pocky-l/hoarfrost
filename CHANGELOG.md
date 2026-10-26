@@ -4,6 +4,22 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1+1.20.1] - Unreleased
+### Changed
+- Hoarfrost comes to Minecraft 1.20.1 with [Forge](https://files.minecraftforge.net), with everything of 1.1.1: seven
+  kinds of snowfall and blizzard, a living wind, soft snow settling on the land with drifts, caps and footprints, snow on
+  distant land, powder blown up by explosions, gusts and feet, clouds of snow and whiteouts, a bright snowy sky and haze,
+  white leaves in snowy biomes, real snow drifts built by the server, the winter soundscape and the `/hoarfrost`
+  commands. It works with [Petrichor](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms),
+  [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons),
+  [Distant Horizons](https://www.curseforge.com/minecraft/mc-mods/distant-horizons),
+  [Particle Rain](https://www.curseforge.com/minecraft/mc-mods/particle-rain),
+  [Oculus](https://www.curseforge.com/minecraft/mc-mods/oculus) shader packs,
+  [Embeddium](https://www.curseforge.com/minecraft/mc-mods/embeddium) and
+  [Sound Physics Remastered](https://www.curseforge.com/minecraft/mc-mods/sound-physics-remastered). Everything below up
+  to 1.1.1 is included, except the [Sable](https://www.curseforge.com/minecraft/mc-mods/sable) support: Sable has no
+  Minecraft 1.20.1 version.
+
 ## [1.1.1] - 2026-10-13
 ### Fixed
 - Settled snow no longer hides rails, redstone dust, tripwire and pressure plates: the ground under them stays clear,

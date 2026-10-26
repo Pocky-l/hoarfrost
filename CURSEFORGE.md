@@ -5,7 +5,7 @@ settling on the land and a quiet winter soundscape.
 
 ![A blizzard sweeping through a snowy spruce forest](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/screenshots/blizzard.jpg)
 
-📦 **Requires** [NeoForge](https://neoforged.net) 1.21.1 · works on the client alone, on the server too for shared
+📦 **Requires** [Forge](https://files.minecraftforge.net) 1.20.1 · works on the client alone, on the server too for shared
 snow and real drifts
 
 ## ✨ Features
@@ -16,8 +16,8 @@ snow and real drifts
   under roofs; flakes, crystals, clumps and grains drift with it.
 - 🏔️ **Soft snow on the ground** - one smooth cover on land, roofs and crowns, with drifts in the lee, wind-swept ridges
   and caps on fence posts; out to the render distance, melting near lamps.
-- 💨 **Snow with physics** - wind charges, explosions, gusts and running feet blow up powder; footprints and trodden
-  paths that fresh snow fills again.
+- 💨 **Snow with physics** - explosions, gusts and running feet blow up powder; footprints and trodden paths that
+  fresh snow fills again.
 - 🌫️ **Storms with volume** - clouds of snow rolling over the land, a bright overcast sky and a blue-grey haze, never
   indoors or underground.
 - 🌲 **White leaves in snowy biomes**, as in Bedrock Edition, and real snow drifts piling up when the mod is on the
@@ -33,13 +33,11 @@ snow and real drifts
 
 [![Serene Seasons](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/serene-seasons.png)](https://www.curseforge.com/minecraft/mc-mods/serene-seasons) ✅ **[Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons)** (optional) - snow falls and lies where the season makes it cold; deep winter brings blizzards.
 
-[![Iris](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/iris.png)](https://modrinth.com/mod/iris) ✅ **[Iris](https://modrinth.com/mod/iris)** (shader packs) - flakes and the snow cover take on the pack's look and lighting.
+[![Oculus](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/oculus.png)](https://www.curseforge.com/minecraft/mc-mods/oculus) ✅ **[Oculus](https://www.curseforge.com/minecraft/mc-mods/oculus)** (shader packs) - flakes and the snow cover take on the pack's look and lighting.
 
-[![Sodium](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sodium.png)](https://modrinth.com/mod/sodium) ✅ **[Sodium](https://modrinth.com/mod/sodium)** - works, white leaves included.
+[![Embeddium](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/embeddium.png)](https://www.curseforge.com/minecraft/mc-mods/embeddium) ✅ **[Embeddium](https://www.curseforge.com/minecraft/mc-mods/embeddium)** - works, white leaves included.
 
 [![Sound Physics Remastered](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sound-physics-remastered.png)](https://www.curseforge.com/minecraft/mc-mods/sound-physics-remastered) ✅ **[Sound Physics Remastered](https://www.curseforge.com/minecraft/mc-mods/sound-physics-remastered)** (optional) - the hush of falling snow lets Sound Physics do the muffling.
-
-[![Sable](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sable.png)](https://www.curseforge.com/minecraft/mc-mods/sable) ✅ **[Sable](https://www.curseforge.com/minecraft/mc-mods/sable)** (optional) - snow lands on the roofs of flying houses and airships and no longer drifts through their walls.
 
 [![Particle Rain](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/particle-rain.png)](https://www.curseforge.com/minecraft/mc-mods/particle-rain) ✅ **[Particle Rain](https://www.curseforge.com/minecraft/mc-mods/particle-rain)** (optional) - Hoarfrost draws the snow, Particle Rain the rain, sand and fog, all in the same wind.
 

@@ -10,8 +10,8 @@
 
 <p align="center">
   <a href="https://www.curseforge.com/minecraft/mc-mods/hoarfrost-snow-blizzards"><img alt="CurseForge downloads" src="https://img.shields.io/curseforge/dt/1736975?logo=curseforge&label=CurseForge&color=F16436"></a>
-  <a href="https://www.minecraft.net"><img alt="Minecraft 1.21.1" src="https://img.shields.io/badge/Minecraft-1.21.1-62B47A"></a>
-  <a href="https://neoforged.net"><img alt="NeoForge" src="https://img.shields.io/badge/Loader-NeoForge-F16436"></a>
+  <a href="https://www.minecraft.net"><img alt="Minecraft 1.20.1" src="https://img.shields.io/badge/Minecraft-1.20.1-62B47A"></a>
+  <a href="https://files.minecraftforge.net"><img alt="Forge" src="https://img.shields.io/badge/Loader-Forge-F16436"></a>
   <a href="LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/License-MIT-blue"></a>
 </p>
 
@@ -27,8 +27,8 @@
   under roofs; flakes, crystals, clumps and grains drift with it.
 - 🏔️ **Soft snow on the ground** - one smooth cover on land, roofs and crowns, with drifts in the lee, wind-swept ridges
   and caps on fence posts; out to the render distance, melting near lamps.
-- 💨 **Snow with physics** - wind charges, explosions, gusts and running feet blow up powder; footprints and trodden
-  paths that fresh snow fills again.
+- 💨 **Snow with physics** - explosions, gusts and running feet blow up powder; footprints and trodden paths that
+  fresh snow fills again.
 - 🌫️ **Storms with volume** - clouds of snow rolling over the land, a bright overcast sky and a blue-grey haze, never
   indoors or underground.
 - 🌲 **White leaves in snowy biomes**, as in Bedrock Edition, and real snow drifts piling up when the mod is on the
@@ -44,13 +44,11 @@
 
 [![Serene Seasons](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/serene-seasons.png)](https://www.curseforge.com/minecraft/mc-mods/serene-seasons) ✅ **[Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons)** (optional) - snow falls and lies where the season makes it cold; deep winter brings blizzards.
 
-[![Iris](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/iris.png)](https://modrinth.com/mod/iris) ✅ **[Iris](https://modrinth.com/mod/iris)** (shader packs) - flakes and the snow cover take on the pack's look and lighting.
+[![Oculus](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/oculus.png)](https://www.curseforge.com/minecraft/mc-mods/oculus) ✅ **[Oculus](https://www.curseforge.com/minecraft/mc-mods/oculus)** (shader packs) - flakes and the snow cover take on the pack's look and lighting.
 
-[![Sodium](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sodium.png)](https://modrinth.com/mod/sodium) ✅ **[Sodium](https://modrinth.com/mod/sodium)** - works, white leaves included.
+[![Embeddium](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/embeddium.png)](https://www.curseforge.com/minecraft/mc-mods/embeddium) ✅ **[Embeddium](https://www.curseforge.com/minecraft/mc-mods/embeddium)** - works, white leaves included.
 
 [![Sound Physics Remastered](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sound-physics-remastered.png)](https://www.curseforge.com/minecraft/mc-mods/sound-physics-remastered) ✅ **[Sound Physics Remastered](https://www.curseforge.com/minecraft/mc-mods/sound-physics-remastered)** (optional) - the hush of falling snow lets Sound Physics do the muffling.
-
-[![Sable](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sable.png)](https://www.curseforge.com/minecraft/mc-mods/sable) ✅ **[Sable](https://www.curseforge.com/minecraft/mc-mods/sable)** (optional) - snow lands on the roofs of flying houses and airships and no longer drifts through their walls.
 
 [![Particle Rain](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/particle-rain.png)](https://www.curseforge.com/minecraft/mc-mods/particle-rain) ✅ **[Particle Rain](https://www.curseforge.com/minecraft/mc-mods/particle-rain)** (optional) - Hoarfrost draws the snow, Particle Rain the rain, sand and fog, all in the same wind.
 
@@ -82,7 +80,7 @@ In the mod list (Mods > Hoarfrost > Config) or in the config files:
 
 ## Installation
 
-1. Install [NeoForge](https://neoforged.net) for Minecraft 1.21.1.
+1. Install [Forge](https://files.minecraftforge.net) for Minecraft 1.20.1.
 2. Put this mod into the `mods` folder (client; on a server too for shared weather and drifts).
 3. Optional: [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons) for seasonal snow,
    [Petrichor](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms) for the rain,
