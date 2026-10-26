@@ -5,7 +5,7 @@ settling on the land and a quiet winter soundscape.
 
 ![A blizzard sweeping through a snowy spruce forest](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/screenshots/blizzard.jpg)
 
-📦 **Requires** [NeoForge](https://neoforged.net) 1.21.1 · works on the client alone, on the server too for shared
+📦 **Requires** [NeoForge](https://neoforged.net) 1.21.1 or [Forge](https://files.minecraftforge.net) 1.20.1 · works on the client alone, on the server too for shared
 snow and real drifts
 
 ## ✨ Features

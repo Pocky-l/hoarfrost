@@ -84,7 +84,8 @@ In the mod list (Mods > Hoarfrost > Config) or in the config files:
 
 ## Installation
 
-1. Install [NeoForge](https://neoforged.net) for Minecraft 1.21.1.
+1. Install [NeoForge](https://neoforged.net) for Minecraft 1.21.1, or [Forge](https://files.minecraftforge.net) for
+   Minecraft 1.20.1 (the 1.20.1 files are marked `+1.20.1`; no Sable support there).
 2. Put this mod into the `mods` folder (client; on a server too for shared weather and drifts).
 3. Optional: [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/serene-seasons) for seasonal snow,
    [Petrichor](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms) for the rain,
