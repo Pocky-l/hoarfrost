@@ -39,6 +39,8 @@
   "hoarfrost.configuration.heavyBlizzardWeight": "Шанс сильной метели",
   "hoarfrost.configuration.thunderBlizzard": "Гроза в снегах — метель",
   "hoarfrost.configuration.seasons": "Следовать Serene Seasons",
+  "hoarfrost.configuration.fairWeatherSnow": "Снег при ясном небе",
+  "hoarfrost.configuration.clearSpells": "Ясные промежутки без снега, %",
   "hoarfrost.configuration.drifts": "Сугробы",
   "hoarfrost.configuration.driftsEnabled": "Ветер наметает сугробы",
   "hoarfrost.configuration.driftMaxLayers": "Высота сугроба (слоёв)",

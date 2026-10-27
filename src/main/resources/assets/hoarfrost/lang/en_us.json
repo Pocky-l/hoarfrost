@@ -39,6 +39,8 @@
   "hoarfrost.configuration.heavyBlizzardWeight": "Heavy blizzard chance",
   "hoarfrost.configuration.thunderBlizzard": "Thunderstorms are blizzards",
   "hoarfrost.configuration.seasons": "Follow Serene Seasons",
+  "hoarfrost.configuration.fairWeatherSnow": "Snow under a clear sky",
+  "hoarfrost.configuration.clearSpells": "Clear spells without snow, %",
   "hoarfrost.configuration.drifts": "Drifts",
   "hoarfrost.configuration.driftsEnabled": "Wind builds drifts",
   "hoarfrost.configuration.driftMaxLayers": "Highest drift (layers)",

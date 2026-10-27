@@ -34,7 +34,7 @@ public final class SnowFog {
      * distances themselves kept such land clear until the storm was at full strength.
      */
     public static float hazeDistance(float clear, float hazy, float k) {
-        float t = Math.clamp(k, 0.0F, 1.0F);
+        float t = Mth.clamp(k, 0.0F, 1.0F);
         return 1.0F / (1.0F / clear + (1.0F / hazy - 1.0F / clear) * t);
     }
 

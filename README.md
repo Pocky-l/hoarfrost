@@ -22,7 +22,8 @@
 ## Features
 
 - ❄️ **Seven kinds of snow** - light snow, snow, heavy snow, large flakes, light blizzard, blizzard and a whiteout heavy
-  blizzard, each with its own flakes, wind, haze and sound, gliding into each other.
+  blizzard, each with its own flakes, wind, haze and sound, gliding into each other. In snowy land it snows under a
+  clear sky too, with a clear spell now and then.
 - 🌬️ **A living wind** - turns, gusts and lulls, rises over hills and walls, is calm behind them and barely reaches
   under roofs; flakes, crystals, clumps and grains drift with it.
 - 🏔️ **Soft snow on the ground** - one smooth cover on land, roofs and crowns, with drifts in the lee, wind-swept ridges
@@ -78,6 +79,7 @@ In the mod list (Mods > Hoarfrost > Config) or in the config files:
   flake density, snow in the distance, clouds of snow in storms, the stream of flakes in storms, Particle Rain integration, snow on the ground, snow
   on distant land, snowy leaves, footprints, powder, haze, bright snowy sky, wind volume, hush, snow footsteps.
 - `hoarfrost-server.toml` (per world): chances of each kind of snow, thunderstorms as blizzards, following Serene Seasons,
+  snow under a clear sky (on/off, share of clear spells),
   drifts (on/off, highest drift, growth speed).
 
 ## Installation
