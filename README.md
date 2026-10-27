@@ -28,12 +28,13 @@
   under roofs; flakes, crystals, clumps and grains drift with it.
 - 🏔️ **Soft snow on the ground** - one smooth cover on land, roofs and crowns, with drifts in the lee, wind-swept ridges
   and caps on fence posts; out to the render distance, melting near lamps.
-- 💨 **Snow with physics** - explosions, gusts and running feet blow up powder; footprints and trodden paths that
-  fresh snow fills again.
+- 💨 **Snow with physics** - explosions, gusts and running feet blow up powder; footprints that depend on the ground (a
+  rim of snow on soil, crisp prints on stone, slips that sweep the ice bare) and trodden paths that fresh snow fills
+  again.
 - 🌫️ **Storms with volume** - clouds of snow rolling over the land, a bright overcast sky and a blue-grey haze, never
   indoors or underground.
-- 🌲 **White leaves in snowy biomes**, as in Bedrock Edition, and real snow drifts piling up when the mod is on the
-  server.
+- 🌲 **Snow on the trees** - green leaves with a cap of snow on the crowns that falls off when you brush, bump or break
+  them, and real snow drifts piling up when the mod is on the server.
 - 🔇 **A quiet winter soundscape** - the hush of falling snow, wind growing to a howl, muffled indoors, footsteps
   crunching and squeaking.
 
@@ -47,11 +48,13 @@
 
 [![Oculus](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/oculus.png)](https://www.curseforge.com/minecraft/mc-mods/oculus) ✅ **[Oculus](https://www.curseforge.com/minecraft/mc-mods/oculus)** (shader packs) - flakes and the snow cover take on the pack's look and lighting.
 
-[![Embeddium](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/embeddium.png)](https://www.curseforge.com/minecraft/mc-mods/embeddium) ✅ **[Embeddium](https://www.curseforge.com/minecraft/mc-mods/embeddium)** - works, white leaves included.
+[![Embeddium](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/embeddium.png)](https://www.curseforge.com/minecraft/mc-mods/embeddium) ✅ **[Embeddium](https://www.curseforge.com/minecraft/mc-mods/embeddium)** - works, snowy leaves included.
 
 [![Sound Physics Remastered](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/sound-physics-remastered.png)](https://www.curseforge.com/minecraft/mc-mods/sound-physics-remastered) ✅ **[Sound Physics Remastered](https://www.curseforge.com/minecraft/mc-mods/sound-physics-remastered)** (optional) - the hush of falling snow lets Sound Physics do the muffling.
 
 [![Particle Rain](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/particle-rain.png)](https://www.curseforge.com/minecraft/mc-mods/particle-rain) ✅ **[Particle Rain](https://www.curseforge.com/minecraft/mc-mods/particle-rain)** (optional) - Hoarfrost draws the snow, Particle Rain the rain, sand and fog, all in the same wind.
+
+[![Living Wind](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/living-wind.png)](https://www.curseforge.com/minecraft/mc-mods/living-wind) ✅ **[Living Wind](https://www.curseforge.com/minecraft/mc-mods/living-wind)** (optional) - the snow flies and drifts the way its wind vanes point, and a soft snowfall or a blizzard blows harder or softer with its wind.
 
 [![Living Wind](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/living-wind.png)](https://www.curseforge.com/minecraft/mc-mods/living-wind) ✅ **[Living Wind](https://www.curseforge.com/minecraft/mc-mods/living-wind)** (optional) - the snow flies and drifts the way its wind vanes point, and a soft snowfall or a blizzard blows harder or softer with its wind.
 
