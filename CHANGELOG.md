@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   near land almost clear: the haze was spread over the whole distant land, thousands of blocks deep, so the snow on
   the ground and the distant land stood out sharp through the storm. The haze now closes in over the near land as it
   should, and the distant land disappears in it.
+- With Sodium, a snowstorm left holes in the land: Sodium skips the chunks hidden behind the fog, and with the haze of
+  a storm only a few dozen blocks deep it dropped the land beyond it, so caves, the sky and the snow on the ground
+  showed through. The land is now drawn out to the render distance in any snowfall, and only the haze hides it.
+- In heavy snow and blizzards the sky overhead no longer shows through the haze.
 
 ## [1.2.0] - 2026-10-26
 ### Added
