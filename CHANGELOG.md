@@ -4,7 +4,7 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.0] - Unreleased
+## [1.3.0] - 2026-10-27
 ### Added
 - Compatibility with [Living Wind](https://www.curseforge.com/minecraft/mc-mods/living-wind): the snow flies the way
   its wind blows, and with the mod on the server the snowdrifts pile up in its lee too. Each kind of snow keeps its
