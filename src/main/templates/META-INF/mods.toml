@@ -42,3 +42,10 @@ description='''${mod_description}'''
     versionRange="${particle_rain_version_range}"
     ordering="NONE"
     side="CLIENT"
+
+[[dependencies.${mod_id}]]
+    modId="livingwind"
+    mandatory=false
+    versionRange="*"
+    ordering="NONE"
+    side="BOTH"

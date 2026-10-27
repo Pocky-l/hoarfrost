@@ -19,6 +19,7 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
 import com.pockyl.hoarfrost.Hoarfrost;
 import com.pockyl.hoarfrost.client.compat.ParticleRain;
 import com.pockyl.hoarfrost.compat.Climate;
+import com.pockyl.hoarfrost.compat.LivingWind;
 import com.pockyl.hoarfrost.sim.AirFlow;
 import com.pockyl.hoarfrost.sim.CoverChunk;
 import com.pockyl.hoarfrost.sim.Flakes;
@@ -140,6 +141,26 @@ public final class ModGameTests {
         }
         double mean = sum / n;
         helper.assertTrue(mean > 0.9 && mean < 1.1, "gusts average to the mean wind, got " + mean);
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void snowFollowsAnotherModsWind(GameTestHelper helper) {
+        SnowConditions own = new SnowConditions();
+        own.snapTo(SnowKind.BLIZZARD);
+        own.advanceWind(48_000.0, 1.0F);
+        // Living Wind blowing north (-z) at half its usual strength for the weather: the heading need not be a unit vector.
+        SnowConditions outer = new SnowConditions();
+        outer.snapTo(SnowKind.BLIZZARD);
+        outer.advanceWind(48_000.0, 1.0F, new float[] {0.0F, -3.0F, 0.5F});
+        helper.assertTrue(Math.abs(outer.windDirX) < 1.0E-4F && Math.abs(outer.windDirZ + 1.0F) < 1.0E-4F,
+                "the snow does not blow north: " + outer.windDirX + ", " + outer.windDirZ);
+        helper.assertTrue(Math.abs(outer.windSpeed - own.windSpeed * 0.5F) < 1.0E-5F,
+                "the blizzard's wind is not scaled: " + outer.windSpeed + " vs " + own.windSpeed);
+        helper.assertTrue(outer.driftZ < 0.0 && outer.driftX == 0.0, "the air is not carried north: " + outer.driftX + ", " + outer.driftZ);
+        helper.assertTrue(LivingWind.usualStrength(1.0F, 1.0F) > LivingWind.usualStrength(1.0F, 0.0F)
+                && LivingWind.usualStrength(1.0F, 0.0F) > LivingWind.usualStrength(0.0F, 0.0F), "a storm is not windier than calm");
+        helper.assertFalse(LivingWind.loaded(), "Living Wind is not part of the test server");
         helper.succeed();
     }
 

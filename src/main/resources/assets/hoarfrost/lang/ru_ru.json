@@ -47,6 +47,7 @@
   "hoarfrost.configuration.snowfall": "Снегопад",
   "hoarfrost.configuration.snowfallEnabled": "Симулируемый снегопад",
   "hoarfrost.configuration.particleRain": "Совместимость с Particle Rain",
+  "hoarfrost.configuration.livingWind": "Совместимость с Living Wind",
   "hoarfrost.configuration.density": "Плотность снежинок",
   "hoarfrost.configuration.distant": "Снег вдали",
   "hoarfrost.configuration.stream": "Поток снега в метель",

@@ -41,6 +41,8 @@ snow and real drifts
 
 [![Particle Rain](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/particle-rain.png)](https://www.curseforge.com/minecraft/mc-mods/particle-rain) ✅ **[Particle Rain](https://www.curseforge.com/minecraft/mc-mods/particle-rain)** (optional) - Hoarfrost draws the snow, Particle Rain the rain, sand and fog, all in the same wind.
 
+[![Living Wind](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/living-wind.png)](https://www.curseforge.com/minecraft/mc-mods/living-wind) ✅ **[Living Wind](https://www.curseforge.com/minecraft/mc-mods/living-wind)** (optional) - the snow flies and drifts the way its wind vanes point, and a soft snowfall or a blizzard blows harder or softer with its wind.
+
 ## ⚙️ Configuration
 
 *Mods > Hoarfrost > Config*: a quality preset and a switch for every effect. Per world: chances of each kind of snow,

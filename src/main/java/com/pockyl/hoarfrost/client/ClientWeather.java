@@ -10,6 +10,7 @@ import net.minecraft.world.phys.Vec3;
 
 import com.pockyl.hoarfrost.Config;
 import com.pockyl.hoarfrost.compat.Climate;
+import com.pockyl.hoarfrost.compat.LivingWind;
 import com.pockyl.hoarfrost.weather.SnowConditions;
 import com.pockyl.hoarfrost.weather.SnowKind;
 import com.pockyl.hoarfrost.weather.SnowSchedule;
@@ -29,6 +30,8 @@ public final class ClientWeather {
     private static final float BLEND = 0.006F;
 
     private static final SnowConditions CONDITIONS = new SnowConditions();
+    /** Living Wind's heading and how hard it blows (see {@link LivingWind#readClient}). */
+    private static final float[] OUTER_WIND = new float[3];
     private static long ticks;
     private static long lastSync = Long.MIN_VALUE;
     private static int serverKind = -1;
@@ -87,7 +90,8 @@ public final class ClientWeather {
             CONDITIONS.blendTo(kind, BLEND);
         }
         CONDITIONS.snow = worldSnow;
-        CONDITIONS.advanceWind(level.getGameTime(), worldSnow);
+        boolean outer = LivingWind.readClient(worldSnow, level.getThunderLevel(1.0F), OUTER_WIND);
+        CONDITIONS.advanceWind(level.getGameTime(), worldSnow, outer ? OUTER_WIND : null);
         gust = CONDITIONS.gustAt(camera.x, camera.z);
         tickSkyView(level);
     }
