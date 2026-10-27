@@ -29,6 +29,8 @@ snow and real drifts
 
 ## 🤝 Compatibility
 
+[![Pocky Shaders](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/pocky-shaders.png)](https://www.curseforge.com/minecraft/shaders/pocky-shaders) ✅ **[Pocky Shaders](https://www.curseforge.com/minecraft/shaders/pocky-shaders)** (shader pack) - a shader pack that shows Hoarfrost's snow: blizzards stay bright, and the haze closes in with the storm's visibility and gusts.
+
 [![Petrichor: Rain & Storms](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/petrichor.png)](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms) ✅ **[Petrichor: Rain & Storms](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms)** (optional) - Petrichor draws the rain, Hoarfrost the snow, both blown by the same wind.
 
 [![Distant Horizons](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/distant-horizons.png)](https://www.curseforge.com/minecraft/mc-mods/distant-horizons) ✅ **[Distant Horizons](https://www.curseforge.com/minecraft/mc-mods/distant-horizons)** (optional) - the snowy haze covers the distant land too, and far snowy trees stay white.
@@ -88,7 +90,7 @@ Made by **Pocky** · [source code](https://github.com/Pocky-l/hoarfrost) · soun
 
 [![Turbo for Distant Horizons](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/more-mods/dhturbo.png)](https://www.curseforge.com/minecraft/mc-mods/turbo-for-distant-horizons) **[Turbo for Distant Horizons](https://www.curseforge.com/minecraft/mc-mods/turbo-for-distant-horizons)** - Distant Horizons terrain generated several times faster
 
-[![Pocky Shaders](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/more-mods/pocky_shaders.png)](https://www.curseforge.com/minecraft/mc-mods/pocky-shaders) **[Pocky Shaders](https://www.curseforge.com/minecraft/mc-mods/pocky-shaders)** - a cosy, natural shader pack that sets itself up
+[![Pocky Shaders](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/more-mods/pocky_shaders.png)](https://www.curseforge.com/minecraft/shaders/pocky-shaders) **[Pocky Shaders](https://www.curseforge.com/minecraft/shaders/pocky-shaders)** - a cosy, natural shader pack that shows the weather of these mods
 
 **⚔️ Gear & gameplay**
 

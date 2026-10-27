@@ -40,6 +40,8 @@
 
 ## Compatibility
 
+[![Pocky Shaders](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/pocky-shaders.png)](https://www.curseforge.com/minecraft/shaders/pocky-shaders) ✅ **[Pocky Shaders](https://www.curseforge.com/minecraft/shaders/pocky-shaders)** (shader pack) - a shader pack that shows Hoarfrost's snow: blizzards stay bright, and the haze closes in with the storm's visibility and gusts.
+
 [![Petrichor: Rain & Storms](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/petrichor.png)](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms) ✅ **[Petrichor: Rain & Storms](https://www.curseforge.com/minecraft/mc-mods/petrichor-rain-storms)** (optional) - Petrichor draws the rain, Hoarfrost the snow, both blown by the same wind.
 
 [![Distant Horizons](https://raw.githubusercontent.com/Pocky-l/hoarfrost/main/docs/compat/distant-horizons.png)](https://www.curseforge.com/minecraft/mc-mods/distant-horizons) ✅ **[Distant Horizons](https://www.curseforge.com/minecraft/mc-mods/distant-horizons)** (optional) - the snowy haze covers the distant land too, and far snowy trees stay white.
@@ -158,8 +160,8 @@ The jar is written to `build/libs/`. `./gradlew runGameTestServer` runs the game
     <td><a href="https://www.curseforge.com/minecraft/mc-mods/turbo-for-distant-horizons"><b>Turbo for Distant Horizons</b></a> - Distant Horizons terrain generated several times faster (<a href="https://github.com/Pocky-l/dhturbo">source</a>)</td>
   </tr>
   <tr>
-    <td width="56"><a href="https://www.curseforge.com/minecraft/mc-mods/pocky-shaders"><img src="docs/more-mods/pocky_shaders.png" width="48" alt="Pocky Shaders"></a></td>
-    <td><a href="https://www.curseforge.com/minecraft/mc-mods/pocky-shaders"><b>Pocky Shaders</b></a> - a cosy, natural shader pack that sets itself up (<a href="https://github.com/Pocky-l/pocky-shaders">source</a>)</td>
+    <td width="56"><a href="https://www.curseforge.com/minecraft/shaders/pocky-shaders"><img src="docs/more-mods/pocky_shaders.png" width="48" alt="Pocky Shaders"></a></td>
+    <td><a href="https://www.curseforge.com/minecraft/shaders/pocky-shaders"><b>Pocky Shaders</b></a> - a cosy, natural shader pack that shows the weather of these mods (<a href="https://github.com/Pocky-l/pocky-shaders">source</a>)</td>
   </tr>
 </table>
 
