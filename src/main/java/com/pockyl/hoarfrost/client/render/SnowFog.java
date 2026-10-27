@@ -1,6 +1,7 @@
 package com.pockyl.hoarfrost.client.render;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.util.Mth;
 
 import java.util.function.IntSupplier;
 

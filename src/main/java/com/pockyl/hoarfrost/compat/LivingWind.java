@@ -3,7 +3,7 @@ package com.pockyl.hoarfrost.compat;
 import com.mojang.logging.LogUtils;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
-import net.neoforged.fml.ModList;
+import net.minecraftforge.fml.ModList;
 import org.slf4j.Logger;
 
 import com.pockyl.hoarfrost.ClientConfig;

@@ -79,7 +79,7 @@ public final class ClientConfig {
                     + "too and hides this mod's falling snow.")
             .translation(key("particleRain"))
             .define("particleRain", true);
-    public static final ModConfigSpec.BooleanValue LIVING_WIND = BUILDER
+    public static final ForgeConfigSpec.BooleanValue LIVING_WIND = BUILDER
             .comment("Living Wind integration, when Living Wind is installed: the snow flies the way its wind blows, and blows "
                     + "harder or softer with it. Off: the falling snow keeps its own wind (server snowdrifts still follow Living Wind).")
             .translation(key("livingWind"))
