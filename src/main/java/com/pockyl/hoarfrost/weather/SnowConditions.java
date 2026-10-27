@@ -1,5 +1,7 @@
 package com.pockyl.hoarfrost.weather;
 
+import org.jetbrains.annotations.Nullable;
+
 /**
  * The weather a snow simulation runs in, set every tick by its owner (the client's weather, a game test or the server).
  * The kind's parameters are blended, so a change of kind glides over several seconds instead of switching; the wind is
@@ -82,11 +84,30 @@ public final class SnowConditions {
      * @param precipitation the world's precipitation level: the wind of a snowfall dies down with it
      */
     public void advanceWind(double gameTime, float precipitation) {
+        advanceWind(gameTime, precipitation, null);
+    }
+
+    /**
+     * The same, in the wind of another mod that rules the world's wind (Living Wind): the snow blows its way, and the
+     * kind's speed is scaled by how hard that wind blows against its usual strength.
+     *
+     * @param outer the other mod's heading ({@code outer[0]} x, {@code outer[1]} z, need not be a unit vector) and
+     *              strength scale ({@code outer[2]}, 1 = usual), or null for this mod's own wind
+     */
+    public void advanceWind(double gameTime, float precipitation, @Nullable float[] outer) {
         time = gameTime;
         float angle = Wind.angle(gameTime, gustiness);
         windDirX = (float) Math.cos(angle);
         windDirZ = (float) Math.sin(angle);
         windSpeed = Wind.speed(gameTime, wind, gustiness) * (0.25F + 0.75F * precipitation);
+        if (outer != null) {
+            float length = (float) Math.sqrt(outer[0] * outer[0] + outer[1] * outer[1]);
+            if (length > 1.0E-4F) {
+                windDirX = outer[0] / length;
+                windDirZ = outer[1] / length;
+            }
+            windSpeed *= Math.max(0.0F, outer[2]);
+        }
         driftX += windDirX * windSpeed;
         driftZ += windDirZ * windSpeed;
     }

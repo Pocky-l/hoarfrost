@@ -15,6 +15,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import com.pockyl.hoarfrost.Config;
 import com.pockyl.hoarfrost.Hoarfrost;
 import com.pockyl.hoarfrost.compat.Climate;
+import com.pockyl.hoarfrost.compat.LivingWind;
 import com.pockyl.hoarfrost.network.SnowSyncPayload;
 import com.pockyl.hoarfrost.weather.SnowConditions;
 import com.pockyl.hoarfrost.weather.SnowData;
@@ -35,6 +36,8 @@ public final class SnowEvents {
     private static final double SNOWY_THUNDER_RANGE = 192.0;
     private static final Map<ServerLevel, SnowKind> LAST_SENT = new WeakHashMap<>();
     private static final Map<ServerLevel, SnowConditions> WIND = new WeakHashMap<>();
+    /** Living Wind's heading and how hard it blows (see {@link LivingWind#readServer}). */
+    private static final float[] OUTER_WIND = new float[3];
 
     private SnowEvents() {
     }
@@ -106,7 +109,9 @@ public final class SnowEvents {
         if (kind != null) {
             conditions.blendTo(kind, 0.006F);
         }
-        conditions.advanceWind(level.getGameTime(), level.getRainLevel(1.0F));
+        float rain = level.getRainLevel(1.0F);
+        boolean outer = LivingWind.readServer(level, rain, level.getThunderLevel(1.0F), OUTER_WIND);
+        conditions.advanceWind(level.getGameTime(), rain, outer ? OUTER_WIND : null);
         return conditions;
     }
 

@@ -41,5 +41,12 @@ description='''${mod_description}'''
     ordering="NONE"
     side="CLIENT"
 
+[[dependencies.${mod_id}]]
+    modId="livingwind"
+    type="optional"
+    versionRange="*"
+    ordering="NONE"
+    side="BOTH"
+
 [[mixins]]
 config="${mod_id}.mixins.json"
