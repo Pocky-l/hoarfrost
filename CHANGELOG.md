@@ -4,6 +4,12 @@ All notable changes to this mod are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - Unreleased
+### Added
+- Shader packs can show Hoarfrost's snow: while an [Iris](https://www.curseforge.com/minecraft/mc-mods/irisshaders) shader pack is on, the mod hands how hard it
+  snows, blizzards, the visibility in the snow and its wind to the pack every frame (`hoarfrost:shader_data`, a small
+  data texture any pack can read). [Pocky Shaders](https://github.com/Pocky-l/pocky-shaders) uses it for bright blizzards and the haze closing in with the storm.
+
 ## [1.3.0] - 2026-10-27
 ### Added
 - Compatibility with [Living Wind](https://www.curseforge.com/minecraft/mc-mods/living-wind): the snow flies the way
