@@ -11,7 +11,8 @@ snow and real drifts
 ## ✨ Features
 
 - ❄️ **Seven kinds of snow** - light snow, snow, heavy snow, large flakes, light blizzard, blizzard and a whiteout heavy
-  blizzard, each with its own flakes, wind, haze and sound, gliding into each other.
+  blizzard, each with its own flakes, wind, haze and sound, gliding into each other. In snowy land it snows under a
+  clear sky too, with a clear spell now and then.
 - 🌬️ **A living wind** - turns, gusts and lulls, rises over hills and walls, is calm behind them and barely reaches
   under roofs; flakes, crystals, clumps and grains drift with it.
 - 🏔️ **Soft snow on the ground** - one smooth cover on land, roofs and crowns, with drifts in the lee, wind-swept ridges

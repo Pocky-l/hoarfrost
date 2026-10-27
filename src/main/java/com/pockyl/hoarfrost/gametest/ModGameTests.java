@@ -142,6 +142,39 @@ public final class ModGameTests {
     }
 
     @GameTest(template = "empty")
+    public static void snowFallsUnderAClearSkyMostOfTheTime(GameTestHelper helper) {
+        int clear = 0;
+        int light = 0;
+        int windows = 2000;
+        for (int w = 0; w < windows; w++) {
+            SnowKind kind = SnowSchedule.fairKind((long) w * SnowSchedule.WINDOW + 100, 15);
+            if (kind == null) {
+                clear++;
+            } else if (kind == SnowKind.LIGHT_SNOW) {
+                light++;
+            } else {
+                helper.assertTrue(kind == SnowKind.SNOW, "a clear sky brings " + kind);
+            }
+        }
+        helper.assertTrue(clear > windows * 0.11 && clear < windows * 0.19, "clear spells: " + clear + " of " + windows);
+        helper.assertTrue(light > (windows - clear) * 0.7, "light snow is not the usual: " + light);
+        helper.assertTrue(SnowSchedule.fairKind(12_345L, 0) != null && SnowSchedule.fairKind(12_345L, 100) == null,
+                "0 percent never clears, 100 percent never snows");
+        // The amount glides from window to window: no jumps from one tick to the next, none in a clear spell.
+        float previous = SnowSchedule.fairLevel(0L, 15);
+        for (long t = 1; t < SnowSchedule.WINDOW * 40L; t++) {
+            float level = SnowSchedule.fairLevel(t, 15);
+            helper.assertTrue(Math.abs(level - previous) < 0.002F, "the snow jumps at tick " + t + ": " + previous + " -> " + level);
+            if (t % SnowSchedule.WINDOW > 1200) {
+                boolean none = SnowSchedule.fairKind(t, 15) == null;
+                helper.assertTrue(none == (level == 0.0F), "the amount does not match the spell at tick " + t);
+            }
+            previous = level;
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
     public static void hazeHidesDistantLand(GameTestHelper helper) {
         helper.assertTrue(SnowFog.hazeDistance(96.0F, 70.0F, 0.0F) == 96.0F, "no haze keeps the clear view");
         helper.assertTrue(Math.abs(SnowFog.hazeDistance(4096.0F, 70.0F, 1.0F) - 70.0F) < 0.01F, "a full storm ends the view at its visibility");

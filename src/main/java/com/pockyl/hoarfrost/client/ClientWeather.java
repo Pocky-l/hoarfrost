@@ -77,9 +77,13 @@ public final class ClientWeather {
             surveyLand(level, camera);
         }
         presence = initialized ? presence + Math.clamp(presenceTarget - presence, -0.02F, 0.02F) : presenceTarget;
-        worldSnow = level.getRainLevel(1.0F);
+        float rain = level.getRainLevel(1.0F);
+        int clearSpells = Config.clearSpells();
+        float fair = clearSpells >= 100 ? 0.0F : SnowSchedule.fairLevel(level.getGameTime(), clearSpells);
+        // The snow from a clear sky turns into the storm's as the vanilla precipitation sets in.
+        worldSnow = rain + (1.0F - rain) * fair;
         snow = worldSnow * presence;
-        SnowKind target = targetKind(level);
+        SnowKind target = targetKind(level, rain, clearSpells);
         if (target != null) {
             kind = target;
         }
@@ -116,11 +120,15 @@ public final class ClientWeather {
         presenceTarget = snowy / 25.0F;
     }
 
-    private static SnowKind targetKind(ClientLevel level) {
-        if (syncedWithServer()) {
+    private static SnowKind targetKind(ClientLevel level, float rain, int clearSpells) {
+        if (syncedWithServer() && serverKind >= 0) {
             return SnowKind.byOrdinal(serverKind);
         }
-        if (worldSnow <= 0.0F) {
+        if (rain <= 0.0F) {
+            return clearSpells >= 100 ? null : SnowSchedule.fairKind(level.getGameTime(), clearSpells);
+        }
+        if (syncedWithServer()) {
+            // The server's precipitation ended and the vanilla one is fading out: keep the kind.
             return null;
         }
         return SnowSchedule.naturalKind(level.getGameTime(), level.getThunderLevel(1.0F) > 0.5F, Config.thunderBlizzard(),

@@ -32,6 +32,15 @@ public final class Config {
                     + "a warm summer), and deep winter brings heavier snow and blizzards.")
             .translation(key("seasons"))
             .define("followSeasons", true);
+    public static final ModConfigSpec.BooleanValue FAIR_WEATHER_SNOW = BUILDER
+            .comment("Snow falls in snowy land under a clear sky too: mostly light snow, now and then a steady snowfall, and once",
+                    "in a while a spell without any. Storms still come with the vanilla weather.")
+            .translation(key("fairWeatherSnow"))
+            .define("fairWeatherSnow", true);
+    public static final ModConfigSpec.IntValue CLEAR_SPELLS = BUILDER
+            .comment("Percent of five-minute spells of clear weather in which no snow falls in snowy land.")
+            .translation(key("clearSpells"))
+            .defineInRange("clearSpells", 15, 0, 100);
 
     static {
         BUILDER.pop();
@@ -97,6 +106,11 @@ public final class Config {
 
     public static boolean followSeasons() {
         return value(SEASONS);
+    }
+
+    /** Percent of clear-weather spells without snow, or 100 when no snow falls in clear weather at all. */
+    public static int clearSpells() {
+        return value(FAIR_WEATHER_SNOW) ? value(CLEAR_SPELLS) : 100;
     }
 
     /** The value, or its default while the server config is not loaded (on a server without the mod). */

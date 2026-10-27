@@ -11,6 +11,11 @@ public final class SnowSchedule {
     public static final int WINDOW = 6000;
     private static final int KIND_SEED = 0x5A0E_0001;
     private static final int STORM_SEED = 0x5A0E_0002;
+    private static final int FAIR_SEED = 0x5A0E_0004;
+    /** Ticks over which the snow from a clear sky eases from one window into the next. */
+    private static final int FAIR_EASE = 1200;
+    /** Share of the snowy spells under a clear sky that are light snow; the rest are a steady snowfall. */
+    private static final float FAIR_LIGHT = 0.8F;
     private static final SnowKind[] KINDS = SnowKind.values();
 
     private SnowSchedule() {
@@ -43,6 +48,51 @@ public final class SnowSchedule {
             }
         }
         return SnowKind.SNOW;
+    }
+
+    /**
+     * The snow that falls in snowy land under a clear sky (as in real snowy country, where it snows on most days without
+     * a storm): light snow most of the time, now and then a steady snowfall, and in {@code clearSpells} percent of the
+     * windows none at all. Rolled per window like {@link #naturalKind}, so every player sees the same.
+     *
+     * @return the kind, or {@code null} in a clear spell
+     */
+    public static SnowKind fairKind(long gameTime, int clearSpells) {
+        return fairKind(Math.floorDiv(gameTime, WINDOW), clearSpells / 100.0F);
+    }
+
+    /**
+     * How much snow falls under a clear sky, 0..1: a little more or less from window to window, eased over a minute
+     * into the next one, so a clear spell sets in and ends gradually.
+     */
+    public static float fairLevel(long gameTime, int clearSpells) {
+        float clear = clearSpells / 100.0F;
+        long window = Math.floorDiv(gameTime, WINDOW);
+        float here = fairStrength(window, clear);
+        long into = gameTime - window * WINDOW;
+        if (into >= FAIR_EASE) {
+            return here;
+        }
+        float t = into / (float) FAIR_EASE;
+        t = t * t * (3.0F - 2.0F * t);
+        float before = fairStrength(window - 1, clear);
+        return before + (here - before) * t;
+    }
+
+    private static SnowKind fairKind(long window, float clear) {
+        float roll = Noise.unit(window, FAIR_SEED);
+        if (roll < clear) {
+            return null;
+        }
+        return (roll - clear) < (1.0F - clear) * FAIR_LIGHT ? SnowKind.LIGHT_SNOW : SnowKind.SNOW;
+    }
+
+    private static float fairStrength(long window, float clear) {
+        SnowKind kind = fairKind(window, clear);
+        if (kind == null) {
+            return 0.0F;
+        }
+        return (kind == SnowKind.SNOW ? 0.55F : 0.45F) + 0.4F * Noise.unit(window, FAIR_SEED + 1);
     }
 
     /**

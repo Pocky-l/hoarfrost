@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   character - light snow still drifts down, a blizzard still drives it sideways - but blows harder in Living Wind's
   gusty spells and softer when it calms down. Client option "Living Wind integration" lets the falling snow keep its
   own wind.
+- In snowy land it now snows under a clear sky too, as in real snowy country: mostly light snow, now and then a
+  steady snowfall, and once in a while a spell of a few minutes without any. Storms still come with the weather.
+  Server options `fairWeatherSnow` and `clearSpells` (percent of spells without snow, 15 by default).
 
 ### Fixed
 - With Distant Horizons, a snowstorm that had not reached full strength (or blew at the edge of a snowy area) left the
