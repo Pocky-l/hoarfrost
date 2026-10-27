@@ -562,12 +562,12 @@ public final class SnowClient {
         float gust = ClientWeather.gust();
         float target = weather.visibility * 1.15F / Mth.lerp(weather.gustiness, 1.0F, Math.clamp(gust, 0.6F, 1.8F));
         float k = (float) Math.min(1.0, snow * strength);
-        float newFar = target < reach ? reach + (target - reach) * k : reach;
+        float newFar = target < reach ? SnowFog.hazeDistance(reach, target, k) : reach;
         // In the heart of a squall of snow the world is gone for a moment.
         float squall = Math.clamp((gust - 1.35F) / 0.6F, 0.0F, 1.0F) * Math.clamp((weather.gustiness - 0.5F) * 2.0F, 0.0F, 1.0F) * snow
                 * (float) Math.min(1.0, strength);
         if (squall > 0.0F) {
-            newFar = Math.min(newFar, Mth.lerp(squall, reach, SQUALL_VISIBILITY));
+            newFar = Math.min(newFar, SnowFog.hazeDistance(reach, SQUALL_VISIBILITY, squall));
             k = Math.max(k, squall);
         }
         if (newFar >= reach) {

@@ -16,6 +16,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import com.pockyl.hoarfrost.Hoarfrost;
 import com.pockyl.hoarfrost.client.compat.ParticleRain;
+import com.pockyl.hoarfrost.client.render.SnowFog;
 import com.pockyl.hoarfrost.compat.Climate;
 import com.pockyl.hoarfrost.compat.LivingWind;
 import com.pockyl.hoarfrost.sim.AirFlow;
@@ -137,6 +138,18 @@ public final class ModGameTests {
         }
         double mean = sum / n;
         helper.assertTrue(mean > 0.9 && mean < 1.1, "gusts average to the mean wind, got " + mean);
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void hazeHidesDistantLand(GameTestHelper helper) {
+        helper.assertTrue(SnowFog.hazeDistance(96.0F, 70.0F, 0.0F) == 96.0F, "no haze keeps the clear view");
+        helper.assertTrue(Math.abs(SnowFog.hazeDistance(4096.0F, 70.0F, 1.0F) - 70.0F) < 0.01F, "a full storm ends the view at its visibility");
+        // Distant Horizons draws land 4096 blocks deep: most of a blizzard's haze must still close the view near it.
+        float most = SnowFog.hazeDistance(4096.0F, 70.0F, 0.8F);
+        helper.assertTrue(most < 90.0F, "most of a blizzard leaves the view open to " + most + " blocks");
+        float half = SnowFog.hazeDistance(4096.0F, 70.0F, 0.5F);
+        helper.assertTrue(half > most && half < 4096.0F * 0.05F, "half a blizzard ends the view at " + half);
         helper.succeed();
     }
 

@@ -27,6 +27,17 @@ public final class SnowFog {
     private SnowFog() {
     }
 
+    /**
+     * Where the view ends in a haze between clear air and a storm: {@code k} of the storm's haze (0..1) between a view
+     * of {@code clear} and one of {@code hazy} blocks. Haze adds up as thickness per block (1 / distance), not as
+     * distance: a little of a storm already hides land thousands of blocks deep (Distant Horizons), while mixing the
+     * distances themselves kept such land clear until the storm was at full strength.
+     */
+    public static float hazeDistance(float clear, float hazy, float k) {
+        float t = Math.clamp(k, 0.0F, 1.0F);
+        return 1.0F / (1.0F / clear + (1.0F / hazy - 1.0F / clear) * t);
+    }
+
     /** A mod that draws land beyond the vanilla render distance tells how far, in blocks (0 when it draws none now). */
     public static void setDistantLand(IntSupplier blocks) {
         distantLand = blocks;

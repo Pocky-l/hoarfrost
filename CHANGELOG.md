@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gusty spells and softer when it calms down. Client option "Living Wind integration" lets the falling snow keep its
   own wind.
 
+### Fixed
+- With Distant Horizons, a snowstorm that had not reached full strength (or blew at the edge of a snowy area) left the
+  near land almost clear: the haze was spread over the whole distant land, thousands of blocks deep, so the snow on
+  the ground and the distant land stood out sharp through the storm. The haze now closes in over the near land as it
+  should, and the distant land disappears in it.
+
 ## [1.2.0] - 2026-10-26
 ### Added
 - Footprints depend on what lies under the snow: on soil a boot-shaped dent with a trodden floor and a rim of pushed-up
