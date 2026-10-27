@@ -78,6 +78,13 @@ public final class SnowClient {
     private static final float STEP_VOLUME = 0.25F;
     /** How far one sees in the heart of a squall of snow. */
     private static final float SQUALL_VISIBILITY = 12.0F;
+    /**
+     * Opacity of the fog colour while the haze of falling snow closes in. Sodium does not draw the chunks behind a fully
+     * opaque fog ("fog occlusion"); with a storm's haze a few dozen blocks deep that left holes in the land through which
+     * caves showed. A fog that is not quite opaque keeps it drawing the land out to the render distance; 0.995 of the
+     * fog cannot be told from all of it.
+     */
+    private static final float SEE_THROUGH_FOG = 0.995F;
 
     private static final SnowSettings SETTINGS = new SnowSettings();
     /** Distance walked since the last footprint, and the fall speed of the tick before, per entity. */
@@ -578,10 +585,17 @@ public final class SnowClient {
             // land's mod turned the vanilla fog off.
             return;
         }
-        event.setFarPlaneDistance(newFar);
-        if (event.getMode() != FogRenderer.FogMode.FOG_SKY) {
-            // The sky itself just fades into the snowy air.
+        if (event.getMode() == FogRenderer.FogMode.FOG_SKY) {
+            // The sky itself just fades into the snowy air. Its dome lies only 16 blocks above the camera, so a storm
+            // pulls its haze in closer still: in a blizzard nothing of the sky shows through, as nothing of the land does.
+            event.setFarPlaneDistance(newFar * (1.0F - 0.7F * k));
+        } else {
+            event.setFarPlaneDistance(newFar);
             event.setNearPlaneDistance(newNear);
+        }
+        if (event.getMode() == FogRenderer.FogMode.FOG_TERRAIN) {
+            float[] color = RenderSystem.getShaderFogColor();
+            RenderSystem.setShaderFogColor(color[0], color[1], color[2], SEE_THROUGH_FOG);
         }
         event.setCanceled(true);
     }
